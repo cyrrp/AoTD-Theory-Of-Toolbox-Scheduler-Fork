@@ -30,6 +30,8 @@ import com.fs.starfarer.api.util.Misc;
 import com.fs.starfarer.campaign.econ.Economy;
 import data.campaign.submarkets.HMI_ExecMarketPlugin;
 import data.campaign.submarkets.HMI_ScrapMarketPlugin;
+import data.kaysaar.aotd.tot.compat.SchedulerBridge;
+import data.kaysaar.aotd.tot.compat.MarketRegistry;
 import data.kaysaar.aotd.tot.codex.AoTDToTIndustryEntryCodex;
 import data.kaysaar.aotd.tot.industries.AoTDToolboxPopAndInfra;
 import data.kaysaar.aotd.tot.intel.bar.events.AoTDDeliveryBarEventCreator;
@@ -37,10 +39,12 @@ import data.kaysaar.aotd.tot.listeners.*;
 import data.kaysaar.aotd.tot.produciton.specs.AoTDProductionSpecManager;
 import data.kaysaar.aotd.tot.raids.AoTDStandardGroundRaidObjectivesCreator;
 import data.kaysaar.aotd.tot.scripts.economy.AoTDEconomy;
+import data.kaysaar.aotd.tot.scripts.economy.AoTDGlobalEconomyCoordinator;
 import data.kaysaar.aotd.tot.scripts.coreui.IndustryTooltipPlacer;
 import data.kaysaar.aotd.tot.scripts.coreui.listeners.ColonyUIListener;
 import data.kaysaar.aotd.tot.scripts.coreui.listeners.MarketContextListenerInjector;
 import data.kaysaar.aotd.tot.scripts.economy.AoTDIndustryData;
+import data.kaysaar.aotd.tot.scripts.economy.AoTDEconomySemanticBaseline;
 import data.kaysaar.aotd.tot.scripts.economy.AoTDWorkerManager;
 import data.kaysaar.aotd.tot.scripts.submarket.aotd.AoTDBlackMarketPlugin;
 import data.kaysaar.aotd.tot.scripts.submarket.aotd.AoTDLocalResourcesSubmarketPlugin;
@@ -106,6 +110,8 @@ public class AoTDToolboxTheoryPlugin extends BaseModPlugin implements MarketCont
 
     @Override
     public void onApplicationLoad() throws Exception {
+        SchedulerBridge.initialize();
+        SchedulerBridge.requireProductionProfile();
         AoTDContractRewardCreatorManager.addCreator(GenericBlueprintCreator.class.getName(), new GenericBlueprintCreator());
         AoTDContractRewardCreatorManager.addCreator(GenericSpecialItemCreator.class.getName(), new GenericSpecialItemCreator());
         AoTDContractRewardCreatorManager.addCreator(GenericAICoreCreator.class.getName(), new GenericAICoreCreator());
@@ -170,9 +176,14 @@ public class AoTDToolboxTheoryPlugin extends BaseModPlugin implements MarketCont
             int firstDeficit = first.getMaxDeficit(Commodities.ALPHA_CORE).two;
             int secondDeficit = second.getMaxDeficit(Commodities.ALPHA_CORE).two;
 
-            if(secondDeficit!=39){
-                throw new RuntimeException("WARNING : AoTD Theory of Toolbox: Market Test Failed. You must replace the 'starfarer.api.jar' file within the game's core folder with a copy that is located in the AoTD-Theory of Toolbox mod folder named '0.98a/starfarer.api.jar'.\nYou only need to replace it once, and you won't need to replace it again when you disable the mod.");
-
+            if(firstDeficit != 0 || secondDeficit != 39){
+                throw new RuntimeException(
+                        "AoTD Scheduler Fork clean BaseIndustry validation failed: expected "
+                                + "deficits 0/39, got " + firstDeficit + "/" + secondDeficit
+                                + ". Verify that the Stage 8 StarsectorPrepatcher production "
+                                + "profile is active. Keep the original game starfarer.api.jar; "
+                                + "do not install the obsolete AoTD core-JAR replacement. "
+                                + SchedulerBridge.statusSummary());
             }
         }
         AoTDCommodityEconSpecManager.loadSpecs();
@@ -276,19 +287,26 @@ public class AoTDToolboxTheoryPlugin extends BaseModPlugin implements MarketCont
     @Override
     public void beforeGameSave() {
         afterSaveState = false;
+        AoTDEconomySemanticBaseline.flush("before-game-save");
         AoTDWorkerManager.beginSaveAndWait();
+        AoTDGlobalEconomyCoordinator.flushDeliveredTimeForBoundary(
+                AoTDGlobalEconomyCoordinator.BOUNDARY_SAVE);
         super.beforeGameSave();
     }
 
     @Override
     public void afterGameSave() {
         afterSaveState = true;
+        AoTDEconomySemanticBaseline.flush("after-game-save");
         AoTDWorkerManager.endSave();
     }
 
 
     @Override
     public void onGameLoad(boolean newGame) {
+        AoTDEconomySemanticBaseline.initialize();
+        AoTDEconomy economy = AoTDEconomy.getInstance();
+        if (economy != null) economy.rebuildMarketRegistry();
         AoTDCommodityEconSpecManager.loadSpecs();
         if(newGame){
             CommandTabMemoryManager.getInstance().setLastCheckedTab("domain");

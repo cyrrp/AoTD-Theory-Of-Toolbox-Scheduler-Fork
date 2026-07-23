@@ -10,6 +10,7 @@ import com.fs.starfarer.campaign.econ.Market;
 import com.fs.starfarer.campaign.econ.reach.CommodityMarketData;
 import com.fs.starfarer.campaign.econ.reach.MarketShareData;
 import data.kaysaar.aotd.tot.scripts.trade.manager.AoTDTradeManager;
+import data.kaysaar.aotd.tot.scripts.economy.AoTDEconomySemanticBaseline;
 
 import java.util.Iterator;
 
@@ -17,6 +18,10 @@ public class AoTDCommodityMarketData extends CommodityMarketData {
     public AoTDCommodityMarketData(String commodityId, String econGroup) {
         super(commodityId, econGroup);
 
+        try (AoTDEconomySemanticBaseline.Scope ignored =
+                     AoTDEconomySemanticBaseline.begin(
+                             "commodity-market-data.constructor", null,
+                             commodityId + "|" + (econGroup == null ? "<global>" : econGroup))) {
         Iterator iter = Global.getSector().getEconomy().getMarketsInGroup(econGroup).iterator();
         while (iter.hasNext()) {
             Market market = (Market) iter.next();
@@ -61,6 +66,7 @@ public class AoTDCommodityMarketData extends CommodityMarketData {
             }
 
 
+        }
         }
     }
 

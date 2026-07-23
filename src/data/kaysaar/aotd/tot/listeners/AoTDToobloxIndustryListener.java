@@ -59,10 +59,8 @@ public class AoTDToobloxIndustryListener implements IndustryOptionProvider {
             float currY = y;
             int maxInRow = 3;
             float effectiveWidth = (width-6)/maxInRow;
-            ind.getDemandReductionFromOther().unmodifyFlat(
-                    AoTDIndustryData.source
-            );
-            ind.apply();
+            // Preview uses the cloned market/industry only. The live market is
+            // authoritative and must not be mutated by tooltip construction.
             int currInRow = 0;
             ArrayList<CustomPanelAPI>toPlace = new ArrayList<>();
             if(!newINdustry.getAllDemand().isEmpty()){
@@ -71,7 +69,7 @@ public class AoTDToobloxIndustryListener implements IndustryOptionProvider {
                     currX = 0;
                     if(currInRow<maxInRow){
                         toPlace.add(new AoTDCommodityShortPanel(entry.getCommodityId(),
-                                -AoTDCommodityEconSpecManager.getEconSpec(entry.getCommodityId()).getCalculationScript().getRawUnitsFromDemand(entry.getQuantity(),ind.getMarket(),entry.getCommodityId(),newINdustry),Misc.getNegativeHighlightColor(),effectiveWidth).getMainPanel());
+                                -AoTDCommodityEconSpecManager.getEconSpec(entry.getCommodityId()).getCalculationScript().getRawUnitsFromDemand(entry.getQuantity(),newM,entry.getCommodityId(),newINdustry),Misc.getNegativeHighlightColor(),effectiveWidth).getMainPanel());
                         currInRow++;
                     }
                     else{
@@ -84,7 +82,7 @@ public class AoTDToobloxIndustryListener implements IndustryOptionProvider {
                         toPlace.clear();
                         currInRow = 0;
                         toPlace.add(new AoTDCommodityShortPanel(entry.getCommodityId(),
-                                -AoTDCommodityEconSpecManager.getEconSpec(entry.getCommodityId()).getCalculationScript().getRawUnitsFromDemand(entry.getQuantity(),ind.getMarket(),entry.getCommodityId(),newINdustry),Misc.getNegativeHighlightColor(),effectiveWidth).getMainPanel());
+                                -AoTDCommodityEconSpecManager.getEconSpec(entry.getCommodityId()).getCalculationScript().getRawUnitsFromDemand(entry.getQuantity(),newM,entry.getCommodityId(),newINdustry),Misc.getNegativeHighlightColor(),effectiveWidth).getMainPanel());
                         currInRow++;
                     }
                 }
@@ -97,7 +95,7 @@ public class AoTDToobloxIndustryListener implements IndustryOptionProvider {
                     currX = 0;
                     if(currInRow<maxInRow){
                         toPlace.add(new AoTDCommodityShortPanel(entry.getCommodityId(),
-                                AoTDCommodityEconSpecManager.getEconSpec(entry.getCommodityId()).getCalculationScript().getRawUnitsFromSupply(entry.getQuantity(),ind.getMarket(),entry.getCommodityId(),newINdustry),Misc.getPositiveHighlightColor(),effectiveWidth).getMainPanel());
+                                AoTDCommodityEconSpecManager.getEconSpec(entry.getCommodityId()).getCalculationScript().getRawUnitsFromSupply(entry.getQuantity(),newM,entry.getCommodityId(),newINdustry),Misc.getPositiveHighlightColor(),effectiveWidth).getMainPanel());
                         currInRow++;
                     }
                     else{
@@ -110,7 +108,7 @@ public class AoTDToobloxIndustryListener implements IndustryOptionProvider {
                         toPlace.clear();
                         currInRow = 0;
                         toPlace.add(new AoTDCommodityShortPanel(entry.getCommodityId(),
-                                AoTDCommodityEconSpecManager.getEconSpec(entry.getCommodityId()).getCalculationScript().getRawUnitsFromSupply(entry.getQuantity(),ind.getMarket(),entry.getCommodityId(),newINdustry),Misc.getPositiveHighlightColor(),effectiveWidth).getMainPanel());
+                                AoTDCommodityEconSpecManager.getEconSpec(entry.getCommodityId()).getCalculationScript().getRawUnitsFromSupply(entry.getQuantity(),newM,entry.getCommodityId(),newINdustry),Misc.getPositiveHighlightColor(),effectiveWidth).getMainPanel());
                         currInRow++;
                     }
                 }
@@ -121,17 +119,7 @@ public class AoTDToobloxIndustryListener implements IndustryOptionProvider {
             }
 
         }
-        if(AoTDIndustryData.getInstance(ind.getMarket()).isPending(ind.getId())){
-            ind.unapply();
-            ind.getDemandReductionFromOther().modifyFlat(
-                    AoTDIndustryData.source,
-                    getReduction(),
-                    INITIAL_STAGE_DESC
-            );
-        }
-
-
-    }
+}
 
     private static void placeRows(ArrayList<CustomPanelAPI> toPlace, float width, float effectiveWidth, float currX, TooltipMakerAPI tooltip) {
         if (!toPlace.isEmpty()) {

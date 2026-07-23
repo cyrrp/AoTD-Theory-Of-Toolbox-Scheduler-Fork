@@ -19,7 +19,6 @@ import data.kaysaar.aotd.tot.scripts.trade.manager.AoTDTradeManager;
 import data.kaysaar.aotd.tot.scripts.trade.models.AoTDFactionTradeData;
 import data.kaysaar.aotd.tot.scripts.trade.models.AoTDMarketData;
 import data.kaysaar.aotd.tot.scripts.trade.tasks.AoTDExternalTradeSolver;
-import data.kaysaar.aotd.tot.scripts.trade.tasks.AoTDFactionInternalTradeTask;
 import data.kaysaar.aotd.tot.ui.income.AoTDMonthlyTooltipCreator;
 
 import java.util.ArrayList;
@@ -31,6 +30,9 @@ public class AoTDEconomyReachStepper extends ReachEconomyStepper {
     private float untilNext;
     private int iterLeft;
     private int prevMonth;
+    private transient long baselineRevision;
+    private boolean monthEndRefreshPending;
+    private int pendingPreviousMonth = -1;
 
     public AoTDEconomyReachStepper(ReachEconomy reachEconomy) {
         super(reachEconomy);
@@ -86,6 +88,13 @@ public class AoTDEconomyReachStepper extends ReachEconomyStepper {
     }
 
     public void performBeforeMonthEnds(int prevMonth) {
+        try (AoTDGlobalEconomyCoordinator.Boundary boundary =
+                     AoTDGlobalEconomyCoordinator.beginCommittedCut(
+                             AoTDGlobalEconomyCoordinator.BOUNDARY_MONTH_END, false);
+             AoTDEconomySemanticBaseline.Scope ignored =
+                     AoTDEconomySemanticBaseline.begin(
+                             "economy.month-end-preparation", null,
+                             "previous-month=" + prevMonth)) {
         SectorSurplusConsumptionStats.getInstance().clear();
 
         for (AoTDFactionTradeData tradeData : AoTDTradeManager.getInstance().getAllFactionTradeData().values()) {
@@ -139,6 +148,7 @@ public class AoTDEconomyReachStepper extends ReachEconomyStepper {
                 AoTDIndustryData.getInstance(marketAPI).applyEndOfMonthChange(marketAPI);
             }
         }
+        }
     }
 
     @Override
@@ -149,17 +159,23 @@ public class AoTDEconomyReachStepper extends ReachEconomyStepper {
         if (state == ReachEconomyStepper.State.WAITING) {
             final int month = Global.getSector().getClock().getMonth();
             if (month != prevMonth) {
-                final int prevMonth = this.prevMonth;
+                pendingPreviousMonth = this.prevMonth;
                 this.prevMonth = month;
                 iterLeft = Economy.NUM_ITER_PER_MONTH;
 
-                final float daysInThisMonth = getNumDaysInCurrMonth() - Global.getSector().getClock().getDay();
+                final float daysInThisMonth = getNumDaysInCurrMonth()
+                        - Global.getSector().getClock().getDay();
                 untilNext = daysInThisMonth / ((float) Economy.NUM_ITER_PER_MONTH + 0f);
-                elapsed = untilNext / 2f;
-                performBeforeMonthEnds(prevMonth);
-                AoTDTradeManager.endOfMonth = true;
-                doEndOfStepStuff(Economy.NUM_ITER_PER_MONTH - 1);
-                doEndOfMonthStuff();
+                elapsed = 0f;
+
+                // First make Prepatcher's pending market time part of the live
+                // market state. Delivery callbacks dirty the affected markets.
+                AoTDGlobalEconomyCoordinator.flushDeliveredTimeForBoundary(
+                        AoTDGlobalEconomyCoordinator.BOUNDARY_MONTH_END);
+                // Then run the normal local pipeline before opening the month-end cut.
+                monthEndRefreshPending = true;
+                state = ReachEconomyStepper.State.DOING_TASKS;
+                tasks = null;
             }
         }
 
@@ -181,10 +197,24 @@ public class AoTDEconomyReachStepper extends ReachEconomyStepper {
             }
 
             if (isDone()) {
-                if (iterLeft > 0) {
+                if (monthEndRefreshPending) {
+                    performBeforeMonthEnds(pendingPreviousMonth);
+                    AoTDTradeManager.endOfMonth = true;
+                    doEndOfStepStuff(Economy.NUM_ITER_PER_MONTH - 1);
+                    doEndOfMonthStuff();
+                    monthEndRefreshPending = false;
+                    pendingPreviousMonth = -1;
+                    elapsed = untilNext / 2f;
+                } else if (iterLeft > 0) {
                     doEndOfStepStuff(Economy.NUM_ITER_PER_MONTH - iterLeft - 1);
                 }
 
+                if (baselineRevision > 0L) {
+                    AoTDEconomySemanticBaseline.endEconomyRevision(
+                            baselineRevision,
+                            "iteration-" + (Economy.NUM_ITER_PER_MONTH - iterLeft - 1));
+                    baselineRevision = 0L;
+                }
                 state = ReachEconomyStepper.State.WAITING;
             }
         }
@@ -192,7 +222,9 @@ public class AoTDEconomyReachStepper extends ReachEconomyStepper {
 
     private void createTasks() {
         tasks = new ArrayList<>();
-        final boolean iterationsDone = iterLeft <= 0;
+        baselineRevision = AoTDEconomySemanticBaseline.beginEconomyRevision(
+                "reach-stepper-iteration-" + (Economy.NUM_ITER_PER_MONTH - iterLeft));
+        final boolean iterationsDone = iterLeft <= 0 || monthEndRefreshPending;
         final MainWorkTask.EconWorkParams mainWork = new MainWorkTask.EconWorkParams();
         mainWork.withIncomeAndUpkeep = true;
         mainWork.withStockpileUpdate = iterationsDone;
@@ -201,8 +233,15 @@ public class AoTDEconomyReachStepper extends ReachEconomyStepper {
         tasks.add(new AoTdMainWorkTask2(econ.getMarkets(), econ, mainWork));
         tasks.add(new AoTDUpdateMarketAgainTask(mainEcon));
         tasks.add(new ImmigrationTask(econ.getMarkets(), econ, false));
-        tasks.add(new AoTDFactionInternalTradeTask(mainEcon));
+        tasks.add(new AoTDPostImmigrationTradeSnapshotTask(
+                econ.getMarkets(), monthEndRefreshPending ? "month-end-refresh" : "regular-iteration"));
         tasks.add(new AoTDFinishEconomyUpdateTask(mainEcon));
+        AoTDEconomySemanticBaseline.operation("economy.task.main-work", 1L);
+        AoTDEconomySemanticBaseline.operation("economy.task.update-market-again", 1L);
+        AoTDEconomySemanticBaseline.operation("economy.task.immigration", 1L);
+        AoTDEconomySemanticBaseline.operation(
+                "economy.task.post-immigration-trade-snapshot", 1L);
+        AoTDEconomySemanticBaseline.operation("economy.task.finish-global-cut", 1L);
     }
 
     public final float getNumDaysInCurrMonth() {

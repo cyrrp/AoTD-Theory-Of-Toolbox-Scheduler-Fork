@@ -2,15 +2,19 @@
 	
 	"graphics":{
 		"ui":{
-			"marketArrow":"graphics/ui/aotd_arrow.png",
+			"marketArrow":"graphics/ui/aotd_arrow.png"
 		
-		},
+		}
 		
 	
 
 
 	},
 	"aotd_allow_multithreaded_economy_calculaton":true,
+	"aotd_semantic_baseline_enabled":false,
+	"aotd_semantic_baseline_deep_snapshots":true,
+	"aotd_semantic_baseline_market_sample_limit":24,
+	"aotd_semantic_baseline_event_limit":200000,
+	"aotd_semantic_baseline_diff_limit":250000,
 	"decivMinStreak":9
 }
-

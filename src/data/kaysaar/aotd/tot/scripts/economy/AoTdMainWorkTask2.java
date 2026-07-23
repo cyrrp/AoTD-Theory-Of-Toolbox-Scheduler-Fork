@@ -12,8 +12,12 @@ import com.fs.starfarer.campaign.econ.PriceCalculator;
 import com.fs.starfarer.campaign.econ.reach.MainWorkTask;
 import com.fs.starfarer.campaign.econ.reach.MainWorkTask2;
 import com.fs.starfarer.campaign.econ.reach.ReachEconomy;
+import data.kaysaar.aotd.tot.compat.MarketRegistry;
+import data.kaysaar.aotd.tot.compat.PrepatcherContract;
+import data.kaysaar.aotd.tot.compat.SchedulerBridge;
 import data.kaysaar.aotd.tot.plugins.ReflectionUtilis;
 import data.kaysaar.aotd.tot.scripts.commoditydata.AoTDCommodityMarketData;
+import data.kaysaar.aotd.tot.scripts.commoditydata.AoTDExcDefData;
 import data.kaysaar.aotd.tot.scripts.commoditydata.AoTDCommodityOnMarket;
 import data.kaysaar.aotd.tot.scripts.commoditydata.AoTDMarketDemandData;
 import data.kaysaar.aotd.tot.scripts.commoditydata.EffectivePriceCalculator;
@@ -24,6 +28,8 @@ import java.util.Collection;
 import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -51,14 +57,28 @@ public class AoTdMainWorkTask2 extends MainWorkTask2 {
     public MarketAPI singleMarketToUpdate;
 
     private boolean runOnce = false;
+    private transient AoTDEconomySemanticBaseline.Scope baselineTaskScope;
+    private boolean baselineTaskClosed = false;
 
 
     private boolean mtMarketPrepDone = false;
     private boolean mtDataCreated = false;
+    private boolean mtCaptureDone = false;
     private boolean mtWorkersSubmitted = false;
     private boolean mtWorkersFinished = false;
+    private boolean mtCommitDone = false;
     private boolean mtListenersNotified = false;
+    private int mtDataCommodityIndex = 0;
+    private int mtCaptureIndex = 0;
+    private int mtSequentialComputeIndex = 0;
+    private int mtCommitIndex = 0;
+    private transient AoTDPriceOffloadBatch mtOffloadBatch;
+    private transient ArrayList<MarketPriceCommitPlan> mtCommitPlans = new ArrayList<>();
     private ArrayList<Future<?>> mtFutures = new ArrayList<>();
+
+    private static final int PRICE_WORKER_CHUNK_SIZE = 16;
+    private static final int MAIN_THREAD_COMMIT_MARKETS_PER_BATCH = 8;
+    private static final long MAIN_THREAD_COMMIT_BUDGET_NANOS = 2_000_000L;
 
     private static final String CORE_MOD_ID = "core";
     private static final String AOTD_PRICE_MOD_ID = "aotd_price_state";
@@ -170,6 +190,9 @@ public class AoTdMainWorkTask2 extends MainWorkTask2 {
         if (mtFutures == null) {
             mtFutures = new ArrayList<>();
         }
+        if (mtCommitPlans == null) {
+            mtCommitPlans = new ArrayList<>();
+        }
 
         if (aotdCommodities == null) {
             initCommodityList();
@@ -179,73 +202,34 @@ public class AoTdMainWorkTask2 extends MainWorkTask2 {
     @Override
     public void doNextBatch() {
         ensureRuntimeCollections();
+        recoverAfterTransientStateLoss();
 
-        if (ENABLE_MULTITHREADED_VERSION) {
-            doMultithreadedNextBatch();
-            return;
-        }
-
-        doSequentialNextBatch();
+        doMultithreadedNextBatch();
     }
 
+    /**
+     * Multi-frame economy tasks can be saved between their batches. The pure
+     * price DTOs and commit bindings are deliberately transient, so a task
+     * restored in the middle of this phase must rebuild them instead of
+     * continuing with the serialized progress flags and a null batch.
+     */
+    private void recoverAfterTransientStateLoss() {
+        if (!aotdStarted || mtOffloadBatch != null) return;
 
-    private void doSequentialNextBatch() {
-        if (!aotdStarted) {
-            startTaskState();
+        Global.getLogger(AoTdMainWorkTask2.class).warn(
+                "AoTD economy task was restored without its transient price batch; "
+                        + "restarting the task from a fresh campaign-thread snapshot.");
 
-            if (singleMarketToUpdate != null) {
-                runSequentialSingleMarketNow();
-            }
-
-            return;
+        if (baselineTaskScope != null) {
+            baselineTaskScope.close();
+            baselineTaskScope = null;
         }
-
-        if (isDone()) {
-            return;
-        }
-
-        if (aotdMarketIndex < marketsForCurrentMode.size()) {
-            processMarketReapplyStage(marketsForCurrentMode.get(aotdMarketIndex));
-            aotdMarketIndex++;
-            return;
-        }
-
-        String commodityId = aotdCommodities.get(aotdIndex);
-        CommoditySpecAPI commoditySpec = Global.getSettings().getCommoditySpec(commodityId);
-        aotdIndex++;
-
-        createCommodityMarketData(commodityId);
-
-        if (aotdParams != null && aotdParams.withStockpileUpdate && commoditySpec != null) {
-            for (MarketAPI market : marketsForCurrentMode) {
-                if (market instanceof Market) {
-                    updateStockpileAndPriceOnce((Market) market, commoditySpec);
-                }
-            }
-        }
-
-        notifyCommodityUpdated(commodityId);
+        baselineTaskClosed = false;
+        aotdStarted = false;
+        mtCommitPlans.clear();
+        mtFutures.clear();
     }
 
-    private void runSequentialSingleMarketNow() {
-        MarketAPI market = singleMarketToUpdate;
-
-        processMarketReapplyStage(market);
-
-        for (String commodityId : aotdCommodities) {
-            CommoditySpecAPI commoditySpec = Global.getSettings().getCommoditySpec(commodityId);
-
-            createCommodityMarketData(commodityId);
-
-            if (aotdParams != null && aotdParams.withStockpileUpdate && commoditySpec != null && market instanceof Market) {
-                updateStockpileAndPriceOnce((Market) market, commoditySpec);
-            }
-
-            notifyCommodityUpdated(commodityId);
-        }
-
-        runOnce = true;
-    }
 
     private void doMultithreadedNextBatch() {
         if (!aotdStarted) {
@@ -253,48 +237,101 @@ public class AoTdMainWorkTask2 extends MainWorkTask2 {
             return;
         }
 
-        if (isDone()) {
-            return;
-        }
+        if (isDone()) return;
 
-        /*
-         * 1) Main-thread market preparation.
-         */
+        /* 1) Materialize live condition/industry state on the campaign thread. */
         if (!mtMarketPrepDone) {
             if (aotdMarketIndex < marketsForCurrentMode.size()) {
                 processMarketReapplyStage(marketsForCurrentMode.get(aotdMarketIndex));
                 aotdMarketIndex++;
                 return;
             }
-
             mtMarketPrepDone = true;
             return;
         }
 
         /*
-         * 2) Main-thread commodity market data creation.
+         * 2) Build global commodity-market data on the campaign thread, but
+         * preserve the multi-frame budget: one commodity/econ-group set per
+         * invocation instead of one full-sector burst.
          */
         if (!mtDataCreated) {
-            for (String commodityId : aotdCommodities) {
-                createCommodityMarketData(commodityId);
+            if (mtDataCommodityIndex < aotdCommodities.size()) {
+                createCommodityMarketData(aotdCommodities.get(mtDataCommodityIndex++));
+                return;
             }
-
             mtDataCreated = true;
             return;
         }
 
         /*
-         * 3) Submit workers, block until they finish, then notify listeners.
+         * 3) Capture one immutable market input per invocation. This keeps the
+         * campaign-thread snapshot cost bounded even with thousands of markets.
+         */
+        if (!mtCaptureDone) {
+            if (aotdParams == null || !aotdParams.withStockpileUpdate) {
+                mtCaptureDone = true;
+                mtCommitDone = true;
+                mtWorkersFinished = true;
+                return;
+            }
+            if (mtCaptureIndex < marketsForCurrentMode.size()) {
+                captureMarketPriceInput(marketsForCurrentMode.get(mtCaptureIndex));
+                mtCaptureIndex++;
+                return;
+            }
+            mtOffloadBatch.freeze();
+            mtCaptureDone = true;
+            return;
+        }
+
+        /*
+         * 4) Execute the same pure batch in one of two optimized modes:
+         * resident dynamic workers, or bounded sequential chunks for A/B.
          */
         if (!mtWorkersSubmitted) {
-            submitMarketPriceWorkers();
+            mtFutures.clear();
+            if (ENABLE_MULTITHREADED_VERSION) {
+                mtFutures.addAll(AoTDWorkerManager.submitDynamicBatch(
+                        "AoTD pure price batch", mtOffloadBatch.size(),
+                        PRICE_WORKER_CHUNK_SIZE, mtOffloadBatch::computeMarket));
+            }
             mtWorkersSubmitted = true;
+            if (mtOffloadBatch.size() == 0) {
+                finishPurePriceComputePhase();
+            }
+            return;
+        }
 
-            waitForMarketPriceWorkers();
-            mtWorkersFinished = true;
+        if (!mtWorkersFinished) {
+            if (ENABLE_MULTITHREADED_VERSION) {
+                // Multi-frame worker path polls instead of blocking campaign execution.
+                if (!AoTDWorkerManager.areDone(mtFutures)) return;
+                waitForMarketPriceWorkers();
+                finishPurePriceComputePhase();
+            } else {
+                // Optimized sequential A/B mode uses the exact same DTO/model/commit
+                // pipeline, but computes a bounded chunk on the campaign thread.
+                int end = Math.min(mtOffloadBatch.size(),
+                        mtSequentialComputeIndex + PRICE_WORKER_CHUNK_SIZE);
+                while (mtSequentialComputeIndex < end) {
+                    mtOffloadBatch.computeMarket(mtSequentialComputeIndex++);
+                }
+                if (mtSequentialComputeIndex >= mtOffloadBatch.size()) {
+                    finishPurePriceComputePhase();
+                }
+            }
+            return;
+        }
 
+        /* 5) Apply validated results on the campaign thread under a small budget. */
+        if (!mtCommitDone) {
+            commitMarketPriceResultsBudgeted();
+            return;
+        }
+
+        if (!mtListenersNotified) {
             notifyCommoditiesUpdated(aotdCommodities);
-
             mtListenersNotified = true;
             runOnce = singleMarketToUpdate != null;
             aotdIndex = aotdCommodities.size();
@@ -303,6 +340,16 @@ public class AoTdMainWorkTask2 extends MainWorkTask2 {
 
     private void startTaskState() {
         ensureRuntimeCollections();
+        baselineTaskScope = AoTDEconomySemanticBaseline.begin(
+                "main-work.task",
+                singleMarketToUpdate,
+                singleMarketToUpdate == null ? "all-markets" : "single-market"
+        );
+        baselineTaskClosed = false;
+        AoTDEconomySemanticBaseline.operation(
+                ENABLE_MULTITHREADED_VERSION
+                        ? "price-mode.pure-workers"
+                        : "price-mode.pure-sequential", 1L);
         initCommodityList();
 
         if (aotdMarkets == null) {
@@ -327,10 +374,18 @@ public class AoTdMainWorkTask2 extends MainWorkTask2 {
 
         mtMarketPrepDone = false;
         mtDataCreated = false;
+        mtDataCommodityIndex = 0;
+        mtCaptureDone = false;
         mtWorkersSubmitted = false;
         mtWorkersFinished = false;
+        mtCommitDone = false;
         mtListenersNotified = false;
+        mtCaptureIndex = 0;
+        mtSequentialComputeIndex = 0;
+        mtCommitIndex = 0;
         mtFutures.clear();
+        mtCommitPlans.clear();
+        mtOffloadBatch = new AoTDPriceOffloadBatch(createPriceModelConfig());
 
         aotdStarted = true;
     }
@@ -354,86 +409,79 @@ public class AoTdMainWorkTask2 extends MainWorkTask2 {
     }
 
     private static void processMarketReapplyStage(MarketAPI market) {
+        if (!MarketRegistry.needsMaterializedReconciliation(market)) {
+            AoTDEconomySemanticBaseline.operation("main-work.reapply-skipped-current", market);
+            return;
+        }
         if (market == null) return;
 
-        market.reapplyConditions();
+        try (AoTDEconomySemanticBaseline.Scope ignored =
+                     AoTDEconomySemanticBaseline.beginMarketMutation(
+                             "main-work.reapply-conditions", market, "first-pass")) {
+            AoTDEconomySemanticBaseline.operation("market.reapplyConditions", market);
+            market.reapplyConditions();
+        }
 
-        AoTDIndustryData data = AoTDIndustryData.getInstance(market);
-        for (Industry industry : market.getIndustries()) {
-            if (!data.isPending(industry.getId())) {
-                industry.reapply();
+        try (AoTDEconomySemanticBaseline.Scope ignored =
+                     AoTDEconomySemanticBaseline.beginMarketMutation(
+                             "main-work.reapply-active-industries", market, "first-pass")) {
+            AoTDIndustryData data = AoTDIndustryData.getInstance(market);
+            data.checkForNewIndustriesAndReport(market);
+            for (Industry industry : market.getIndustries()) {
+                if (!data.isPending(industry.getId())) {
+                    AoTDEconomySemanticBaseline.operation("industry.reapply", market);
+                    industry.reapply();
+                } else {
+                    AoTDEconomySemanticBaseline.operation("industry.reapply.skipped-pending", market);
+                }
             }
         }
     }
 
     private void createCommodityMarketData(String commodityId) {
-        new AoTDCommodityMarketData(commodityId, null);
+        try (AoTDEconomySemanticBaseline.Scope ignored =
+                     AoTDEconomySemanticBaseline.begin(
+                             "main-work.commodity-market-data", null, commodityId)) {
+            AoTDEconomySemanticBaseline.operation("commodity-market-data.global", 1L);
+            new AoTDCommodityMarketData(commodityId, null);
 
-        for (String econGroup : cachedEconGroups) {
-            new AoTDCommodityMarketData(commodityId, econGroup);
+            for (String econGroup : cachedEconGroups) {
+                AoTDEconomySemanticBaseline.operation("commodity-market-data.econ-group", 1L);
+                new AoTDCommodityMarketData(commodityId, econGroup);
+            }
         }
     }
 
-    private void submitMarketPriceWorkers() {
-        ensureRuntimeCollections();
-
-        mtFutures.clear();
-
-        if (aotdParams == null || !aotdParams.withStockpileUpdate) {
-            return;
+    /** Legacy entry retained for binary/source compatibility; Stage 6 uses dynamic batches. */
+    private void finishPurePriceComputePhase() {
+        if (mtWorkersFinished) return;
+        mtWorkersFinished = true;
+        for (MarketPriceCommitPlan plan : mtCommitPlans) {
+            if (plan.ticket != null) MarketRegistry.markResultReady(plan.ticket);
         }
-
-        for (MarketAPI market : marketsForCurrentMode) {
-            if (!(market instanceof Market)) {
-                continue;
-            }
-
-            Market vanillaMarket = (Market) market;
-
-            Future<?> future = AoTDWorkerManager.submit(
-                    "AoTD price recalculation: " + market.getId(),
-                    () -> runMarketPriceWorker(vanillaMarket)
-            );
-
-            mtFutures.add(future);
-        }
-    }
-
-    private void runMarketPriceWorker(Market market) {
-
-        for (String commodityId : aotdCommodities) {
-            AoTDWorkerManager.checkpoint();
-
-            CommoditySpecAPI commoditySpec = Global.getSettings().getCommoditySpec(commodityId);
-            if (commoditySpec == null || commoditySpec.hasTag("nonecon")) {
-                continue;
-            }
-
-            try {
-                updateStockpileAndPriceOnce(market, commoditySpec);
-            } catch (Throwable ex) {
-                Global.getLogger(AoTdMainWorkTask2.class).warn(
-                        "AoTD price worker failed for commodity " + commodityId +
-                                " on market " + market.getId() + ". Skipping.",
-                        ex
-                );
-            }
-        }
-
-        AoTDWorkerManager.checkpoint();
     }
 
     private void waitForMarketPriceWorkers() {
-        for (Future<?> future : mtFutures) {
-            if (future == null) continue;
-
-            try {
-                future.get();
-            } catch (Exception ex) {
-                Global.getLogger(AoTdMainWorkTask2.class).warn(
-                        "AoTD price worker failed.",
-                        ex
-                );
+        boolean infrastructureFailure = false;
+        try (AoTDEconomySemanticBaseline.Scope ignored =
+                     AoTDEconomySemanticBaseline.begin(
+                             "main-work.wait-for-price-workers", null,
+                             "futures=" + mtFutures.size())) {
+            for (Future<?> future : mtFutures) {
+                if (future == null) continue;
+                try {
+                    future.get();
+                } catch (Exception ex) {
+                    infrastructureFailure = true;
+                    AoTDEconomySemanticBaseline.operation("price-worker.future-failure", 1L);
+                    Global.getLogger(AoTdMainWorkTask2.class).warn(
+                            "AoTD price worker infrastructure failed; retrying missing pure DTO items sequentially.", ex);
+                }
+            }
+        }
+        if (infrastructureFailure) {
+            for (int i = 0; i < mtOffloadBatch.size(); i++) {
+                if (mtOffloadBatch.resultAt(i) == null) mtOffloadBatch.computeMarket(i);
             }
         }
     }
@@ -452,39 +500,574 @@ public class AoTdMainWorkTask2 extends MainWorkTask2 {
 
         String key = market.getId() + '\u0000' + demandClass;
         if (!processedMarketDemandClasses.add(key)) {
+            AoTDEconomySemanticBaseline.operation("price-update.skipped-duplicate-demand-class", market);
             return;
         }
 
-        aotdUpdateStockpileAndPrice(market, commoditySpec);
+        try (AoTDEconomySemanticBaseline.Scope ignored =
+                     AoTDEconomySemanticBaseline.begin(
+                             "main-work.price-demand-class", market, demandClass)) {
+            AoTDEconomySemanticBaseline.operation("price-update.demand-class", market);
+            aotdUpdateStockpileAndPrice(market, commoditySpec);
+        }
+    }
+
+    private static AoTDPriceOffloadBatch.ModelConfig createPriceModelConfig() {
+        return new AoTDPriceOffloadBatch.ModelConfig(
+                AOTD_REFERENCE_TRADE_QUANTITY,
+                AOTD_NORMAL_BUY_MIN, AOTD_NORMAL_BUY_MAX,
+                AOTD_NORMAL_SELL_MIN, AOTD_NORMAL_SELL_MAX,
+                AOTD_EXCESS_PRICE_FLOOR, AOTD_EXCESS_SELL_SPREAD,
+                AOTD_DEFICIT_CENTER_MIN, AOTD_DEFICIT_CENTER_MAX,
+                AOTD_ILLEGAL_DEFICIT_CENTER_MIN, AOTD_ILLEGAL_DEFICIT_CENTER_MAX,
+                AOTD_MAX_RESELL_RETURN_MULT,
+                AOTD_GREED_FRACTION, AOTD_PRICE_CURVE_STATE_STRENGTH,
+                AOTD_CUSTOM_PRICE_RESPONSE,
+                AOTD_CUSTOM_PRICE_STOCKPILE_DENOM_MULT,
+                AOTD_CUSTOM_PRICE_DENOM_MAX_REFERENCE_MULT,
+                AOTD_PRICING_STOCKPILE_RESERVE_FRACTION,
+                AOTD_PRICING_STOCKPILE_RESERVE_MIN_MULT,
+                PriceCalculator.MIN_STOCKPILE_FOR_PRICING,
+                PriceCalculator.MIN_DEMAND_FOR_PRICING,
+                AOTD_MIN_STATE_AMOUNT);
+    }
+
+    private void captureMarketPriceInput(MarketAPI marketApi) {
+        if (!(marketApi instanceof Market market)) return;
+
+        boolean deliveryDriven = SchedulerBridge.hasCapability(
+                PrepatcherContract.CAPABILITY_NATIVE_DELIVERY_EVENTS)
+                && SchedulerBridge.hasCapability(
+                        PrepatcherContract.CAPABILITY_MARKET_GENERATIONS);
+        if (deliveryDriven && !MarketRegistry.needsPriceRefresh(market)) {
+            AoTDEconomySemanticBaseline.operation("price-offload.capture-skipped-current", market);
+            return;
+        }
+
+        // Any live-structure repair must happen before the registry ticket is
+        // captured. A mutation callback after claim would correctly advance the
+        // dirty/structural generation and make our own snapshot stale.
+        try {
+            prepareMarketPriceStructure(market);
+        } catch (RuntimeException failure) {
+            AoTDEconomySemanticBaseline.operation("price-offload.prepare-failure", market);
+            Global.getLogger(AoTdMainWorkTask2.class).error(
+                    "AoTD price snapshot preparation failed for market " + market.getId()
+                            + "; quarantining this market generation.", failure);
+            MarketRegistry.quarantineMarket(market,
+                    "price-structure:" + failure.getClass().getName());
+            return;
+        }
+
+        // Without the native delivery contract, the economy entry point itself
+        // is the authoritative signal that this market requires refresh. Mark it
+        // before materialization so the committed supply/demand revision is tagged
+        // with the same dirty generation later captured by the price ticket.
+        if (!deliveryDriven) {
+            MarketRegistry.markDirty(market,
+                    MarketRegistry.DIRTY_PRICE | MarketRegistry.DIRTY_STOCKPILE,
+                    market.isPlayerOwned()
+                            ? MarketRegistry.PRIORITY_PLAYER : MarketRegistry.PRIORITY_NORMAL);
+        }
+
+        // Stage 8.2: publish one complete market-wide supply/demand revision
+        // before claiming the price ticket. buildMarketPricePlan() is now read-only.
+        try {
+            materializeMarketSupplyDemand(market);
+        } catch (RuntimeException failure) {
+            AoTDEconomySemanticBaseline.operation(
+                    "price-offload.materialization-failure", market);
+            Global.getLogger(AoTdMainWorkTask2.class).error(
+                    "AoTD supply/demand materialization failed for market "
+                            + market.getId()
+                            + "; preserving the previous committed market revision.",
+                    failure);
+            MarketRegistry.quarantineMarket(market,
+                    "supply-demand:" + failure.getClass().getName());
+            return;
+        }
+
+        MarketRegistry.WorkTicket ticket = MarketRegistry.claimMarketForPrice(market);
+        if (ticket == null) {
+            AoTDEconomySemanticBaseline.operation("price-offload.capture-skipped", market);
+            return;
+        }
+
+        long started = System.nanoTime();
+        try (AoTDEconomySemanticBaseline.Scope ignored =
+                     AoTDEconomySemanticBaseline.begin(
+                             "price-offload.capture-market", market, "immutable-snapshot")) {
+            MarketPriceCommitPlan plan = buildMarketPricePlan(market, ticket);
+            if (!MarketRegistry.markWorkRunning(ticket)) {
+                MarketRegistry.abandon(ticket, true);
+                return;
+            }
+            plan.batchIndex = mtOffloadBatch.addMarket(plan.input);
+            mtCommitPlans.add(plan);
+            plan.captureNanos = Math.max(0L, System.nanoTime() - started);
+        } catch (RuntimeException failure) {
+            AoTDEconomySemanticBaseline.operation("price-offload.capture-failure", market);
+            Global.getLogger(AoTdMainWorkTask2.class).error(
+                    "AoTD pure price snapshot failed for market " + market.getId()
+                            + "; preserving the previous committed price revision.", failure);
+            MarketRegistry.recordFailure(ticket,
+                    "price-capture:" + failure.getClass().getName());
+        }
+    }
+
+    /**
+     * Performs the rare live-object repair required to make snapshot capture
+     * read-only. This method runs on the campaign thread and opens exactly one
+     * temporal mutation boundary if demand/commodity structure needs repair.
+     */
+    private void prepareMarketPriceStructure(Market market) {
+        boolean demandDataMissing = !(market.getDemandData() instanceof AoTDMarketDemandData);
+        boolean commodityRepairNeeded = false;
+        for (String commodityId : aotdCommodities) {
+            CommoditySpecAPI spec = Global.getSettings().getCommoditySpec(commodityId);
+            if (spec == null || spec.hasTag("nonecon") || spec.getDemandClass() == null) continue;
+            List<CommodityOnMarket> sameClass =
+                    getCommoditiesWithSameDemandClass(spec.getDemandClass(), market);
+            boolean hasAoTD = false;
+            for (CommodityOnMarket commodity : sameClass) {
+                if (commodity instanceof AoTDCommodityOnMarket) {
+                    hasAoTD = true;
+                    break;
+                }
+            }
+            if (!hasAoTD) {
+                commodityRepairNeeded = true;
+                break;
+            }
+        }
+        if (!demandDataMissing && !commodityRepairNeeded) return;
+
+        long token = SchedulerBridge.beforeMarketMutation(
+                market, SchedulerBridge.MUTATION_COMMODITY_STRUCTURE);
+        try {
+            if (demandDataMissing) {
+                ReflectionUtilis.setPrivateVariableFromSuperclass(
+                        "demandData", market, new AoTDMarketDemandData(market));
+            }
+            if (commodityRepairNeeded) {
+                AoTDEconomy.pruneCommoditiesThatMightAppear(market);
+            }
+        } finally {
+            SchedulerBridge.afterMarketMutation(token, market,
+                    SchedulerBridge.DIRTY_STRUCTURE
+                            | SchedulerBridge.DIRTY_DERIVED_ECONOMY
+                            | MarketRegistry.DIRTY_VALUE_STATE
+                            | MarketRegistry.DIRTY_PRICE
+                            | MarketRegistry.DIRTY_STOCKPILE, 0L);
+        }
+    }
+
+    /**
+     * Prepares every commodity first and only then publishes the complete local
+     * supply/demand revision. If any calculation fails, all staging buffers are
+     * discarded and every previous authoritative commodity revision remains
+     * untouched.
+     */
+    private void materializeMarketSupplyDemand(Market market) {
+        ArrayList<AoTDSupplyDemandData.PreparedRefresh> prepared = new ArrayList<>();
+        ArrayList<AoTDSupplyDemandData> owners = new ArrayList<>();
+        LinkedHashSet<AoTDCommodityOnMarket> commodities = new LinkedHashSet<>();
+
+        try {
+            for (String demandClass : collectDemandClasses()) {
+                for (CommodityOnMarket commodity :
+                        getCommoditiesWithSameDemandClass(demandClass, market)) {
+                    if (commodity instanceof AoTDCommodityOnMarket aotdCommodity) {
+                        commodities.add(aotdCommodity);
+                    }
+                }
+            }
+
+            for (AoTDCommodityOnMarket commodity : commodities) {
+                AoTDSupplyDemandData owner = commodity.getSupplyDemandData();
+                owners.add(owner);
+                prepared.add(owner.prepareSupplyDemandData(market, false));
+            }
+        } catch (RuntimeException failure) {
+            for (int i = 0; i < prepared.size(); i++) {
+                owners.get(i).discardPreparedRefresh(prepared.get(i));
+            }
+            throw failure;
+        }
+
+        // These commits are reference swaps plus scalar assignments; there is no
+        // industry calculation or external callback between commodity commits.
+        for (int i = 0; i < prepared.size(); i++) {
+            owners.get(i).commitPreparedRefresh(prepared.get(i));
+        }
+        for (int i = 0; i < prepared.size(); i++) {
+            owners.get(i).finishPreparedRefresh(prepared.get(i));
+        }
+        AoTDEconomySemanticBaseline.operation(
+                "supply-demand.market-atomic-commit", market);
+        AoTDEconomySemanticBaseline.operation(
+                "supply-demand.market-commodities", prepared.size());
+    }
+
+    private LinkedHashSet<String> collectDemandClasses() {
+        LinkedHashSet<String> demandClasses = new LinkedHashSet<>();
+        for (String commodityId : aotdCommodities) {
+            CommoditySpecAPI spec = Global.getSettings().getCommoditySpec(commodityId);
+            if (spec != null && !spec.hasTag("nonecon")
+                    && spec.getDemandClass() != null) {
+                demandClasses.add(spec.getDemandClass());
+            }
+        }
+        return demandClasses;
+    }
+
+    private MarketPriceCommitPlan buildMarketPricePlan(
+            Market market, MarketRegistry.WorkTicket ticket) {
+        LinkedHashSet<String> demandClasses = collectDemandClasses();
+
+        ArrayList<AoTDPriceOffloadBatch.DemandClassInput> classInputs = new ArrayList<>();
+        ArrayList<DemandClassCommitPlan> classPlans = new ArrayList<>();
+
+        for (String demandClass : demandClasses) {
+            List<CommodityOnMarket> sameClass = getCommoditiesWithSameDemandClass(demandClass, market);
+            boolean hasAoTD = false;
+            for (CommodityOnMarket commodity : sameClass) {
+                if (commodity instanceof AoTDCommodityOnMarket) {
+                    hasAoTD = true;
+                    break;
+                }
+            }
+            if (!hasAoTD) {
+                throw new IllegalStateException(
+                        "Missing AoTD commodity after structural preparation: market="
+                                + market.getId() + ", demandClass=" + demandClass);
+            }
+
+            ArrayList<AoTDPriceOffloadBatch.CommodityInput> commodityInputs = new ArrayList<>();
+            ArrayList<AoTDCommodityOnMarket> bindings = new ArrayList<>();
+            ArrayList<AoTDExcDefData.PreparedSuddenDemandUpdate> suddenUpdates =
+                    new ArrayList<>();
+            for (CommodityOnMarket commodity : sameClass) {
+                if (!(commodity instanceof AoTDCommodityOnMarket aotdCommodity)) continue;
+                AoTDSupplyDemandData data = aotdCommodity.getSupplyDemandData();
+                AoTDExcDefData.PreparedSuddenDemandUpdate suddenUpdate =
+                        aotdCommodity.getExcDefData()
+                                .prepareDeficitDueToSuddenChangeOfDemand(aotdCommodity);
+
+                float rawSupply = Math.max(0f, data.getTotalRawUnitsFromSupply());
+                float rawDemand = Math.max(0f, data.getTotalRawUnitsFromDemand());
+                float projectedDeficit = Math.min(
+                        Math.max(0f, suddenUpdate.projectedEffectiveDeficit), rawDemand);
+                float projectedExcess = Math.max(
+                        0f, suddenUpdate.projectedEffectiveExcess);
+                float projectedDeficitQuantity = getProjectedDeficitQuantity(
+                        aotdCommodity, projectedDeficit);
+                float projectedExcessQuantity = getProjectedExcessQuantity(
+                        aotdCommodity, projectedExcess, rawDemand);
+                float limit = getAoTDStableSharedSubmarketLimit(
+                        market, aotdCommodity, rawSupply);
+                CommoditySpecAPI spec = aotdCommodity.getSpec();
+                commodityInputs.add(new AoTDPriceOffloadBatch.CommodityInput(
+                        aotdCommodity.getId(),
+                        aotdCommodity.getUtilityOnMarket(),
+                        rawSupply, rawDemand, limit,
+                        projectedDeficit,
+                        projectedExcess,
+                        projectedDeficitQuantity,
+                        projectedExcessQuantity,
+                        getAoTDLocalTradeQuantityForPricing(aotdCommodity),
+                        getMarketPriceWrapper(market, true),
+                        getMarketPriceWrapper(market, false),
+                        aotdCommodity.isIllegal(),
+                        aotdCommodity.getMaxDemand() <= 0
+                                && aotdCommodity.getMaxSupply() <= 0,
+                        spec != null
+                                && spec.getPriceVariability() == PriceVariability.V0));
+                bindings.add(aotdCommodity);
+                suddenUpdates.add(suddenUpdate);
+            }
+
+            if (commodityInputs.isEmpty()) continue;
+            classInputs.add(new AoTDPriceOffloadBatch.DemandClassInput(
+                    demandClass,
+                    getAoTDStoredStatePressureAnchor(market, demandClass, 1),
+                    getAoTDStoredStatePressureAnchor(market, demandClass, -1),
+                    commodityInputs.toArray(new AoTDPriceOffloadBatch.CommodityInput[0])));
+            classPlans.add(new DemandClassCommitPlan(
+                    demandClass,
+                    bindings.toArray(new AoTDCommodityOnMarket[0]),
+                    suddenUpdates.toArray(
+                            new AoTDExcDefData.PreparedSuddenDemandUpdate[0])));
+        }
+
+        AoTDPriceOffloadBatch.MarketInput input = new AoTDPriceOffloadBatch.MarketInput(
+                market.getId(), market.getName(), market.getFactionId(),
+                classInputs.toArray(new AoTDPriceOffloadBatch.DemandClassInput[0]));
+        MarketPriceCommitPlan plan = new MarketPriceCommitPlan(ticket, market);
+        plan.input = input;
+        plan.classes = classPlans.toArray(new DemandClassCommitPlan[0]);
+        return plan;
+    }
+
+    private static float getProjectedDeficitQuantity(
+            AoTDCommodityOnMarket commodity, float projectedDeficit) {
+        if (projectedDeficit <= 0f) return 0f;
+        float trade = commodity.getTradeMod().getModifiedValue()
+                + commodity.getTradeModPlus().getModifiedValue()
+                + commodity.getTradeModMinus().getModifiedValue();
+        return Math.max(0f, Math.round(projectedDeficit - trade));
+    }
+
+    private static float getProjectedExcessQuantity(
+            AoTDCommodityOnMarket commodity,
+            float projectedExcess,
+            float rawDemand) {
+        float trade = commodity.getTradeMod().getModifiedValue()
+                + commodity.getTradeModPlus().getModifiedValue()
+                + commodity.getTradeModMinus().getModifiedValue();
+        if (projectedExcess <= 0f) {
+            float effectiveOversurplus = Math.max(
+                    rawDemand * 2f, commodity.getSpec().getEconUnit() * 3f);
+            return Math.max(0f, trade - effectiveOversurplus);
+        }
+        return Math.max(0f, Math.round(projectedExcess + trade));
+    }
+
+    private void commitMarketPriceResultsBudgeted() {
+        long started = System.nanoTime();
+        int committed = 0;
+        while (mtCommitIndex < mtCommitPlans.size()) {
+            MarketPriceCommitPlan plan = mtCommitPlans.get(mtCommitIndex++);
+            commitMarketPricePlan(plan);
+            committed++;
+            if (committed >= MAIN_THREAD_COMMIT_MARKETS_PER_BATCH
+                    || System.nanoTime() - started >= MAIN_THREAD_COMMIT_BUDGET_NANOS) {
+                return;
+            }
+        }
+        mtCommitDone = true;
+    }
+
+    private void commitMarketPricePlan(MarketPriceCommitPlan plan) {
+        long started = System.nanoTime();
+        if (!MarketRegistry.isCurrent(plan.ticket)) {
+            AoTDEconomySemanticBaseline.operation("price-offload.stale-result", plan.market);
+            MarketRegistry.commitPriceDerived(plan.ticket, 0L);
+            return;
+        }
+        AoTDPriceOffloadBatch.MarketResult result = mtOffloadBatch.resultAt(plan.batchIndex);
+        if (result == null) {
+            MarketRegistry.recordFailure(plan.ticket, "price-result-missing");
+            return;
+        }
+        if (result.failure != null) {
+            Global.getLogger(AoTdMainWorkTask2.class).error(
+                    "AoTD pure price model failed for market " + plan.market.getId()
+                            + "; preserving the previous committed price revision.",
+                    result.failure);
+            MarketRegistry.recordFailure(plan.ticket,
+                    "price-model:" + result.failure.getClass().getName());
+            return;
+        }
+        try (AoTDEconomySemanticBaseline.Scope ignored =
+                     AoTDEconomySemanticBaseline.begin(
+                             "price-offload.commit-market", plan.market, "pure-result")) {
+            applyMarketPriceResult(plan, result);
+        } catch (RuntimeException failure) {
+            Global.getLogger(AoTdMainWorkTask2.class).error(
+                    "AoTD price commit failed for market " + plan.market.getId()
+                            + "; preserving dirty state.", failure);
+            MarketRegistry.recordFailure(plan.ticket,
+                    "price-commit:" + failure.getClass().getName());
+            return;
+        }
+        long computeNanos = Math.max(0L, System.nanoTime() - started)
+                + plan.captureNanos + Math.max(0L, result.computeNanos);
+        if (MarketRegistry.commitPriceDerived(plan.ticket, computeNanos)) {
+            AoTDEconomySemanticBaseline.operation("price-offload.committed", plan.market);
+        }
+    }
+
+    private static void applyMarketPriceResult(
+            MarketPriceCommitPlan plan, AoTDPriceOffloadBatch.MarketResult result) {
+        int classes = Math.min(plan.classes.length, result.demandClasses.length);
+        for (int classIndex = 0; classIndex < classes; classIndex++) {
+            DemandClassCommitPlan binding = plan.classes[classIndex];
+            AoTDPriceOffloadBatch.DemandClassResult classResult = result.demandClasses[classIndex];
+            if (classResult == null) continue;
+            if (classResult.anchorMode != 0 && classResult.anchorValue > 0f) {
+                String key = AOTD_STATE_PRESSURE_ANCHOR_PREFIX
+                        + classResult.anchorMode + "_" + binding.demandClass;
+                plan.market.getMemoryWithoutUpdate().set(key, classResult.anchorValue, 31f);
+            }
+
+            int commodities = Math.min(binding.commodities.length, classResult.commodities.length);
+            for (int i = 0; i < commodities; i++) {
+                AoTDCommodityOnMarket commodity = binding.commodities[i];
+                AoTDPriceOffloadBatch.CommodityResult commodityResult =
+                        classResult.commodities[i];
+                if (commodity == null || commodityResult == null) continue;
+
+                if (i < binding.suddenDemandUpdates.length) {
+                    commodity.getExcDefData().commitPreparedSuddenDemandUpdate(
+                            binding.suddenDemandUpdates[i]);
+                }
+                commodity.setStocks(commodityResult.stocks);
+                commodity.setStockpile(commodityResult.pricingStockpile);
+                if (commodityResult.noDemandOrSupply) {
+                    commodity.getPlayerDemandPriceMod().modifyMult(
+                            CORE_MOD_ID, Economy.ECONOMY_NO_DEMAND_PRICE_MULT);
+                } else {
+                    commodity.getPlayerDemandPriceMod().unmodifyMult(CORE_MOD_ID);
+                }
+                setModifiedValueWithFlatMod(
+                        commodity.getDemand().getDemand(), CORE_MOD_ID,
+                        commodityResult.demandCurve);
+                setModifiedValueWithFlatMod(
+                        commodity.getGreed(), CORE_MOD_ID, commodityResult.greed);
+                ensureAoTDPriceCalculators(commodity);
+                commodity.updateCalc();
+
+                AoTDPriceOffloadBatch.CalculatorModel model = commodityResult.model;
+                configureAoTDCalculator(
+                        commodity.getDemandPrice(), model.targetSellMult, model.targetBuyMult,
+                        model.blankSellMult, model.blankBuyMult,
+                        model.minSellMult, model.maxSellMult,
+                        model.minBuyMult, model.maxBuyMult,
+                        model.neutralStockpileUtility, model.officialStateMode,
+                        model.officialStateUtility, model.officialStatePressureDenom,
+                        model.stateStartSellMult, model.stateStartBuyMult,
+                        model.stateExtremeSellMult, model.stateExtremeBuyMult);
+                configureAoTDCalculator(
+                        commodity.getSupplyPrice(), model.targetSellMult, model.targetBuyMult,
+                        model.blankSellMult, model.blankBuyMult,
+                        model.minSellMult, model.maxSellMult,
+                        model.minBuyMult, model.maxBuyMult,
+                        model.neutralStockpileUtility, model.officialStateMode,
+                        model.officialStateUtility, model.officialStatePressureDenom,
+                        model.stateStartSellMult, model.stateStartBuyMult,
+                        model.stateExtremeSellMult, model.stateExtremeBuyMult);
+
+                commodity.getPlayerDemandPriceMod().unmodifyMult(AOTD_PRICE_MOD_ID);
+                commodity.getPlayerSupplyPriceMod().unmodifyMult(AOTD_PRICE_MOD_ID);
+                if (commodityResult.variabilityV0) {
+                    commodity.getPlayerDemandPriceMod().modifyMult(
+                            AOTD_PRICE_MOD_ID, commodityResult.v0SellMult);
+                    commodity.getPlayerSupplyPriceMod().modifyMult(
+                            AOTD_PRICE_MOD_ID, commodityResult.v0BuyMult);
+                }
+            }
+        }
+    }
+
+    private static void configureAoTDCalculator(
+            PriceCalculator calculator,
+            float targetSellMult, float targetBuyMult,
+            float blankSellMult, float blankBuyMult,
+            float minSell, float maxSell, float minBuy, float maxBuy,
+            float neutralStockpileUtility, int officialStateMode,
+            float officialStateUtility, float officialStatePressureDenom,
+            float stateStartSellMult, float stateStartBuyMult,
+            float stateExtremeSellMult, float stateExtremeBuyMult) {
+        if (calculator instanceof EffectivePriceCalculator aotdCalculator) {
+            aotdCalculator.setAoTDPriceModel(
+                    targetSellMult, targetBuyMult,
+                    blankSellMult, blankBuyMult,
+                    minSell, maxSell, minBuy, maxBuy,
+                    AOTD_REFERENCE_TRADE_QUANTITY,
+                    AOTD_CUSTOM_PRICE_RESPONSE,
+                    AOTD_CUSTOM_PRICE_STOCKPILE_DENOM_MULT,
+                    AOTD_CUSTOM_PRICE_DENOM_MAX_REFERENCE_MULT,
+                    AOTD_MAX_RESELL_RETURN_MULT,
+                    neutralStockpileUtility, officialStateMode,
+                    officialStateUtility, officialStatePressureDenom,
+                    stateStartSellMult, stateStartBuyMult,
+                    stateExtremeSellMult, stateExtremeBuyMult);
+        }
+    }
+
+    /** Used by synchronous economy entry points to avoid a hot polling loop. */
+    public void awaitWorkersIfSubmitted() {
+        if (!mtWorkersSubmitted || mtWorkersFinished) return;
+        if (ENABLE_MULTITHREADED_VERSION) {
+            waitForMarketPriceWorkers();
+        } else {
+            while (mtSequentialComputeIndex < mtOffloadBatch.size()) {
+                mtOffloadBatch.computeMarket(mtSequentialComputeIndex++);
+            }
+        }
+        finishPurePriceComputePhase();
+    }
+
+    private static final class MarketPriceCommitPlan {
+        final MarketRegistry.WorkTicket ticket;
+        final Market market;
+        AoTDPriceOffloadBatch.MarketInput input;
+        DemandClassCommitPlan[] classes = new DemandClassCommitPlan[0];
+        int batchIndex = -1;
+        long captureNanos;
+
+        MarketPriceCommitPlan(MarketRegistry.WorkTicket ticket, Market market) {
+            this.ticket = ticket;
+            this.market = market;
+        }
+    }
+
+    private static final class DemandClassCommitPlan {
+        final String demandClass;
+        final AoTDCommodityOnMarket[] commodities;
+        final AoTDExcDefData.PreparedSuddenDemandUpdate[] suddenDemandUpdates;
+
+        DemandClassCommitPlan(
+                String demandClass,
+                AoTDCommodityOnMarket[] commodities,
+                AoTDExcDefData.PreparedSuddenDemandUpdate[] suddenDemandUpdates) {
+            this.demandClass = demandClass;
+            this.commodities = commodities;
+            this.suddenDemandUpdates = suddenDemandUpdates;
+        }
     }
 
     private static void notifyCommodityUpdated(String commodityId) {
-        List<EconomyAPI.EconomyUpdateListener> listeners =
-                new ArrayList<>(Global.getSector().getEconomy().getUpdateListeners());
+        try (AoTDEconomySemanticBaseline.Scope ignored =
+                     AoTDEconomySemanticBaseline.begin(
+                             "main-work.notify-commodity-listeners", null, commodityId)) {
+            List<EconomyAPI.EconomyUpdateListener> listeners =
+                    new ArrayList<>(Global.getSector().getEconomy().getUpdateListeners());
 
-        for (EconomyAPI.EconomyUpdateListener listener : listeners) {
-            if (listener == null) continue;
+            for (EconomyAPI.EconomyUpdateListener listener : listeners) {
+                if (listener == null) continue;
 
-            if (listener.isEconomyListenerExpired()) {
-                Global.getSector().getEconomy().removeUpdateListener(listener);
-            } else {
-                listener.commodityUpdated(commodityId);
+                if (listener.isEconomyListenerExpired()) {
+                    AoTDEconomySemanticBaseline.operation("listener.commodityUpdated.expired", 1L);
+                    Global.getSector().getEconomy().removeUpdateListener(listener);
+                } else {
+                    AoTDEconomySemanticBaseline.operation("listener.commodityUpdated", 1L);
+                    listener.commodityUpdated(commodityId);
+                }
             }
         }
     }
 
     private static void notifyCommoditiesUpdated(Collection<String> commodityIds) {
-        List<EconomyAPI.EconomyUpdateListener> listeners =
-                new ArrayList<>(Global.getSector().getEconomy().getUpdateListeners());
+        try (AoTDEconomySemanticBaseline.Scope ignored =
+                     AoTDEconomySemanticBaseline.begin(
+                             "main-work.notify-all-commodity-listeners", null,
+                             "commodities=" + commodityIds.size())) {
+            List<EconomyAPI.EconomyUpdateListener> listeners =
+                    new ArrayList<>(Global.getSector().getEconomy().getUpdateListeners());
 
-        for (String commodityId : commodityIds) {
-            for (EconomyAPI.EconomyUpdateListener listener : listeners) {
-                if (listener == null) continue;
+            for (String commodityId : commodityIds) {
+                for (EconomyAPI.EconomyUpdateListener listener : listeners) {
+                    if (listener == null) continue;
 
-                if (listener.isEconomyListenerExpired()) {
-                    Global.getSector().getEconomy().removeUpdateListener(listener);
-                } else {
-                    listener.commodityUpdated(commodityId);
+                    if (listener.isEconomyListenerExpired()) {
+                        AoTDEconomySemanticBaseline.operation("listener.commodityUpdated.expired", 1L);
+                        Global.getSector().getEconomy().removeUpdateListener(listener);
+                    } else {
+                        AoTDEconomySemanticBaseline.operation("listener.commodityUpdated", 1L);
+                        listener.commodityUpdated(commodityId);
+                    }
                 }
             }
         }
@@ -492,24 +1075,25 @@ public class AoTdMainWorkTask2 extends MainWorkTask2 {
 
     @Override
     public boolean isDone() {
-        if (ENABLE_MULTITHREADED_VERSION) {
-            if (singleMarketToUpdate != null) {
-                return runOnce;
-            }
-
-            return aotdCommodities != null
+        final boolean result;
+        if (singleMarketToUpdate != null) {
+            result = runOnce;
+        } else {
+            result = aotdCommodities != null
                     && mtMarketPrepDone
                     && mtDataCreated
+                    && mtCaptureDone
                     && mtWorkersSubmitted
                     && mtWorkersFinished
+                    && mtCommitDone
                     && mtListenersNotified;
         }
 
-        if (singleMarketToUpdate != null) {
-            return runOnce;
+        if (result && !baselineTaskClosed) {
+            baselineTaskClosed = true;
+            if (baselineTaskScope != null) baselineTaskScope.close();
         }
-
-        return aotdCommodities != null && aotdIndex >= aotdCommodities.size();
+        return result;
     }
 
     @Override
@@ -1142,7 +1726,7 @@ public class AoTdMainWorkTask2 extends MainWorkTask2 {
                     return trade;
                 }
             }
-        } catch (Throwable ignored) {
+        } catch (RuntimeException ignored) {
             /* Different decompiled/API paths may not expose all three mods. */
         }
 
@@ -1184,7 +1768,7 @@ public class AoTdMainWorkTask2 extends MainWorkTask2 {
             String key = AOTD_STATE_PRESSURE_ANCHOR_PREFIX + mode + "_" + stateAnchorKey;
             Object value = market.getMemoryWithoutUpdate().get(key);
             return value instanceof Number ? Math.max(0f, ((Number) value).floatValue()) : 0f;
-        } catch (Throwable ignored) {
+        } catch (RuntimeException ignored) {
             return 0f;
         }
     }
@@ -1219,7 +1803,7 @@ public class AoTdMainWorkTask2 extends MainWorkTask2 {
 
             market.getMemoryWithoutUpdate().set(key, stored, 31f);
             return Math.max(AOTD_REFERENCE_TRADE_QUANTITY, stored);
-        } catch (Throwable ignored) {
+        } catch (RuntimeException ignored) {
             return fallback;
         }
     }

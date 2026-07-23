@@ -9,6 +9,7 @@ import com.fs.starfarer.api.impl.campaign.econ.impl.BaseIndustry;
 import com.fs.starfarer.api.impl.campaign.econ.impl.Farming;
 import com.fs.starfarer.api.impl.campaign.ids.Commodities;
 import com.fs.starfarer.api.impl.campaign.ids.Industries;
+import data.kaysaar.aotd.tot.compat.SchedulerBridge;
 
 import java.util.ArrayList;
 import java.util.Map;
@@ -53,6 +54,27 @@ public class AoTDToolboxFoodProd extends BaseMarketConditionPlugin {
 
     @Override
     public void apply(String id) {
+        boolean conditionStructureMutation =
+                !market.hasCondition("aotd_toolbox_food_corrector_start")
+                        || market.getConditions().get(market.getConditions().size() - 1) != this.condition;
+        if (!conditionStructureMutation) {
+            applyWithoutConditionBoundary(id);
+            return;
+        }
+        long token = SchedulerBridge.beforeMarketMutation(
+                market, SchedulerBridge.MUTATION_CONDITION_STRUCTURE);
+        try {
+            applyWithoutConditionBoundary(id);
+        } finally {
+            SchedulerBridge.afterMarketMutation(token, market,
+                    SchedulerBridge.DIRTY_STRUCTURE
+                            | SchedulerBridge.DIRTY_CONDITIONS
+                            | SchedulerBridge.DIRTY_DERIVED_ECONOMY,
+                    0L);
+        }
+    }
+
+    private void applyWithoutConditionBoundary(String id) {
         super.apply(id);
         if(!market.hasCondition("aotd_toolbox_food_corrector_start")){
             ArrayList<MarketConditionAPI>conditionAPIS = new ArrayList<>(market.getConditions());

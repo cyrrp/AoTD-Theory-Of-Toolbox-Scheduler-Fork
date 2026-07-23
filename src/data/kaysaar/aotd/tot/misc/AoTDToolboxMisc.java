@@ -10,6 +10,7 @@ import com.fs.starfarer.api.combat.MutableStat;
 import com.fs.starfarer.api.impl.campaign.ids.Factions;
 import com.fs.starfarer.api.impl.campaign.submarkets.LocalResourcesSubmarketPlugin;
 import com.fs.starfarer.api.util.Misc;
+import data.kaysaar.aotd.tot.compat.SchedulerBridge;
 import data.kaysaar.aotd.tot.plugins.AoTDCommodityEconSpecManager;
 import data.kaysaar.aotd.tot.scripts.commoditydata.AoTDCommodityOnMarket;
 import data.kaysaar.aotd.tot.scripts.economy.AoTDSectorProductionDemandDataUtils;
@@ -41,24 +42,32 @@ public class AoTDToolboxMisc {
             if (planet.getName().equals(Planetname)) {
 
                 if (planet.getMarket() == null) continue;
-                SpecialItemData data = null;
-                if (removeIndustry != null && planet.getMarket().getIndustry(removeIndustry) != null) {
-
-                    data = planet.getMarket().getIndustry(removeIndustry).getSpecialItem();
-                    planet.getMarket().removeIndustry(removeIndustry, null, false);
-
-                }
-                if (industryId != null) {
-                    planet.getMarket().addIndustry(industryId);
-                    planet.getMarket().getIndustry(industryId).setImproved(toImprove);
-                    planet.getMarket().getIndustry(industryId).setAICoreId(aiCore);
-                    if (data != null) {
-                        planet.getMarket().getIndustry(industryId).setSpecialItem(data);
+                MarketAPI mutationMarket = planet.getMarket();
+                long token = SchedulerBridge.beforeMarketMutation(
+                        mutationMarket, SchedulerBridge.MUTATION_INDUSTRY_STRUCTURE);
+                try {
+                    SpecialItemData data = null;
+                    if (removeIndustry != null && mutationMarket.getIndustry(removeIndustry) != null) {
+                        data = mutationMarket.getIndustry(removeIndustry).getSpecialItem();
+                        mutationMarket.removeIndustry(removeIndustry, null, false);
                     }
-                    if (itemToInsert != null) {
-                        SpecialItemData daten = new SpecialItemData(itemToInsert, null);
-                        planet.getMarket().getIndustry(industryId).setSpecialItem(daten);
+                    if (industryId != null) {
+                        mutationMarket.addIndustry(industryId);
+                        mutationMarket.getIndustry(industryId).setImproved(toImprove);
+                        mutationMarket.getIndustry(industryId).setAICoreId(aiCore);
+                        if (data != null) {
+                            mutationMarket.getIndustry(industryId).setSpecialItem(data);
+                        }
+                        if (itemToInsert != null) {
+                            SpecialItemData daten = new SpecialItemData(itemToInsert, null);
+                            mutationMarket.getIndustry(industryId).setSpecialItem(daten);
+                        }
                     }
+                } finally {
+                    SchedulerBridge.afterMarketMutation(token, mutationMarket,
+                            SchedulerBridge.DIRTY_STRUCTURE
+                                    | SchedulerBridge.DIRTY_INDUSTRIES
+                                    | SchedulerBridge.DIRTY_DERIVED_ECONOMY, 0L);
                 }
 
 

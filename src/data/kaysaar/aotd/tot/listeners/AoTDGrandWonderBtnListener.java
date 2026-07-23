@@ -11,6 +11,7 @@ import com.fs.starfarer.api.impl.campaign.econ.impl.BaseIndustry;
 import com.fs.starfarer.api.ui.CustomPanelAPI;
 import com.fs.starfarer.api.ui.TooltipMakerAPI;
 import com.fs.starfarer.api.util.Misc;
+import data.kaysaar.aotd.tot.compat.SchedulerBridge;
 import data.kaysaar.aotd.tot.grandwonders.GrandWonderAPI;
 import data.kaysaar.aotd.tot.grandwonders.GrandWonderManager;
 import data.kaysaar.aotd.tot.industries.AoTDConstructionSite;
@@ -96,10 +97,19 @@ public class AoTDGrandWonderBtnListener implements IndustryOptionProvider {
                 @Override
                 public void customDialogConfirm() {
                     MarketAPI market  = industry.getMarket();
-                    market.removeIndustry(industry.getId(), MarketAPI.MarketInteractionMode.REMOTE,false);
-                    GrandWonderManager.getInstance().removeBuiltSoFar(industry.getId());
-                    for (MarketAPI factionMarket : Misc.getFactionMarkets(market.getFaction())) {
-                        factionMarket.getStability().addTemporaryModFlat(365,"aotd_wonder_destroyed_"+industry.getId(),"Destruction of wonder",-3);
+                    long token = SchedulerBridge.beforeMarketMutation(
+                            market, SchedulerBridge.MUTATION_INDUSTRY_STRUCTURE);
+                    try {
+                        market.removeIndustry(industry.getId(), MarketAPI.MarketInteractionMode.REMOTE,false);
+                        GrandWonderManager.getInstance().removeBuiltSoFar(industry.getId());
+                        for (MarketAPI factionMarket : Misc.getFactionMarkets(market.getFaction())) {
+                            factionMarket.getStability().addTemporaryModFlat(365,"aotd_wonder_destroyed_"+industry.getId(),"Destruction of wonder",-3);
+                        }
+                    } finally {
+                        SchedulerBridge.afterMarketMutation(token, market,
+                                SchedulerBridge.DIRTY_STRUCTURE
+                                        | SchedulerBridge.DIRTY_INDUSTRIES
+                                        | SchedulerBridge.DIRTY_DERIVED_ECONOMY, 0L);
                     }
                 }
 

@@ -139,9 +139,6 @@ public class CommoditiesPanelInjector implements MarketUIListener {
                                     SharedUnlockData.get().reportPlayerAwareOfIndustry(ind.getSpec().getId(), true);
                                 }
                                 tooltip.setCodexEntryId(CodexDataV2.getIndustryEntryId(ind.getSpec().getId()));
-                                if(AoTDIndustryData.getInstance(ind.getMarket()).isPending(ind.getId())){
-                                    ind.unapply();
-                                }
 
                             }
                         },object, TooltipMakerAPI.TooltipLocation.RIGHT,false);
@@ -229,9 +226,6 @@ public class CommoditiesPanelInjector implements MarketUIListener {
                                 SharedUnlockData.get().reportPlayerAwareOfIndustry(ind.getSpec().getId(), true);
                             }
                             tooltip.setCodexEntryId(CodexDataV2.getIndustryEntryId(ind.getSpec().getId()));
-                            if(AoTDIndustryData.getInstance(ind.getMarket()).isPending(ind.getId())){
-                                ind.unapply();
-                            }
 
                         }
                     },widget, TooltipMakerAPI.TooltipLocation.RIGHT,false);
@@ -281,9 +275,6 @@ public class CommoditiesPanelInjector implements MarketUIListener {
                                 SharedUnlockData.get().reportPlayerAwareOfIndustry(ind.getSpec().getId(), true);
                             }
                             tooltip.setCodexEntryId(CodexDataV2.getIndustryEntryId(ind.getSpec().getId()));
-                            if(AoTDIndustryData.getInstance(ind.getMarket()).isPending(ind.getId())){
-                                ind.unapply();
-                            }
 
                         }
                     },widget, TooltipMakerAPI.TooltipLocation.RIGHT,false);

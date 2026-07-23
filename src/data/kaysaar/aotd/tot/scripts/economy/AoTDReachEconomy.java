@@ -17,10 +17,11 @@ public class AoTDReachEconomy extends ReachEconomy {
             admin.getStats().refreshCharacterStatsEffects();
             admin.getStats().refreshGovernedOutpostEffects(market);
         }
-        final MainWorkTask2 workTask = new AoTdMainWorkTask2(markets, this, econWorkParams);
+        final AoTdMainWorkTask2 workTask = new AoTdMainWorkTask2(markets, this, econWorkParams);
 
         while (!workTask.isDone()) {
             workTask.doNextBatch();
+            workTask.awaitWorkersIfSubmitted();
         }
 
         final AoTDUpdateMarketAgainTask marketUpdateTask = new AoTDUpdateMarketAgainTask((Economy) Global.getSector().getEconomy());
@@ -33,6 +34,12 @@ public class AoTDReachEconomy extends ReachEconomy {
             while (!immigrationTask.isDone()) {
                 immigrationTask.doNextBatch();
             }
+        }
+
+        final AoTDPostImmigrationTradeSnapshotTask tradeSnapshotTask =
+                new AoTDPostImmigrationTradeSnapshotTask(markets, "player-step");
+        while (!tradeSnapshotTask.isDone()) {
+            tradeSnapshotTask.doNextBatch();
         }
 
         final AoTDFinishEconomyUpdateTask finishUpdateTask = new AoTDFinishEconomyUpdateTask((Economy) Global.getSector().getEconomy());
@@ -49,10 +56,11 @@ public class AoTDReachEconomy extends ReachEconomy {
             admin.getStats().refreshCharacterStatsEffects();
             admin.getStats().refreshGovernedOutpostEffects(openMarket);
 
-            final MainWorkTask2 workTask = new AoTdMainWorkTask2(markets, this, econWorkParams, openMarket);
+            final AoTdMainWorkTask2 workTask = new AoTdMainWorkTask2(markets, this, econWorkParams, openMarket);
 
             while (!workTask.isDone()) {
                 workTask.doNextBatch();
+                workTask.awaitWorkersIfSubmitted();
             }
 
             final AoTDUpdateMarketAgainTask marketUpdateTask = new AoTDUpdateMarketAgainTask((Economy) Global.getSector().getEconomy(), openMarket);
@@ -67,10 +75,11 @@ public class AoTDReachEconomy extends ReachEconomy {
                 admin.getStats().refreshGovernedOutpostEffects(market);
             }
 
-            final MainWorkTask2 workTask = new AoTdMainWorkTask2(markets, this, econWorkParams);
+            final AoTdMainWorkTask2 workTask = new AoTdMainWorkTask2(markets, this, econWorkParams);
 
             while (!workTask.isDone()) {
                 workTask.doNextBatch();
+                workTask.awaitWorkersIfSubmitted();
             }
 
             final AoTDUpdateMarketAgainTask marketUpdateTask = new AoTDUpdateMarketAgainTask((Economy) Global.getSector().getEconomy());
@@ -85,6 +94,12 @@ public class AoTDReachEconomy extends ReachEconomy {
             while (!immigrationTask.isDone()) {
                 immigrationTask.doNextBatch();
             }
+        }
+
+        final AoTDPostImmigrationTradeSnapshotTask tradeSnapshotTask =
+                new AoTDPostImmigrationTradeSnapshotTask(markets, "manual-step");
+        while (!tradeSnapshotTask.isDone()) {
+            tradeSnapshotTask.doNextBatch();
         }
 
         final FinishEconomyUpdateTask finishUpdateTask = new AoTDFinishEconomyUpdateTask((Economy) Global.getSector().getEconomy());

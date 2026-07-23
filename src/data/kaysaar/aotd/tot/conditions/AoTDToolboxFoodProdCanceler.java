@@ -7,6 +7,8 @@ import com.fs.starfarer.api.impl.campaign.econ.BaseMarketConditionPlugin;
 import com.fs.starfarer.api.impl.campaign.ids.Commodities;
 import com.fs.starfarer.campaign.econ.Market;
 import data.kaysaar.aotd.tot.plugins.AoTDToolboxTheoryPlugin;
+import data.kaysaar.aotd.tot.compat.MarketRegistry;
+import data.kaysaar.aotd.tot.compat.SchedulerBridge;
 
 import java.util.ArrayList;
 
@@ -21,6 +23,36 @@ public class AoTDToolboxFoodProdCanceler extends BaseMarketConditionPlugin {
     }
     @Override
     public void apply(String id) {
+        boolean conditionOrderMutation = market.getConditions().get(0) != this.condition;
+        boolean commodityStructureMutation =
+                (Global.LOADING_SAVE && AoTDToolboxTheoryPlugin.afterSaveState)
+                        || runningPrePlayerEconomy;
+        if (!conditionOrderMutation && !commodityStructureMutation) {
+            applyWithoutStructureBoundary(id);
+            return;
+        }
+        int reason = 0;
+        int dirty = SchedulerBridge.DIRTY_STRUCTURE
+                | SchedulerBridge.DIRTY_DERIVED_ECONOMY;
+        if (conditionOrderMutation) {
+            reason |= SchedulerBridge.MUTATION_CONDITION_STRUCTURE;
+            dirty |= SchedulerBridge.DIRTY_CONDITIONS;
+        }
+        if (commodityStructureMutation) {
+            reason |= SchedulerBridge.MUTATION_COMMODITY_STRUCTURE;
+            dirty |= MarketRegistry.DIRTY_VALUE_STATE
+                    | MarketRegistry.DIRTY_PRICE
+                    | MarketRegistry.DIRTY_STOCKPILE;
+        }
+        long token = SchedulerBridge.beforeMarketMutation(market, reason);
+        try {
+            applyWithoutStructureBoundary(id);
+        } finally {
+            SchedulerBridge.afterMarketMutation(token, market, dirty, 0L);
+        }
+    }
+
+    private void applyWithoutStructureBoundary(String id) {
         super.apply(id);
         if(market.getConditions().get(0)!=this.condition){
             ArrayList<MarketConditionAPI> conditionAPIS = new ArrayList<>(market.getConditions());

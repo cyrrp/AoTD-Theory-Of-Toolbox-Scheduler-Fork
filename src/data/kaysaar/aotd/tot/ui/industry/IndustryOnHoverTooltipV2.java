@@ -2,15 +2,12 @@ package data.kaysaar.aotd.tot.ui.industry;
 
 import ashlib.data.plugins.ui.models.ExtendedUIPanelPlugin;
 import com.fs.starfarer.api.Global;
-import com.fs.starfarer.api.campaign.econ.CommodityOnMarketAPI;
 import com.fs.starfarer.api.campaign.econ.Industry;
 import com.fs.starfarer.api.input.InputEventAPI;
 import com.fs.starfarer.api.ui.*;
 import data.kaysaar.aotd.tot.plugins.ReflectionUtilis;
-import data.kaysaar.aotd.tot.scripts.economy.AoTDIndustryData;
 import data.kaysaar.aotd.tot.ui.commoditypanel.AoTDCommodityShortPanelCombined;
 
-import java.util.Iterator;
 import java.util.List;
 
 public class IndustryOnHoverTooltipV2 implements ExtendedUIPanelPlugin {
@@ -61,25 +58,9 @@ public class IndustryOnHoverTooltipV2 implements ExtendedUIPanelPlugin {
     public void createUI() {
         TooltipMakerAPI tooltipHeight = mainPanel.createUIElement(mainPanel.getPosition().getWidth(), 10000, false);
         TooltipMakerAPI firstHalf = mainPanel.createUIElement(mainPanel.getPosition().getWidth(), 100000, true);
-        ind.getMarket().reapplyConditions();
-        boolean hasFreePort = ind.getMarket().isFreePort();
-        for (Industry industry : ind.getMarket().getIndustries()) {
-            if(!AoTDIndustryData.getInstance(industry.getMarket()).isPending(industry.getId())){
-                industry.reapply();
-            }
-        }
-
-        boolean needToAddIndustry = !ind.getMarket().hasIndustry(ind.getId());
-        //addDialogMode = true;
-        if (needToAddIndustry) {
-            for (CommodityOnMarketAPI curr : ind.getMarket().getAllCommodities()) {
-                curr.getAvailableStat().setBaseValue(10000);
-            }
-            ind.apply();
-            ind.getMarket().reapplyConditions();
-            ind.apply();
-        }
-
+        // The economy pipeline owns materialized market state. Tooltips are
+        // read-only consumers and must not replay conditions, apply industries,
+        // or temporarily overwrite commodity availability on the live market.
         ind.createTooltip(mode, firstHalf, expanded);
         UIPanelAPI holder = (UIPanelAPI) ReflectionUtilis.getChildrenCopy(firstHalf).get(0);
         List<UIComponentAPI> comps = ReflectionUtilis.getChildrenCopy((UIPanelAPI) holder);
@@ -147,14 +128,6 @@ public class IndustryOnHoverTooltipV2 implements ExtendedUIPanelPlugin {
 
         mainPanel.getPosition().setSize(mainPanel.getPosition().getWidth(), lastRecordedY);
         mainPanel.addUIElement(tooltipHeight).inTL(0, 0);
-        if (needToAddIndustry) {
-            ind.unapply();
-            for (CommodityOnMarketAPI curr : ind.getMarket().getAllCommodities()) {
-                curr.getAvailableStat().setBaseValue(0);
-            }
-            ind.getMarket().reapplyConditions();
-        }
-        ind.getMarket().setFreePort(hasFreePort);
         this.tl = tooltipHeight;
 
     }

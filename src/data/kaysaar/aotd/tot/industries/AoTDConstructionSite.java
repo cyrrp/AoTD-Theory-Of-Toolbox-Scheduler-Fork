@@ -1,5 +1,6 @@
 package data.kaysaar.aotd.tot.industries;
 
+import data.kaysaar.aotd.tot.compat.SchedulerBridge;
 import ashlib.data.plugins.ui.models.ProgressBarComponentV2;
 import com.fs.starfarer.api.Global;
 import com.fs.starfarer.api.campaign.comm.CommMessageAPI;
@@ -54,7 +55,16 @@ public class AoTDConstructionSite extends BaseIndustry {
 
     @Override
     protected void buildingFinished() {
+        long token = SchedulerBridge.beforeMarketMutation(
+                market, SchedulerBridge.MUTATION_INDUSTRY_STRUCTURE);
+        try {
         super.buildingFinished();
+        } finally {
+            SchedulerBridge.afterMarketMutation(token, market,
+                    SchedulerBridge.DIRTY_STRUCTURE
+                            | SchedulerBridge.DIRTY_INDUSTRIES
+                            | SchedulerBridge.DIRTY_DERIVED_ECONOMY, 0L);
+        }
     }
 
     public float getAllowedProgressOnRestoration() {
@@ -259,22 +269,31 @@ public class AoTDConstructionSite extends BaseIndustry {
                 }
                 float progress = getBuildOrUpgradeProgress();
                 if (daysPassedOnConstruction >= totalDaysNeeded || progress >= 1f) {
-                    daysPassedOnConstruction = totalDaysNeeded;
-                    building = false;
-                    GrandWonderAPI wonderAPI1 = (GrandWonderAPI) market.instantiateIndustry(wonderAPI.getId());
-                    wonderAPI.doPreSaveCleanup();
-                    wonderAPI = null;
-                    wonderAPI1.finishedConstruction(market);
-                    market.getIndustries().add(wonderAPI1);
-                    MessageIntel intel = new MessageIntel(wonderAPI1.getCurrentName() + " at " + market.getName(), Misc.getBasePlayerColor());
-                    intel.addLine(BaseIntelPlugin.BULLET + "Construction completed");
-                    intel.setIcon(Global.getSector().getPlayerFaction().getCrest());
-                    intel.setSound(BaseIntelPlugin.getSoundStandardUpdate());
-                    Global.getSector().getCampaignUI().addMessage(intel, CommMessageAPI.MessageClickAction.COLONY_INFO, market);
-                    AoTDIndustryData.getInstance(market).statesOnMarket.put(wonderAPI1.getId(), AoTDIndustryData.AoTDIndustryState.ALREADY_WORKING);
-                    AoTDTradeContractManager.getInstance().removeContract(getUniqueIdForContract());
-                    GrandWonderManager.getInstance().addBuiltSoFar(wonderAPI1.getId(), 1);
-                    market.removeIndustry(this.getId(), MarketAPI.MarketInteractionMode.REMOTE, false);
+                    long token = SchedulerBridge.beforeMarketMutation(
+                            market, SchedulerBridge.MUTATION_INDUSTRY_STRUCTURE);
+                    try {
+                        daysPassedOnConstruction = totalDaysNeeded;
+                        building = false;
+                        GrandWonderAPI wonderAPI1 = (GrandWonderAPI) market.instantiateIndustry(wonderAPI.getId());
+                        wonderAPI.doPreSaveCleanup();
+                        wonderAPI = null;
+                        wonderAPI1.finishedConstruction(market);
+                        market.getIndustries().add(wonderAPI1);
+                        MessageIntel intel = new MessageIntel(wonderAPI1.getCurrentName() + " at " + market.getName(), Misc.getBasePlayerColor());
+                        intel.addLine(BaseIntelPlugin.BULLET + "Construction completed");
+                        intel.setIcon(Global.getSector().getPlayerFaction().getCrest());
+                        intel.setSound(BaseIntelPlugin.getSoundStandardUpdate());
+                        Global.getSector().getCampaignUI().addMessage(intel, CommMessageAPI.MessageClickAction.COLONY_INFO, market);
+                        AoTDIndustryData.getInstance(market).statesOnMarket.put(wonderAPI1.getId(), AoTDIndustryData.AoTDIndustryState.ALREADY_WORKING);
+                        AoTDTradeContractManager.getInstance().removeContract(getUniqueIdForContract());
+                        GrandWonderManager.getInstance().addBuiltSoFar(wonderAPI1.getId(), 1);
+                        market.removeIndustry(this.getId(), MarketAPI.MarketInteractionMode.REMOTE, false);
+                    } finally {
+                        SchedulerBridge.afterMarketMutation(token, market,
+                                SchedulerBridge.DIRTY_STRUCTURE
+                                        | SchedulerBridge.DIRTY_INDUSTRIES
+                                        | SchedulerBridge.DIRTY_DERIVED_ECONOMY, 0L);
+                    }
                 }
 
             }

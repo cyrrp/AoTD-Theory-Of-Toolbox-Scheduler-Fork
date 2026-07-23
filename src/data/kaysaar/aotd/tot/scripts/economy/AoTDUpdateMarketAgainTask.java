@@ -1,21 +1,31 @@
 package data.kaysaar.aotd.tot.scripts.economy;
 
 import com.fs.starfarer.api.Global;
+import com.fs.starfarer.api.campaign.econ.CommodityOnMarketAPI;
 import com.fs.starfarer.api.campaign.econ.Industry;
 import com.fs.starfarer.api.campaign.econ.MarketAPI;
 import com.fs.starfarer.campaign.econ.Economy;
 import com.fs.starfarer.campaign.econ.reach.UpdateMarketsAgainTask;
-import data.kaysaar.aotd.tot.scripts.trade.manager.AoTDTradeManager;
+import data.kaysaar.aotd.tot.compat.MarketRegistry;
+import data.kaysaar.aotd.tot.scripts.commoditydata.AoTDCommodityOnMarket;
 
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Finalizes one market's authoritative AoTD state after the price phase.
+ *
+ * <p>Stage 5 removes the unconditional second reconciliation pass. Industry
+ * apply/unapply is now executed only for pending/active transitions; a full
+ * local supply/demand refresh is performed only when such a transition changed
+ * the materialized industry state.</p>
+ */
 public class AoTDUpdateMarketAgainTask extends UpdateMarketsAgainTask {
 
     public static final String INITIAL_STAGE_DESC = "AoTD economy initial stage";
     private static final int REDUCTION = 10000;
 
-    private  List<MarketAPI> markets;
+    private List<MarketAPI> markets;
     private final MarketAPI singleMarket;
 
     private int marketIndex = 0;
@@ -37,18 +47,11 @@ public class AoTDUpdateMarketAgainTask extends UpdateMarketsAgainTask {
     public void doNextBatch() {
         if (isDone()) return;
 
-        /*
-         * Single-market mode.
-         *
-         * The old version processed the selected market, then continued into the
-         * normal all-market branch because it did not return and never set runOnce.
-         */
         if (singleMarket != null) {
             processMarket(singleMarket);
             done = true;
             return;
-
-        } else if (markets==null) {
+        } else if (markets == null) {
             markets = Global.getSector().getEconomy().getMarketsCopy();
         }
 
@@ -59,44 +62,116 @@ public class AoTDUpdateMarketAgainTask extends UpdateMarketsAgainTask {
 
         processMarket(markets.get(marketIndex));
         marketIndex++;
-
-        if (marketIndex >= markets.size()) {
-            done = true;
-        }
+        if (marketIndex >= markets.size()) done = true;
     }
 
     private static void processMarket(MarketAPI market) {
-        market.reapplyConditions();
-        AoTDTradeManager.getInstance().addMarket(market);
+        if (market == null) return;
+        long started = System.nanoTime();
         final AoTDIndustryData data = AoTDIndustryData.getInstance(market);
-        data.checkForNewIndustries(market);
+        boolean registryDirty = MarketRegistry.needsDerivedRefresh(market);
+        if (!registryDirty) {
+            AoTDEconomySemanticBaseline.operation(
+                    "update-market-again.skipped-current-market", market);
+            return;
+        }
 
-        for (Industry industry : market.getIndustries()) {
-            if (data.isPending(industry.getId())) {
-                applyPendingIndustrySuppression(industry);
-            } else {
-                restoreIndustry(industry);
+        boolean materializedRefresh = MarketRegistry.needsMaterializedReconciliation(market);
+        boolean desiredStateChanged = false;
+        if (materializedRefresh) {
+            try (AoTDEconomySemanticBaseline.Scope ignored =
+                         AoTDEconomySemanticBaseline.beginMarketMutation(
+                                 "update-market-again.detect-industry-state", market,
+                                 "authoritative-state-refresh")) {
+                AoTDEconomySemanticBaseline.operation("industry-data.check-new-industries", market);
+                desiredStateChanged = data.checkForNewIndustriesAndReport(market);
+            }
+        }
+
+        List<Industry> industries = new ArrayList<>(market.getIndustries());
+        boolean conditionsReapplied = false;
+        for (Industry industry : industries) {
+            if (data.needsReconciliation(industry.getId())) {
+                try (AoTDEconomySemanticBaseline.Scope ignored =
+                             AoTDEconomySemanticBaseline.beginMarketMutation(
+                                     "update-market-again.reapply-conditions", market,
+                                     "transition-only")) {
+                    AoTDEconomySemanticBaseline.operation(
+                            "market.reapplyConditions.transition-only", market);
+                    market.reapplyConditions();
+                }
+                conditionsReapplied = true;
+
+                // Conditions supplied by other mods may add or remove industries.
+                // Refresh both the desired-state map and the traversal snapshot
+                // after the callback so its live ArrayList is never iterated while
+                // it is being structurally modified.
+                desiredStateChanged |= data.checkForNewIndustriesAndReport(market);
+                industries = new ArrayList<>(market.getIndustries());
+                break;
+            }
+        }
+
+        int reconciled = 0;
+        for (Industry industry : industries) {
+            if (!data.needsReconciliation(industry.getId())) continue;
+
+            try (AoTDEconomySemanticBaseline.Scope ignored =
+                         AoTDEconomySemanticBaseline.beginMarketMutation(
+                                 "update-market-again.reconcile-industry", market,
+                                 industry.getId())) {
+                if (data.isPending(industry.getId())) {
+                    AoTDEconomySemanticBaseline.operation("industry.pending-suppression", market);
+                    applyPendingIndustrySuppression(industry);
+                } else {
+                    AoTDEconomySemanticBaseline.operation("industry.restore-active", market);
+                    restoreIndustry(industry);
+                }
+                data.markReconciled(industry.getId());
+                reconciled++;
+            }
+        }
+
+        if (conditionsReapplied || reconciled > 0 || desiredStateChanged) {
+            refreshAuthoritativeSupplyDemand(market);
+        } else {
+            AoTDEconomySemanticBaseline.operation(
+                    "update-market-again.reconciliation-skipped-unchanged", market);
+        }
+
+        long elapsed = Math.max(0L, System.nanoTime() - started);
+        if (materializedRefresh || conditionsReapplied || desiredStateChanged || reconciled > 0) {
+            MarketRegistry.commitMaterializedState(market, elapsed);
+        }
+
+        // Trade inputs are captured only after ImmigrationTask. Publishing here
+        // would expose a pre-growth snapshot to the same iteration's global cut.
+        AoTDEconomySemanticBaseline.operation(
+                "update-market-again.trade-snapshot-deferred-post-immigration", market);
+    }
+
+    private static void refreshAuthoritativeSupplyDemand(MarketAPI market) {
+        try (AoTDEconomySemanticBaseline.Scope ignored =
+                     AoTDEconomySemanticBaseline.begin(
+                             "update-market-again.authoritative-supply-demand", market,
+                             "transition-refresh")) {
+            for (CommodityOnMarketAPI commodity : new ArrayList<>(market.getAllCommodities())) {
+                if (commodity instanceof AoTDCommodityOnMarket aotdCommodity) {
+                    aotdCommodity.getSupplyDemandData().updateSupplyDemandData(market, true);
+                }
             }
         }
     }
 
     public static void applyPendingIndustrySuppression(Industry industry) {
         industry.getSupplyBonusFromOther().modifyFlat(
-            AoTDIndustryData.source,
-            -getReduction(),
-            INITIAL_STAGE_DESC
-        );
-
+                AoTDIndustryData.source, -getReduction(), INITIAL_STAGE_DESC);
         industry.getDemandReductionFromOther().modifyFlat(
-            AoTDIndustryData.source,
-            getReduction(),
-            INITIAL_STAGE_DESC
-        );
+                AoTDIndustryData.source, getReduction(), INITIAL_STAGE_DESC);
 
-        /*
-         * Keep the original order for pending industries.
-         */
+        AoTDEconomySemanticBaseline.operation("industry.apply.pending", industry.getMarket());
         industry.apply();
+        AoTDEconomySemanticBaseline.operation("industry.unapply.pending", industry.getMarket());
         industry.unapply();
     }
 
@@ -104,10 +179,9 @@ public class AoTDUpdateMarketAgainTask extends UpdateMarketsAgainTask {
         industry.getSupplyBonusFromOther().unmodifyFlat(AoTDIndustryData.source);
         industry.getDemandReductionFromOther().unmodifyFlat(AoTDIndustryData.source);
 
-        /*
-         * Keep the original order for active industries.
-         */
+        AoTDEconomySemanticBaseline.operation("industry.unapply.active", industry.getMarket());
         industry.unapply();
+        AoTDEconomySemanticBaseline.operation("industry.apply.active", industry.getMarket());
         industry.apply();
     }
 

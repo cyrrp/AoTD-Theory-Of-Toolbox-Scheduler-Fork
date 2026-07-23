@@ -4,12 +4,9 @@ import com.fs.starfarer.api.Global;
 import com.fs.starfarer.api.campaign.econ.CommoditySpecAPI;
 import com.fs.starfarer.api.combat.MutableStat;
 import com.fs.starfarer.api.combat.MutableStatWithTempMods;
-import com.fs.starfarer.api.impl.campaign.ids.Commodities;
 import com.fs.starfarer.api.impl.campaign.ids.Submarkets;
-import com.fs.starfarer.api.impl.campaign.submarkets.LocalResourcesSubmarketPlugin;
 import data.kaysaar.aotd.tot.scripts.economy.AoTDEconomy;
 import data.kaysaar.aotd.tot.scripts.economy.AoTdMainWorkTask2;
-import data.kaysaar.aotd.tot.scripts.submarket.aotd.AoTDLocalResourcesSubmarketPlugin;
 import data.kaysaar.aotd.tot.scripts.trade.manager.AoTDTradeManager;
 import data.kaysaar.aotd.tot.strings.AoTDTradeTags;
 
@@ -110,31 +107,98 @@ public class AoTDExcDefData {
 
         else excess.removeTemporaryMod(EXT_TRADE_ID);
     }
-    public void applyDeficitDueToSuddenChangeOfDemand(AoTDCommodityOnMarket commodity){
+    /**
+     * Builds the sudden-demand change without mutating the live commodity.
+     * Stage 8.2 carries this proposal with the price snapshot and only applies
+     * it after the work ticket has passed generation validation.
+     */
+    public PreparedSuddenDemandUpdate prepareDeficitDueToSuddenChangeOfDemand(
+            AoTDCommodityOnMarket commodity) {
+        int currentDemand = commodity.getSupplyDemandData()
+                .getDemandExceptPendingIndustries(commodity.getMarket());
+        int recorded = (int) recordedDemandFromNonPendingThisMonth;
 
-        int currDemand = commodity.getSupplyDemandData().getDemandExceptPendingIndustries(commodity.getMarket());
+        boolean recordOnly = AoTDEconomy.runningPrePlayerEconomy
+                || (!commodity.getMarket().isPlayerOwned()
+                && Global.getSector().getClock().getMonth() <= 3
+                && Global.getSector().getClock().getCycle() <= 206);
 
-        int recoreded = (int) recordedDemandFromNonPendingThisMonth;
-        if(AoTDEconomy.runningPrePlayerEconomy){
-            this.recordedDemandFromNonPendingThisMonth = currDemand;
-            return;
+        int oldModifier = getFlatModifierInt(deficit, DEF_FROM_NEW_IND);
+        int nextModifier = oldModifier;
+        boolean replaceModifier = false;
+        if (!recordOnly) {
+            int diff = currentDemand - recorded;
+            nextModifier = Math.max(0, diff);
+            replaceModifier = true;
         }
-        //This is to prevent early stage deficits due to placement of industries via other mods
-        if(!commodity.getMarket().isPlayerOwned()&& Global.getSector().getClock().getMonth()<=3&&Global.getSector().getClock().getCycle()<=206){
-            this.recordedDemandFromNonPendingThisMonth = currDemand;
-            return;
+
+        int projectedDeficitRaw = deficit.getModifiedInt();
+        if (replaceModifier) {
+            projectedDeficitRaw = projectedDeficitRaw - oldModifier + nextModifier;
         }
-        int diff =currDemand - recoreded;
-        if(commodity.getSpec().getId().equals(Commodities.SUPPLIES)){
-            String hehe = "ege";
+        int projectedEffectiveDeficit = Math.max(
+                0, projectedDeficitRaw - excess.getModifiedInt());
+        int projectedEffectiveExcess = Math.max(
+                0, excess.getModifiedInt() - projectedDeficitRaw);
+
+        return new PreparedSuddenDemandUpdate(
+                this, currentDemand, nextModifier, replaceModifier,
+                projectedEffectiveDeficit, projectedEffectiveExcess);
+    }
+
+    /** Applies a previously prepared change after generation validation. */
+    public void commitPreparedSuddenDemandUpdate(
+            PreparedSuddenDemandUpdate prepared) {
+        if (prepared == null || prepared.owner != this) {
+            throw new IllegalArgumentException(
+                    "Prepared sudden-demand update belongs to another owner");
         }
-        if(diff>0){
-            deficit.addTemporaryModFlat(31,DEF_FROM_NEW_IND,"Sudden surge of demand", diff);
-        }
-        else{
+        recordedDemandFromNonPendingThisMonth = prepared.recordedDemand;
+        if (!prepared.replaceModifier) return;
+        if (prepared.modifierAmount > 0) {
+            deficit.addTemporaryModFlat(
+                    31, DEF_FROM_NEW_IND, "Sudden surge of demand",
+                    prepared.modifierAmount);
+        } else {
             deficit.removeTemporaryMod(DEF_FROM_NEW_IND);
         }
+    }
 
+    /** Compatibility entry point for non-price callers. */
+    public void applyDeficitDueToSuddenChangeOfDemand(
+            AoTDCommodityOnMarket commodity) {
+        commitPreparedSuddenDemandUpdate(
+                prepareDeficitDueToSuddenChangeOfDemand(commodity));
+    }
+
+    private static int getFlatModifierInt(
+            MutableStat stat, String modifierId) {
+        MutableStat.StatMod mod = stat.getFlatMods().get(modifierId);
+        return mod == null ? 0 : Math.round(mod.value);
+    }
+
+    public static final class PreparedSuddenDemandUpdate {
+        private final AoTDExcDefData owner;
+        public final int recordedDemand;
+        public final int modifierAmount;
+        public final boolean replaceModifier;
+        public final int projectedEffectiveDeficit;
+        public final int projectedEffectiveExcess;
+
+        private PreparedSuddenDemandUpdate(
+                AoTDExcDefData owner,
+                int recordedDemand,
+                int modifierAmount,
+                boolean replaceModifier,
+                int projectedEffectiveDeficit,
+                int projectedEffectiveExcess) {
+            this.owner = owner;
+            this.recordedDemand = recordedDemand;
+            this.modifierAmount = modifierAmount;
+            this.replaceModifier = replaceModifier;
+            this.projectedEffectiveDeficit = projectedEffectiveDeficit;
+            this.projectedEffectiveExcess = projectedEffectiveExcess;
+        }
     }
 
 

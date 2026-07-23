@@ -4,7 +4,6 @@ package data.kaysaar.aotd.tot.scripts.trade.models;
 import com.fs.starfarer.api.Global;
 import com.fs.starfarer.api.campaign.FactionAPI;
 import com.fs.starfarer.api.campaign.econ.MarketAPI;
-import com.fs.starfarer.api.util.Misc;
 import data.kaysaar.aotd.tot.scripts.commoditydata.AoTDCommodityOnMarket;
 import data.kaysaar.aotd.tot.scripts.economy.AoTDEconomy;
 import data.kaysaar.aotd.tot.scripts.economy.AoTDWorkerManager;
@@ -34,10 +33,14 @@ public class AoTDFactionTradeData {
     }
 
     public void removeMarket(MarketAPI market) {
-        if (tradeData.containsKey(market.getId())) {
-            tradeData.remove(market.getId());
+        if (market != null && removeMarketSnapshot(market.getId())) {
             computeInternalTrade(); // rebuild remainingNet
         }
+    }
+
+    /** Removes only the authoritative snapshot; settlement is a later phase. */
+    public boolean removeMarketSnapshot(String marketId) {
+        return marketId != null && tradeData.remove(marketId) != null;
     }
 
     private boolean isBeforeStartOfHistory(int cycle, int month) {
@@ -173,8 +176,13 @@ public class AoTDFactionTradeData {
     }
 
     public void addMarket(MarketAPI market) {
-        tradeData.put(market.getId(), new AoTDMarketData(market));
-        // no cached flag anymore; computeInternalTrade is cheap enough and you call it once/month anyway
+        putMarketSnapshot(new AoTDMarketData(market));
+    }
+
+    public void putMarketSnapshot(AoTDMarketData snapshot) {
+        if (snapshot != null && snapshot.marketId != null) {
+            tradeData.put(snapshot.marketId, snapshot);
+        }
     }
 
     public void reset() {
