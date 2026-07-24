@@ -1,21 +1,25 @@
 package data.kaysaar.aotd.tot.compat;
 
+import data.kaysaar.aotd.tot.scripts.economy.AoTDRuntimeEpoch;
+
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.IdentityHashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * AoTD-owned market registry and coalescing dirty queue.
  *
- * <p>The market-id lookup is lock-free because it is used from synchronous
- * price APIs. Registry/queue transitions remain serialized under one short-lived
- * lock. A market has at most one queued or in-flight ticket; later events are
- * merged into one replacement revision.</p>
+ * <p>The dirty mask is a work queue, not a causal validity token. Each market
+ * also owns a domain-specific revision vector. Price results are validated only
+ * against price dependencies; trade/accessibility-only mutations therefore do
+ * not invalidate an in-flight price result.</p>
  */
 public final class MarketRegistry {
     public static final int DIRTY_TIME_DELIVERED = 1 << 4;
@@ -27,7 +31,7 @@ public final class MarketRegistry {
     public static final int DIRTY_GLOBAL_REVISION = 1 << 10;
     public static final int DIRTY_INITIAL_REGISTRATION = 1 << 11;
 
-    /** Bits fully satisfied by the Stage 6 local price/stockpile commit. */
+    /** Bits fully satisfied by the local price/stockpile commit. */
     public static final int PRICE_WORK_MASK = DIRTY_PRICE | DIRTY_STOCKPILE;
 
     public static final int PRIORITY_NORMAL = 0;
@@ -35,15 +39,68 @@ public final class MarketRegistry {
     public static final int PRIORITY_PLAYER = 20;
     public static final int PRIORITY_IMMEDIATE = 30;
 
+    private static final int MATERIALIZED_WORK_MASK = SchedulerBridge.DIRTY_STRUCTURE
+            | SchedulerBridge.DIRTY_INDUSTRIES
+            | SchedulerBridge.DIRTY_CONDITIONS
+            | DIRTY_TIME_DELIVERED
+            | DIRTY_VALUE_STATE
+            | DIRTY_INITIAL_REGISTRATION;
+
+    private static final int TRADE_WORK_MASK = SchedulerBridge.DIRTY_STRUCTURE
+            | SchedulerBridge.DIRTY_INDUSTRIES
+            | SchedulerBridge.DIRTY_CONDITIONS
+            | SchedulerBridge.DIRTY_DERIVED_ECONOMY
+            | DIRTY_TIME_DELIVERED
+            | DIRTY_VALUE_STATE
+            | DIRTY_ACCESSIBILITY
+            | DIRTY_TRADE
+            | DIRTY_GLOBAL_REVISION
+            | DIRTY_INITIAL_REGISTRATION;
+
+    private static final int PRICE_REVISION_MASK = SchedulerBridge.DIRTY_STRUCTURE
+            | SchedulerBridge.DIRTY_INDUSTRIES
+            | SchedulerBridge.DIRTY_CONDITIONS
+            | DIRTY_VALUE_STATE
+            | DIRTY_PRICE
+            | DIRTY_INITIAL_REGISTRATION;
+
+    private static final int MATERIALIZED_REVISION_MASK = SchedulerBridge.DIRTY_STRUCTURE
+            | SchedulerBridge.DIRTY_INDUSTRIES
+            | SchedulerBridge.DIRTY_CONDITIONS
+            | DIRTY_VALUE_STATE
+            | DIRTY_INITIAL_REGISTRATION;
+
+    private static final int ACCESSIBILITY_REVISION_MASK = SchedulerBridge.DIRTY_STRUCTURE
+            | SchedulerBridge.DIRTY_CONDITIONS
+            | DIRTY_ACCESSIBILITY
+            | DIRTY_GLOBAL_REVISION
+            | DIRTY_INITIAL_REGISTRATION;
+
+    private static final int TRADE_REVISION_MASK = TRADE_WORK_MASK;
+
+    private static final int DEP_STRUCTURE = 1;
+    private static final int DEP_MATERIALIZED = 1 << 1;
+    private static final int DEP_PRICE_INPUT = 1 << 2;
+    private static final int DEP_STOCKPILE = 1 << 3;
+    private static final int DEP_ACCESSIBILITY = 1 << 4;
+    private static final int DEP_TRADE_INPUT = 1 << 5;
+    private static final int DEP_TEMPORAL = 1 << 6;
+    private static final int PRICE_DEPENDENCIES = DEP_STRUCTURE | DEP_MATERIALIZED
+            | DEP_PRICE_INPUT | DEP_STOCKPILE | DEP_TEMPORAL;
+
     private static final Object LOCK = new Object();
-    private static final ConcurrentHashMap<String, Object> MARKETS_BY_ID =
+
+    /** Only this map is read without LOCK; full rebuild swaps the reference once. */
+    private static volatile ConcurrentHashMap<String, Object> marketsById =
             new ConcurrentHashMap<>();
-    private static final Map<String, MarketEconomyState> STATES_BY_ID = new HashMap<>();
-    private static final IdentityHashMap<Object, String> IDS_BY_MARKET = new IdentityHashMap<>();
-    private static final ArrayDeque<MarketEconomyState> URGENT = new ArrayDeque<>();
-    private static final ArrayDeque<MarketEconomyState> NORMAL = new ArrayDeque<>();
+    private static Map<String, MarketEconomyState> statesById = new HashMap<>();
+    private static IdentityHashMap<Object, String> idsByMarket = new IdentityHashMap<>();
+    private static ArrayDeque<MarketEconomyState> urgent = new ArrayDeque<>();
+    private static ArrayDeque<MarketEconomyState> normal = new ArrayDeque<>();
+    private static volatile RegistryLifecycle registryLifecycle = RegistryLifecycle.EMPTY;
 
     private static long registryGeneration;
+    /** Global event sequence retained for ordering/diagnostics only. */
     private static long dirtyGeneration;
     private static long claimedTickets;
     private static long committedTickets;
@@ -57,6 +114,25 @@ public final class MarketRegistry {
     private static long priceClaims;
     private static long priceCommits;
     private static long stalePriceResults;
+    private static long synchronousCommitCommitted;
+    private static long synchronousCommitUnknownMarket;
+    private static long synchronousCommitSnapshotBuilding;
+    private static long synchronousCommitRunning;
+    private static long synchronousCommitResultReady;
+    private static long invariantAudits;
+    private static long invariantAuditFailures;
+    private static long invariantViolations;
+    private static long atomicPublications;
+    private static long atomicPublicationFailures;
+    private static final AtomicLong lookupsDuringBuild = new AtomicLong();
+    private static long lookupMisses;
+    private static long targetedRepairAttempts;
+    private static long targetedRepairSuccesses;
+    private static long negativeLookupHits;
+    private static long fullRebuilds;
+    private static long unrelatedPriceInvalidationsAvoided;
+    private static long staleEpochTickets;
+    private static long epochSafeDrops;
     private static int urgentBurst;
 
     private MarketRegistry() {}
@@ -64,56 +140,151 @@ public final class MarketRegistry {
     /** Clears loader-local runtime state when a new economy/save is installed. */
     public static void clear() {
         synchronized (LOCK) {
-            MARKETS_BY_ID.clear();
-            STATES_BY_ID.clear();
-            IDS_BY_MARKET.clear();
-            URGENT.clear();
-            NORMAL.clear();
+            marketsById = new ConcurrentHashMap<>();
+            statesById = new HashMap<>();
+            idsByMarket = new IdentityHashMap<>();
+            urgent = new ArrayDeque<>();
+            normal = new ArrayDeque<>();
+            registryLifecycle = RegistryLifecycle.EMPTY;
             registryGeneration = nextPositive(registryGeneration);
             dirtyGeneration = 0L;
-            claimedTickets = 0L;
-            committedTickets = 0L;
-            staleTickets = 0L;
-            coalescedEvents = 0L;
-            unknownDeliveryEvents = 0L;
-            unknownMutationEvents = 0L;
-            duplicateDeliveryEvents = 0L;
-            replacedMarketIdentities = 0L;
-            lifecycleRejects = 0L;
-            priceClaims = 0L;
-            priceCommits = 0L;
-            stalePriceResults = 0L;
-            urgentBurst = 0;
+            resetCountersLocked();
         }
+    }
+
+    private static void resetCountersLocked() {
+        claimedTickets = 0L;
+        committedTickets = 0L;
+        staleTickets = 0L;
+        coalescedEvents = 0L;
+        unknownDeliveryEvents = 0L;
+        unknownMutationEvents = 0L;
+        duplicateDeliveryEvents = 0L;
+        replacedMarketIdentities = 0L;
+        lifecycleRejects = 0L;
+        priceClaims = 0L;
+        priceCommits = 0L;
+        stalePriceResults = 0L;
+        synchronousCommitCommitted = 0L;
+        synchronousCommitUnknownMarket = 0L;
+        synchronousCommitSnapshotBuilding = 0L;
+        synchronousCommitRunning = 0L;
+        synchronousCommitResultReady = 0L;
+        invariantAudits = 0L;
+        invariantAuditFailures = 0L;
+        invariantViolations = 0L;
+        atomicPublications = 0L;
+        atomicPublicationFailures = 0L;
+        lookupsDuringBuild.set(0L);
+        lookupMisses = 0L;
+        targetedRepairAttempts = 0L;
+        targetedRepairSuccesses = 0L;
+        negativeLookupHits = 0L;
+        fullRebuilds = 0L;
+        unrelatedPriceInvalidationsAvoided = 0L;
+        staleEpochTickets = 0L;
+        epochSafeDrops = 0L;
+        urgentBurst = 0;
+    }
+
+    /**
+     * Builds all registry/state/queue structures while the previous complete
+     * lookup snapshot remains visible, then publishes the new lookup map once.
+     */
+    public static int replaceAllMarkets(Map<String, ?> completeMarkets) {
+        Map<String, ?> source = completeMarkets == null
+                ? Collections.emptyMap() : completeMarkets;
+        synchronized (LOCK) {
+            RegistryLifecycle previousLifecycle = registryLifecycle;
+            registryLifecycle = RegistryLifecycle.BUILDING;
+            try {
+                ConcurrentHashMap<String, Object> nextMarkets = new ConcurrentHashMap<>();
+                Map<String, MarketEconomyState> nextStates = new HashMap<>();
+                IdentityHashMap<Object, String> nextIdentities = new IdentityHashMap<>();
+                ArrayDeque<MarketEconomyState> nextNormal = new ArrayDeque<>();
+                ArrayDeque<MarketEconomyState> nextUrgent = new ArrayDeque<>();
+
+                for (Map.Entry<String, ?> entry : source.entrySet()) {
+                    String marketId = entry.getKey();
+                    Object market = entry.getValue();
+                    if (marketId == null || marketId.isEmpty() || market == null) continue;
+                    if (nextMarkets.putIfAbsent(marketId, market) != null) {
+                        throw new IllegalArgumentException("duplicate market id: " + marketId);
+                    }
+                    String previousId = nextIdentities.put(market, marketId);
+                    if (previousId != null) {
+                        throw new IllegalArgumentException(
+                                "market identity appears under multiple ids: "
+                                        + previousId + ", " + marketId);
+                    }
+                    MarketEconomyState state = new MarketEconomyState(marketId, market);
+                    state.setDeliveredGeneration(
+                            SchedulerBridge.getDeliveredMarketGeneration(market));
+                    state.setStructuralGeneration(
+                            SchedulerBridge.getMarketStructuralGeneration(market));
+                    initializeDirtyStateLocked(state,
+                            SchedulerBridge.DIRTY_STRUCTURE
+                                    | SchedulerBridge.DIRTY_INDUSTRIES
+                                    | SchedulerBridge.DIRTY_CONDITIONS
+                                    | SchedulerBridge.DIRTY_DERIVED_ECONOMY
+                                    | DIRTY_INITIAL_REGISTRATION,
+                            PRIORITY_NORMAL, nextUrgent, nextNormal);
+                    nextStates.put(marketId, state);
+                }
+
+                statesById = nextStates;
+                idsByMarket = nextIdentities;
+                urgent = nextUrgent;
+                normal = nextNormal;
+                urgentBurst = 0;
+                registryGeneration = nextPositive(registryGeneration);
+                fullRebuilds++;
+                atomicPublications++;
+                marketsById = nextMarkets; // single lock-free publication point
+                registryLifecycle = nextMarkets.isEmpty()
+                        ? RegistryLifecycle.EMPTY : RegistryLifecycle.READY;
+                return nextMarkets.size();
+            } catch (RuntimeException | Error failure) {
+                atomicPublicationFailures++;
+                registryLifecycle = previousLifecycle;
+                throw failure;
+            }
+        }
+    }
+
+    public static int replaceAllMarkets(Iterable<? extends Map.Entry<String, ?>> entries) {
+        LinkedHashMap<String, Object> materialized = new LinkedHashMap<>();
+        if (entries != null) {
+            for (Map.Entry<String, ?> entry : entries) {
+                if (entry != null) materialized.put(entry.getKey(), entry.getValue());
+            }
+        }
+        return replaceAllMarkets(materialized);
     }
 
     public static void registerMarket(String marketId, Object market) {
         if (marketId == null || marketId.isEmpty() || market == null) return;
         synchronized (LOCK) {
-            Object previous = MARKETS_BY_ID.put(marketId, market);
+            ConcurrentHashMap<String, Object> lookup = marketsById;
+            Object previous = lookup.put(marketId, market);
             if (previous != null && previous != market) {
-                IDS_BY_MARKET.remove(previous);
+                idsByMarket.remove(previous);
                 replacedMarketIdentities++;
             }
 
-            String previousId = IDS_BY_MARKET.put(market, marketId);
+            String previousId = idsByMarket.put(market, marketId);
             if (previousId != null && !previousId.equals(marketId)) {
-                MARKETS_BY_ID.remove(previousId, market);
-                MarketEconomyState displaced = STATES_BY_ID.remove(previousId);
+                lookup.remove(previousId, market);
+                MarketEconomyState displaced = statesById.remove(previousId);
                 removeQueuedLocked(displaced);
             }
 
-            MarketEconomyState state = STATES_BY_ID.get(marketId);
-            boolean created = state == null;
-            boolean replaced = state != null && state.getMarket() != market;
-            if (replaced) {
+            MarketEconomyState state = statesById.get(marketId);
+            boolean created = state == null || state.getMarket() != market;
+            if (created) {
                 removeQueuedLocked(state);
-                state = null;
-            }
-            if (state == null) {
                 state = new MarketEconomyState(marketId, market);
-                STATES_BY_ID.put(marketId, state);
-                created = true;
+                statesById.put(marketId, state);
             } else {
                 state.setMarket(market);
             }
@@ -123,6 +294,7 @@ public final class MarketRegistry {
             if (delivered > state.getDeliveredGeneration()) state.setDeliveredGeneration(delivered);
             if (structural > state.getStructuralGeneration()) state.setStructuralGeneration(structural);
             registryGeneration = nextPositive(registryGeneration);
+            registryLifecycle = RegistryLifecycle.READY;
 
             if (created) {
                 markDirtyLocked(state,
@@ -140,35 +312,51 @@ public final class MarketRegistry {
         synchronized (LOCK) {
             String resolved = marketId;
             if ((resolved == null || resolved.isEmpty()) && market != null) {
-                resolved = IDS_BY_MARKET.get(market);
+                resolved = idsByMarket.get(market);
             }
             if (resolved == null) return;
 
-            Object mapped = MARKETS_BY_ID.get(resolved);
-            // A late unregister for an old object must not remove its replacement.
+            Object mapped = marketsById.get(resolved);
             if (market != null && mapped != null && mapped != market) {
-                IDS_BY_MARKET.remove(market);
+                idsByMarket.remove(market);
                 return;
             }
 
-            Object removed = MARKETS_BY_ID.remove(resolved);
-            if (removed != null) IDS_BY_MARKET.remove(removed);
-            if (market != null) IDS_BY_MARKET.remove(market);
-            MarketEconomyState state = STATES_BY_ID.remove(resolved);
+            Object removed = marketsById.remove(resolved);
+            if (removed != null) idsByMarket.remove(removed);
+            if (market != null) idsByMarket.remove(market);
+            MarketEconomyState state = statesById.remove(resolved);
             removeQueuedLocked(state);
             registryGeneration = nextPositive(registryGeneration);
+            if (marketsById.isEmpty()) registryLifecycle = RegistryLifecycle.EMPTY;
         }
     }
 
     /** Hot synchronous lookup: no registry monitor is acquired. */
     public static Object lookupMarket(String marketId) {
-        return marketId == null ? null : MARKETS_BY_ID.get(marketId);
+        if (marketId == null) return null;
+        if (registryLifecycle == RegistryLifecycle.BUILDING) {
+            lookupsDuringBuild.incrementAndGet();
+        }
+        return marketsById.get(marketId);
     }
 
     public static MarketEconomyState stateForId(String marketId) {
-        synchronized (LOCK) {
-            return STATES_BY_ID.get(marketId);
-        }
+        synchronized (LOCK) { return statesById.get(marketId); }
+    }
+
+    public static RegistryLifecycle getRegistryLifecycle() { return registryLifecycle; }
+    public static int getRegisteredMarketCount() { return marketsById.size(); }
+
+    public static void recordLookupMiss() { synchronized (LOCK) { lookupMisses++; } }
+    public static void recordTargetedRepairAttempt() {
+        synchronized (LOCK) { targetedRepairAttempts++; }
+    }
+    public static void recordTargetedRepairSuccess() {
+        synchronized (LOCK) { targetedRepairSuccesses++; }
+    }
+    public static void recordNegativeLookupHit() {
+        synchronized (LOCK) { negativeLookupHits++; }
     }
 
     public static void onMarketTimeDelivered(
@@ -220,7 +408,6 @@ public final class MarketRegistry {
                 state.setStructuralGeneration(structuralGeneration);
             } else if (structuralGeneration <= 0L
                     && (dirtyMask & SchedulerBridge.DIRTY_STRUCTURE) != 0) {
-                // No-agent fallback: keep the fork-local stale-result contract valid.
                 state.setStructuralGeneration(nextPositive(state.getStructuralGeneration()));
             }
             if (sourceGeneration > state.getLastSourceGeneration()) {
@@ -234,6 +421,14 @@ public final class MarketRegistry {
         if (market == null || dirtyMask == 0) return;
         synchronized (LOCK) {
             MarketEconomyState state = stateForMarketLocked(market);
+            if (state != null) markDirtyLocked(state, dirtyMask, priorityHint);
+        }
+    }
+
+    public static void markDirtyById(String marketId, int dirtyMask, int priorityHint) {
+        if (marketId == null || dirtyMask == 0) return;
+        synchronized (LOCK) {
+            MarketEconomyState state = statesById.get(marketId);
             if (state != null) markDirtyLocked(state, dirtyMask, priorityHint);
         }
     }
@@ -262,7 +457,7 @@ public final class MarketRegistry {
         }
     }
 
-    /** True while local authoritative/derived state still needs a commit. */
+    /** True while any output domain still needs a commit. */
     public static boolean needsDerivedRefresh(Object market) {
         if (market == null) return true;
         synchronized (LOCK) {
@@ -273,56 +468,50 @@ public final class MarketRegistry {
                     || state.isSnapshotBuilding()
                     || state.isRunning()
                     || state.isResultReady()
-                    || state.getDerivedGeneration() < state.getDirtyGeneration();
+                    || needsMaterializedVectorLocked(state)
+                    || needsPriceVectorLocked(state)
+                    || needsTradeVectorLocked(state);
         }
     }
 
-    /** Whether the live condition/industry modifiers must be materialized again. */
     public static boolean needsMaterializedReconciliation(Object market) {
-        int mask = getMarketDirtyMask(market);
-        int materializedMask = SchedulerBridge.DIRTY_STRUCTURE
-                | SchedulerBridge.DIRTY_INDUSTRIES
-                | SchedulerBridge.DIRTY_CONDITIONS
-                | SchedulerBridge.DIRTY_DERIVED_ECONOMY
-                | DIRTY_TIME_DELIVERED
-                | DIRTY_VALUE_STATE
-                | DIRTY_INITIAL_REGISTRATION;
-        return (mask & materializedMask) != 0;
+        if (market == null) return true;
+        synchronized (LOCK) {
+            MarketEconomyState state = stateForMarketLocked(market);
+            return state == null
+                    || (state.getDirtyMask() & MATERIALIZED_WORK_MASK) != 0
+                    || needsMaterializedVectorLocked(state);
+        }
     }
 
-    /** Whether the authoritative local trade snapshot can have changed. */
     public static boolean needsTradeSnapshot(Object market) {
-        int mask = getMarketDirtyMask(market);
-        int tradeMask = SchedulerBridge.DIRTY_STRUCTURE
-                | SchedulerBridge.DIRTY_INDUSTRIES
-                | SchedulerBridge.DIRTY_CONDITIONS
-                | SchedulerBridge.DIRTY_DERIVED_ECONOMY
-                | DIRTY_TIME_DELIVERED
-                | DIRTY_VALUE_STATE
-                | DIRTY_ACCESSIBILITY
-                | DIRTY_TRADE
-                | DIRTY_GLOBAL_REVISION
-                | DIRTY_INITIAL_REGISTRATION;
-        return (mask & tradeMask) != 0;
+        if (market == null) return true;
+        synchronized (LOCK) {
+            MarketEconomyState state = stateForMarketLocked(market);
+            return state == null
+                    || (state.getDirtyMask() & TRADE_WORK_MASK) != 0
+                    || needsTradeVectorLocked(state);
+        }
     }
 
-    /** Whether the market needs a new pure price/stockpile computation. */
     public static boolean needsPriceRefresh(Object market) {
         if (market == null) return true;
         synchronized (LOCK) {
             MarketEconomyState state = stateForMarketLocked(market);
             if (state == null) return true;
             return (state.getDirtyMask() & PRICE_WORK_MASK) != 0
-                    || state.getPriceGeneration() < state.getDirtyGeneration();
+                    || needsPriceVectorLocked(state);
         }
     }
 
-    /**
-     * Claims one specific market for Stage 6 price work. Unlike the general
-     * queue claim this preserves market ordering selected by the economy task.
-     */
     public static WorkTicket claimMarketForPrice(Object market) {
-        if (market == null) return null;
+        return claimMarketForPrice(market,
+                AoTDRuntimeEpoch.captureBatch("market-price-ticket"));
+    }
+
+    public static WorkTicket claimMarketForPrice(
+            Object market, AoTDRuntimeEpoch.Stamp stamp) {
+        if (market == null || !AoTDRuntimeEpoch.isCurrent(stamp)) return null;
         synchronized (LOCK) {
             MarketEconomyState state = stateForMarketLocked(market);
             if (state == null || state.isQuarantined()
@@ -331,14 +520,12 @@ public final class MarketRegistry {
                 return null;
             }
             if ((state.getDirtyMask() & PRICE_WORK_MASK) == 0
-                    && state.getPriceGeneration() >= state.getDirtyGeneration()) {
+                    && !needsPriceVectorLocked(state)) {
                 return null;
             }
             removeQueuedLocked(state);
-            int capturedMask = state.getDirtyMask();
-            int capturedPriority = state.getPriorityHint();
-            long capturedSince = state.getFirstDirtyNanos();
-            long capturedDirtyGeneration = state.getDirtyGeneration();
+            WorkTicket ticket = captureTicketLocked(state, TicketKind.PRICE,
+                    PRICE_DEPENDENCIES, stamp);
             state.setDirtyMask(0);
             state.setPriorityHint(PRIORITY_NORMAL);
             state.setFirstDirtyNanos(0L);
@@ -346,22 +533,19 @@ public final class MarketRegistry {
             state.setSnapshotBuilding(true);
             claimedTickets++;
             priceClaims++;
-            return new WorkTicket(
-                    state.getMarketId(), state.getMarket(),
-                    state.getDeliveredGeneration(), state.getStructuralGeneration(),
-                    capturedDirtyGeneration, capturedMask,
-                    capturedPriority, capturedSince);
+            return ticket;
         }
     }
 
-    /**
-     * Completes only the local price/stockpile portion of a market revision.
-     * Reconciliation/trade bits remain dirty for AoTDUpdateMarketAgainTask.
-     */
     public static boolean commitPriceDerived(WorkTicket ticket, long computeNanos) {
         if (ticket == null) return false;
         synchronized (LOCK) {
-            MarketEconomyState state = STATES_BY_ID.get(ticket.marketId);
+            if (!matchesEpochLocked(ticket)) {
+                staleEpochTickets++;
+                epochSafeDrops++;
+                return false;
+            }
+            MarketEconomyState state = statesById.get(ticket.marketId);
             if (!matchesIdentityLocked(state, ticket)) return false;
             if (!state.isResultReady()) {
                 lifecycleRejects++;
@@ -370,24 +554,13 @@ public final class MarketRegistry {
             boolean current = matchesGenerationsLocked(state, ticket);
             state.setResultReady(false);
             if (current) {
+                state.commitPriceVector();
                 state.setPriceGeneration(Math.max(
                         state.getPriceGeneration(), ticket.dirtyGeneration));
                 state.setLastComputeNanos(Math.max(0L, computeNanos));
                 int remaining = ticket.dirtyMask & ~PRICE_WORK_MASK;
-                if (remaining != 0) {
-                    state.setDirtyMask(state.getDirtyMask() | remaining);
-                    if (ticket.priorityHint > state.getPriorityHint()) {
-                        state.setPriorityHint(ticket.priorityHint);
-                    }
-                    if (ticket.dirtySinceNanos > 0L
-                            && (state.getFirstDirtyNanos() == 0L
-                            || ticket.dirtySinceNanos < state.getFirstDirtyNanos())) {
-                        state.setFirstDirtyNanos(ticket.dirtySinceNanos);
-                    }
-                    if (state.getLastDirtyNanos() == 0L) {
-                        state.setLastDirtyNanos(System.nanoTime());
-                    }
-                } else if (state.getDirtyMask() == 0) {
+                restoreMaskMetadataLocked(state, ticket, remaining);
+                if (remaining == 0 && state.getDirtyMask() == 0) {
                     state.setDerivedGeneration(Math.max(
                             state.getDerivedGeneration(), ticket.dirtyGeneration));
                 }
@@ -403,18 +576,14 @@ public final class MarketRegistry {
         }
     }
 
-    public static void markDirtyById(String marketId, int dirtyMask, int priorityHint) {
-        if (marketId == null || dirtyMask == 0) return;
-        synchronized (LOCK) {
-            MarketEconomyState state = STATES_BY_ID.get(marketId);
-            if (state != null) markDirtyLocked(state, dirtyMask, priorityHint);
-        }
-    }
-
     public static WorkTicket[] claimDirtyBatch(int maxMarkets) {
-        if (maxMarkets <= 0) return new WorkTicket[0];
+        AoTDRuntimeEpoch.Stamp stamp =
+                AoTDRuntimeEpoch.captureBatch("market-dirty-batch");
+        if (maxMarkets <= 0 || !AoTDRuntimeEpoch.isCurrent(stamp)) {
+            return new WorkTicket[0];
+        }
         synchronized (LOCK) {
-            int count = Math.min(maxMarkets, URGENT.size() + NORMAL.size());
+            int count = Math.min(maxMarkets, urgent.size() + normal.size());
             if (count <= 0) return new WorkTicket[0];
             List<WorkTicket> result = new ArrayList<>(count);
             while (result.size() < count) {
@@ -427,23 +596,16 @@ public final class MarketRegistry {
                 }
                 state.setQueued(false);
                 state.setUrgentQueued(false);
-
-                int capturedMask = state.getDirtyMask();
-                int capturedPriority = state.getPriorityHint();
-                long capturedSince = state.getFirstDirtyNanos();
-                long capturedDirtyGeneration = state.getDirtyGeneration();
-
+                int dependencies = dependenciesForDirtyMask(state.getDirtyMask());
+                WorkTicket ticket = captureTicketLocked(
+                        state, TicketKind.GENERAL, dependencies, stamp);
                 state.setDirtyMask(0);
                 state.setPriorityHint(PRIORITY_NORMAL);
                 state.setFirstDirtyNanos(0L);
                 state.setLastDirtyNanos(0L);
                 state.setSnapshotBuilding(true);
                 claimedTickets++;
-                result.add(new WorkTicket(
-                        state.getMarketId(), state.getMarket(),
-                        state.getDeliveredGeneration(), state.getStructuralGeneration(),
-                        capturedDirtyGeneration, capturedMask,
-                        capturedPriority, capturedSince));
+                result.add(ticket);
             }
             return result.toArray(new WorkTicket[0]);
         }
@@ -452,7 +614,12 @@ public final class MarketRegistry {
     public static boolean markWorkRunning(WorkTicket ticket) {
         if (ticket == null) return false;
         synchronized (LOCK) {
-            MarketEconomyState state = STATES_BY_ID.get(ticket.marketId);
+            if (!matchesEpochLocked(ticket)) {
+                staleEpochTickets++;
+                epochSafeDrops++;
+                return false;
+            }
+            MarketEconomyState state = statesById.get(ticket.marketId);
             if (!matchesIdentityLocked(state, ticket) || !state.isSnapshotBuilding()) {
                 lifecycleRejects++;
                 return false;
@@ -466,7 +633,12 @@ public final class MarketRegistry {
     public static boolean markResultReady(WorkTicket ticket) {
         if (ticket == null) return false;
         synchronized (LOCK) {
-            MarketEconomyState state = STATES_BY_ID.get(ticket.marketId);
+            if (!matchesEpochLocked(ticket)) {
+                staleEpochTickets++;
+                epochSafeDrops++;
+                return false;
+            }
+            MarketEconomyState state = statesById.get(ticket.marketId);
             if (!matchesIdentityLocked(state, ticket) || !state.isRunning()) {
                 lifecycleRejects++;
                 return false;
@@ -480,41 +652,68 @@ public final class MarketRegistry {
     public static boolean isCurrent(WorkTicket ticket) {
         if (ticket == null) return false;
         synchronized (LOCK) {
-            return matchesGenerationsLocked(STATES_BY_ID.get(ticket.marketId), ticket);
+            if (!matchesEpochLocked(ticket)) return false;
+            return matchesGenerationsLocked(statesById.get(ticket.marketId), ticket);
         }
     }
 
-    /** Commits only live condition/industry materialization for a market. */
     public static boolean commitMaterializedState(Object market, long computeNanos) {
-        int mask = SchedulerBridge.DIRTY_STRUCTURE
-                | SchedulerBridge.DIRTY_INDUSTRIES
-                | SchedulerBridge.DIRTY_CONDITIONS
-                | DIRTY_TIME_DELIVERED
-                | DIRTY_VALUE_STATE
-                | DIRTY_INITIAL_REGISTRATION;
-        return commitSynchronousMask(market, mask, computeNanos);
+        return commitMaterializedStateDetailed(market, computeNanos)
+                == CommitStatus.COMMITTED;
     }
 
-    /** Commits only the authoritative local trade-snapshot publication. */
+    public static CommitStatus commitMaterializedStateDetailed(
+            Object market, long computeNanos) {
+        return commitSynchronousMask(market, MATERIALIZED_WORK_MASK,
+                OutputDomain.MATERIALIZED, computeNanos);
+    }
+
     public static boolean commitTradeSnapshot(Object market, long computeNanos) {
-        int mask = SchedulerBridge.DIRTY_DERIVED_ECONOMY
-                | DIRTY_ACCESSIBILITY | DIRTY_TRADE | DIRTY_GLOBAL_REVISION;
-        return commitSynchronousMask(market, mask, computeNanos);
+        return commitTradeSnapshotDetailed(market, computeNanos)
+                == CommitStatus.COMMITTED;
     }
 
-    private static boolean commitSynchronousMask(
-            Object market, int completedMask, long computeNanos) {
-        if (market == null) return false;
+    public static CommitStatus commitTradeSnapshotDetailed(
+            Object market, long computeNanos) {
+        return commitSynchronousMask(market,
+                SchedulerBridge.DIRTY_DERIVED_ECONOMY
+                        | DIRTY_ACCESSIBILITY | DIRTY_TRADE | DIRTY_GLOBAL_REVISION,
+                OutputDomain.TRADE, computeNanos);
+    }
+
+    private static CommitStatus commitSynchronousMask(
+            Object market, int completedMask, OutputDomain domain,
+            long computeNanos) {
+        if (market == null) {
+            synchronized (LOCK) { synchronousCommitUnknownMarket++; }
+            return CommitStatus.UNKNOWN_MARKET;
+        }
         synchronized (LOCK) {
             MarketEconomyState state = stateForMarketLocked(market);
-            if (state == null) return false;
-            if (state.isSnapshotBuilding() || state.isRunning() || state.isResultReady()) {
+            if (state == null) {
+                synchronousCommitUnknownMarket++;
+                return CommitStatus.UNKNOWN_MARKET;
+            }
+            if (state.isSnapshotBuilding()) {
                 lifecycleRejects++;
-                return false;
+                synchronousCommitSnapshotBuilding++;
+                return CommitStatus.SNAPSHOT_BUILDING;
+            }
+            if (state.isRunning()) {
+                lifecycleRejects++;
+                synchronousCommitRunning++;
+                return CommitStatus.RUNNING;
+            }
+            if (state.isResultReady()) {
+                lifecycleRejects++;
+                synchronousCommitResultReady++;
+                return CommitStatus.RESULT_READY;
             }
             removeQueuedLocked(state);
             state.setDirtyMask(state.getDirtyMask() & ~completedMask);
             state.setLastComputeNanos(Math.max(0L, computeNanos));
+            if (domain == OutputDomain.MATERIALIZED) state.commitMaterializedVector();
+            if (domain == OutputDomain.TRADE) state.commitTradeVector();
             if (state.getDirtyMask() == 0) {
                 state.setDerivedGeneration(Math.max(
                         state.getDerivedGeneration(), state.getDirtyGeneration()));
@@ -523,24 +722,30 @@ public final class MarketRegistry {
                 state.setLastDirtyNanos(0L);
             }
             committedTickets++;
+            synchronousCommitCommitted++;
             enqueueIfIdleLocked(state);
-            return true;
+            return CommitStatus.COMMITTED;
         }
     }
 
     public static boolean commitDerived(WorkTicket ticket, long computeNanos) {
         if (ticket == null) return false;
         synchronized (LOCK) {
-            MarketEconomyState state = STATES_BY_ID.get(ticket.marketId);
+            if (!matchesEpochLocked(ticket)) {
+                staleEpochTickets++;
+                epochSafeDrops++;
+                return false;
+            }
+            MarketEconomyState state = statesById.get(ticket.marketId);
             if (!matchesIdentityLocked(state, ticket)) return false;
             if (!state.isResultReady()) {
                 lifecycleRejects++;
                 return false;
             }
-
             boolean current = matchesGenerationsLocked(state, ticket);
             state.setResultReady(false);
             if (current) {
+                commitVectorsForMaskLocked(state, ticket.dirtyMask);
                 state.setDerivedGeneration(Math.max(
                         state.getDerivedGeneration(), ticket.dirtyGeneration));
                 state.setLastComputeNanos(Math.max(0L, computeNanos));
@@ -557,7 +762,12 @@ public final class MarketRegistry {
     public static void abandon(WorkTicket ticket, boolean restoreCapturedDirty) {
         if (ticket == null) return;
         synchronized (LOCK) {
-            MarketEconomyState state = STATES_BY_ID.get(ticket.marketId);
+            if (!matchesEpochLocked(ticket)) {
+                staleEpochTickets++;
+                epochSafeDrops++;
+                return;
+            }
+            MarketEconomyState state = statesById.get(ticket.marketId);
             if (!matchesIdentityLocked(state, ticket)) return;
             state.setSnapshotBuilding(false);
             state.setRunning(false);
@@ -567,20 +777,25 @@ public final class MarketRegistry {
         }
     }
 
-    /** Records a deterministic capture/model failure. Two identical failures quarantine the generation. */
     public static void recordFailure(WorkTicket ticket, String reason) {
         if (ticket == null) return;
         synchronized (LOCK) {
-            MarketEconomyState state = STATES_BY_ID.get(ticket.marketId);
+            if (!matchesEpochLocked(ticket)) {
+                staleEpochTickets++;
+                epochSafeDrops++;
+                return;
+            }
+            MarketEconomyState state = statesById.get(ticket.marketId);
             if (!matchesIdentityLocked(state, ticket)) return;
             state.setSnapshotBuilding(false);
             state.setRunning(false);
             state.setResultReady(false);
             restoreTicketDirtyLocked(state, ticket);
-            if (state.getFailureGeneration() == ticket.dirtyGeneration) {
+            long failureKey = ticket.validationFingerprint;
+            if (state.getFailureGeneration() == failureKey) {
                 state.setFailureCount(state.getFailureCount() + 1);
             } else {
-                state.setFailureGeneration(ticket.dirtyGeneration);
+                state.setFailureGeneration(failureKey);
                 state.setFailureCount(1);
             }
             state.setLastFailure(reason == null ? "unknown" : reason);
@@ -616,23 +831,18 @@ public final class MarketRegistry {
 
     public static List<StateSnapshot> snapshotStates() {
         synchronized (LOCK) {
-            List<StateSnapshot> result = new ArrayList<>(STATES_BY_ID.size());
-            for (MarketEconomyState state : STATES_BY_ID.values()) {
+            List<StateSnapshot> result = new ArrayList<>(statesById.size());
+            for (MarketEconomyState state : statesById.values()) {
                 result.add(new StateSnapshot(state));
             }
             return Collections.unmodifiableList(result);
         }
     }
 
-    /**
-     * Cold recovery used only after a hard global delivery barrier. It repairs
-     * missed loader-neutral callbacks without putting an O(n) scan in normal
-     * price or frame paths.
-     */
     public static int resynchronizeRuntimeGenerations() {
         int repaired = 0;
         synchronized (LOCK) {
-            for (MarketEconomyState state : STATES_BY_ID.values()) {
+            for (MarketEconomyState state : statesById.values()) {
                 Object market = state.getMarket();
                 if (market == null) continue;
                 long delivered = SchedulerBridge.getDeliveredMarketGeneration(market);
@@ -656,50 +866,227 @@ public final class MarketRegistry {
         return repaired;
     }
 
+    public static String describeCommitState(Object market) {
+        synchronized (LOCK) {
+            String marketId = market == null ? null : idsByMarket.get(market);
+            MarketEconomyState state = marketId == null ? null : statesById.get(marketId);
+            if (state == null) {
+                return "marketId=" + marketId
+                        + ", registered=" + (marketId != null)
+                        + ", registryGeneration=" + registryGeneration
+                        + ", registryMarkets=" + marketsById.size()
+                        + ", registryStates=" + statesById.size()
+                        + ", registryLifecycle=" + registryLifecycle;
+            }
+            return "marketId=" + state.getMarketId()
+                    + ", dirtyMask=0x" + Integer.toHexString(state.getDirtyMask())
+                    + ", dirtyGeneration=" + state.getDirtyGeneration()
+                    + ", revisions=" + RevisionVector.of(state)
+                    + ", queued=" + state.isQueued()
+                    + ", snapshotBuilding=" + state.isSnapshotBuilding()
+                    + ", running=" + state.isRunning()
+                    + ", resultReady=" + state.isResultReady()
+                    + ", registryGeneration=" + registryGeneration
+                    + ", registryLifecycle=" + registryLifecycle;
+        }
+    }
+
+    public static InvariantReport auditInvariants(Map<String, ?> expectedMarkets) {
+        synchronized (LOCK) {
+            invariantAudits++;
+            ArrayList<String> samples = new ArrayList<>();
+            int violations = 0;
+            final int sampleLimit = 20;
+
+            if (marketsById.size() != statesById.size()) {
+                violations = addViolation(samples, sampleLimit, violations,
+                        "registry/state size mismatch: registry=" + marketsById.size()
+                                + ", states=" + statesById.size());
+            }
+            if (marketsById.size() != idsByMarket.size()) {
+                violations = addViolation(samples, sampleLimit, violations,
+                        "registry/identity size mismatch: registry=" + marketsById.size()
+                                + ", identities=" + idsByMarket.size());
+            }
+
+            IdentityHashMap<MarketEconomyState, Integer> queueMembership =
+                    new IdentityHashMap<>();
+            for (MarketEconomyState state : urgent) {
+                queueMembership.put(state, queueMembership.getOrDefault(state, 0) + 1);
+                if (!state.isQueued() || !state.isUrgentQueued()) {
+                    violations = addViolation(samples, sampleLimit, violations,
+                            "urgent queue flags invalid: " + state.getMarketId());
+                }
+            }
+            for (MarketEconomyState state : normal) {
+                queueMembership.put(state, queueMembership.getOrDefault(state, 0) + 1);
+                if (!state.isQueued() || state.isUrgentQueued()) {
+                    violations = addViolation(samples, sampleLimit, violations,
+                            "normal queue flags invalid: " + state.getMarketId());
+                }
+            }
+
+            for (Map.Entry<String, Object> entry : marketsById.entrySet()) {
+                String marketId = entry.getKey();
+                Object market = entry.getValue();
+                MarketEconomyState state = statesById.get(marketId);
+                if (state == null || state.getMarket() != market) {
+                    violations = addViolation(samples, sampleLimit, violations,
+                            "market/state identity mismatch: " + marketId);
+                }
+                if (!marketId.equals(idsByMarket.get(market))) {
+                    violations = addViolation(samples, sampleLimit, violations,
+                            "reverse identity mismatch: " + marketId);
+                }
+            }
+
+            for (MarketEconomyState state : statesById.values()) {
+                int membership = queueMembership.getOrDefault(state, 0);
+                if (membership > 1 || state.isQueued() != (membership == 1)) {
+                    violations = addViolation(samples, sampleLimit, violations,
+                            "queue membership mismatch: " + state.getMarketId()
+                                    + ", queued=" + state.isQueued()
+                                    + ", count=" + membership);
+                }
+                int lifecycleStates = (state.isQueued() ? 1 : 0)
+                        + (state.isSnapshotBuilding() ? 1 : 0)
+                        + (state.isRunning() ? 1 : 0)
+                        + (state.isResultReady() ? 1 : 0);
+                if (lifecycleStates > 1) {
+                    violations = addViolation(samples, sampleLimit, violations,
+                            "overlapping lifecycle states: " + state.getMarketId());
+                }
+            }
+
+            int expectedCount = expectedMarkets == null ? -1 : expectedMarkets.size();
+            if (expectedMarkets != null) {
+                if (expectedMarkets.size() != marketsById.size()) {
+                    violations = addViolation(samples, sampleLimit, violations,
+                            "economy/registry size mismatch: expected=" + expectedMarkets.size()
+                                    + ", registry=" + marketsById.size());
+                }
+                for (Map.Entry<String, ?> entry : expectedMarkets.entrySet()) {
+                    Object registered = marketsById.get(entry.getKey());
+                    if (registered == null || registered != entry.getValue()) {
+                        violations = addViolation(samples, sampleLimit, violations,
+                                "economy/registry identity mismatch: " + entry.getKey());
+                    }
+                }
+            }
+
+            if (violations > 0) {
+                invariantAuditFailures++;
+                invariantViolations += violations;
+            }
+            return new InvariantReport(expectedCount, marketsById.size(), statesById.size(),
+                    idsByMarket.size(), urgent.size() + normal.size(), registryGeneration,
+                    registryLifecycle, violations, samples);
+        }
+    }
+
+    public static InvariantReport auditInvariants() { return auditInvariants(null); }
+
+    private static int addViolation(
+            List<String> samples, int sampleLimit, int current, String description) {
+        if (samples.size() < sampleLimit) samples.add(description);
+        return current + 1;
+    }
+
     public static String statusSummary() {
         synchronized (LOCK) {
             int busy = 0;
             int quarantined = 0;
-            for (MarketEconomyState state : STATES_BY_ID.values()) {
+            for (MarketEconomyState state : statesById.values()) {
                 if (state.isSnapshotBuilding() || state.isRunning() || state.isResultReady()) busy++;
                 if (state.isQuarantined()) quarantined++;
             }
-            return "markets=" + STATES_BY_ID.size()
-                    + ", queued=" + (URGENT.size() + NORMAL.size())
-                    + ", urgent=" + URGENT.size()
+            return "markets=" + statesById.size()
+                    + ", queued=" + (urgent.size() + normal.size())
+                    + ", urgent=" + urgent.size()
                     + ", busy=" + busy
                     + ", quarantined=" + quarantined
+                    + ", registryLifecycle=" + registryLifecycle
                     + ", registryGeneration=" + registryGeneration
-                    + ", dirtyGeneration=" + dirtyGeneration
+                    + ", dirtyEventSequence=" + dirtyGeneration
                     + ", claimed=" + claimedTickets
                     + ", committed=" + committedTickets
                     + ", stale=" + staleTickets
                     + ", coalesced=" + coalescedEvents
-                    + ", duplicateDelivery=" + duplicateDeliveryEvents
-                    + ", replacedIdentity=" + replacedMarketIdentities
                     + ", lifecycleRejects=" + lifecycleRejects
                     + ", priceClaims=" + priceClaims
                     + ", priceCommits=" + priceCommits
                     + ", stalePrice=" + stalePriceResults
+                    + ", staleEpochTickets=" + staleEpochTickets
+                    + ", epochSafeDrops=" + epochSafeDrops
+                    + ", campaignEpoch=" + AoTDRuntimeEpoch.getCampaignEpoch()
+                    + ", economyEpoch=" + AoTDRuntimeEpoch.getEconomyEpoch()
+                    + ", avoidedUnrelatedPriceInvalidations="
+                    + unrelatedPriceInvalidationsAvoided
+                    + ", syncCommitCommitted=" + synchronousCommitCommitted
+                    + ", syncCommitUnknownMarket=" + synchronousCommitUnknownMarket
+                    + ", syncCommitSnapshotBuilding=" + synchronousCommitSnapshotBuilding
+                    + ", syncCommitRunning=" + synchronousCommitRunning
+                    + ", syncCommitResultReady=" + synchronousCommitResultReady
+                    + ", atomicPublications=" + atomicPublications
+                    + ", atomicPublicationFailures=" + atomicPublicationFailures
+                    + ", lookupsDuringBuild=" + lookupsDuringBuild.get()
+                    + ", lookupMisses=" + lookupMisses
+                    + ", targetedRepairAttempts=" + targetedRepairAttempts
+                    + ", targetedRepairSuccesses=" + targetedRepairSuccesses
+                    + ", negativeLookupHits=" + negativeLookupHits
+                    + ", fullRebuilds=" + fullRebuilds
+                    + ", invariantAudits=" + invariantAudits
+                    + ", invariantAuditFailures=" + invariantAuditFailures
+                    + ", invariantViolations=" + invariantViolations
+                    + ", duplicateDelivery=" + duplicateDeliveryEvents
+                    + ", replacedIdentity=" + replacedMarketIdentities
                     + ", unknownDelivery=" + unknownDeliveryEvents
                     + ", unknownMutation=" + unknownMutationEvents;
         }
     }
 
-    public static int size() { synchronized (LOCK) { return STATES_BY_ID.size(); } }
-    public static int queuedCount() { synchronized (LOCK) { return URGENT.size() + NORMAL.size(); } }
+    public static int size() { synchronized (LOCK) { return statesById.size(); } }
+    public static int queuedCount() { synchronized (LOCK) { return urgent.size() + normal.size(); } }
     public static long getRegistryGeneration() { synchronized (LOCK) { return registryGeneration; } }
     public static long getDirtyGeneration() { synchronized (LOCK) { return dirtyGeneration; } }
+    public static long getAtomicPublicationCount() { synchronized (LOCK) { return atomicPublications; } }
+    public static long getAtomicPublicationFailureCount() {
+        synchronized (LOCK) { return atomicPublicationFailures; }
+    }
 
     private static MarketEconomyState stateForMarketLocked(Object market) {
-        String id = IDS_BY_MARKET.get(market);
-        return id == null ? null : STATES_BY_ID.get(id);
+        String id = idsByMarket.get(market);
+        return id == null ? null : statesById.get(id);
+    }
+
+    private static void initializeDirtyStateLocked(
+            MarketEconomyState state, int dirtyMask, int priorityHint,
+            ArrayDeque<MarketEconomyState> targetUrgent,
+            ArrayDeque<MarketEconomyState> targetNormal) {
+        long now = System.nanoTime();
+        state.setFirstDirtyNanos(now);
+        state.setLastDirtyNanos(now);
+        state.setDirtyMask(dirtyMask);
+        state.setDirtyGeneration(nextPositive(dirtyGeneration));
+        dirtyGeneration = state.getDirtyGeneration();
+        advanceDomainRevisionsLocked(state, dirtyMask);
+        state.setPriorityHint(priorityHint);
+        state.setQueued(true);
+        if (priorityHint > PRIORITY_NORMAL) {
+            state.setUrgentQueued(true);
+            targetUrgent.addLast(state);
+        } else {
+            state.setUrgentQueued(false);
+            targetNormal.addLast(state);
+        }
     }
 
     private static void markDirtyLocked(
             MarketEconomyState state, int dirtyMask, int priorityHint) {
         if (dirtyMask == 0) return;
         long now = System.nanoTime();
+        boolean priceWasCurrent = !needsPriceVectorLocked(state)
+                && (state.getDirtyMask() & PRICE_WORK_MASK) == 0;
         if (state.getDirtyMask() != 0 || state.isQueued()
                 || state.isSnapshotBuilding() || state.isRunning() || state.isResultReady()) {
             coalescedEvents++;
@@ -709,6 +1096,12 @@ public final class MarketRegistry {
         state.setDirtyMask(state.getDirtyMask() | dirtyMask);
         state.setDirtyGeneration(nextPositive(dirtyGeneration));
         dirtyGeneration = state.getDirtyGeneration();
+        advanceDomainRevisionsLocked(state, dirtyMask);
+        if (priceWasCurrent && (dirtyMask & PRICE_REVISION_MASK) == 0
+                && (dirtyMask & DIRTY_STOCKPILE) == 0
+                && (dirtyMask & DIRTY_TIME_DELIVERED) == 0) {
+            unrelatedPriceInvalidationsAvoided++;
+        }
         state.setQuarantined(false);
         state.setFailureCount(0);
         state.setFailureGeneration(0L);
@@ -717,9 +1110,52 @@ public final class MarketRegistry {
         enqueueIfIdleLocked(state);
     }
 
+    private static void advanceDomainRevisionsLocked(
+            MarketEconomyState state, int dirtyMask) {
+        if ((dirtyMask & (SchedulerBridge.DIRTY_STRUCTURE
+                | DIRTY_INITIAL_REGISTRATION)) != 0) {
+            state.setStructureRevision(nextPositive(state.getStructureRevision()));
+        }
+        if ((dirtyMask & MATERIALIZED_REVISION_MASK) != 0) {
+            state.setMaterializedRevision(nextPositive(state.getMaterializedRevision()));
+        }
+        if ((dirtyMask & PRICE_REVISION_MASK) != 0) {
+            state.setPriceInputRevision(nextPositive(state.getPriceInputRevision()));
+        }
+        if ((dirtyMask & (DIRTY_STOCKPILE | SchedulerBridge.DIRTY_STRUCTURE
+                | DIRTY_INITIAL_REGISTRATION)) != 0) {
+            state.setStockpileRevision(nextPositive(state.getStockpileRevision()));
+        }
+        if ((dirtyMask & ACCESSIBILITY_REVISION_MASK) != 0) {
+            state.setAccessibilityRevision(nextPositive(state.getAccessibilityRevision()));
+        }
+        if ((dirtyMask & TRADE_REVISION_MASK) != 0) {
+            state.setTradeInputRevision(nextPositive(state.getTradeInputRevision()));
+        }
+        if ((dirtyMask & DIRTY_TIME_DELIVERED) != 0) {
+            state.setTemporalRevision(nextPositive(state.getTemporalRevision()));
+        }
+    }
+
+    private static WorkTicket captureTicketLocked(
+            MarketEconomyState state, TicketKind kind, int dependencyMask,
+            AoTDRuntimeEpoch.Stamp stamp) {
+        return new WorkTicket(state.getMarketId(), state.getMarket(),
+                state.getDeliveredGeneration(), state.getStructuralGeneration(),
+                state.getDirtyGeneration(), state.getDirtyMask(),
+                state.getPriorityHint(), state.getFirstDirtyNanos(), kind,
+                dependencyMask, RevisionVector.of(state), stamp);
+    }
+
     private static void restoreTicketDirtyLocked(
             MarketEconomyState state, WorkTicket ticket) {
-        state.setDirtyMask(state.getDirtyMask() | ticket.dirtyMask);
+        restoreMaskMetadataLocked(state, ticket, ticket.dirtyMask);
+    }
+
+    private static void restoreMaskMetadataLocked(
+            MarketEconomyState state, WorkTicket ticket, int mask) {
+        if (mask == 0) return;
+        state.setDirtyMask(state.getDirtyMask() | mask);
         if (ticket.priorityHint > state.getPriorityHint()) {
             state.setPriorityHint(ticket.priorityHint);
         }
@@ -732,52 +1168,198 @@ public final class MarketRegistry {
     }
 
     private static void enqueueIfIdleLocked(MarketEconomyState state) {
-        if (state == null || state.isQuarantined() || state.getDirtyMask() == 0 || state.isQueued()
-                || state.isSnapshotBuilding() || state.isRunning() || state.isResultReady()) return;
+        if (state == null || state.isQuarantined() || state.getDirtyMask() == 0
+                || state.isQueued() || state.isSnapshotBuilding()
+                || state.isRunning() || state.isResultReady()) return;
         state.setQueued(true);
         if (state.getPriorityHint() > PRIORITY_NORMAL) {
             state.setUrgentQueued(true);
-            URGENT.addLast(state);
+            urgent.addLast(state);
         } else {
             state.setUrgentQueued(false);
-            NORMAL.addLast(state);
+            normal.addLast(state);
         }
     }
 
     private static MarketEconomyState pollNextLocked() {
         MarketEconomyState state;
-        if (!URGENT.isEmpty() && (NORMAL.isEmpty() || urgentBurst < 7)) {
+        if (!urgent.isEmpty() && (normal.isEmpty() || urgentBurst < 7)) {
             urgentBurst++;
-            state = URGENT.pollFirst();
+            state = urgent.pollFirst();
         } else {
             urgentBurst = 0;
-            state = NORMAL.pollFirst();
-            if (state == null) state = URGENT.pollFirst();
+            state = normal.pollFirst();
+            if (state == null) state = urgent.pollFirst();
         }
         return state;
     }
 
     private static void removeQueuedLocked(MarketEconomyState state) {
         if (state == null || !state.isQueued()) return;
-        if (state.isUrgentQueued()) URGENT.remove(state); else NORMAL.remove(state);
+        if (state.isUrgentQueued()) urgent.remove(state); else normal.remove(state);
         state.setQueued(false);
         state.setUrgentQueued(false);
     }
 
-    private static boolean matchesIdentityLocked(MarketEconomyState state, WorkTicket ticket) {
+    private static boolean matchesEpochLocked(WorkTicket ticket) {
+        return ticket != null && AoTDRuntimeEpoch.isCurrent(ticket.epochStamp);
+    }
+
+    private static boolean matchesIdentityLocked(
+            MarketEconomyState state, WorkTicket ticket) {
         return state != null && state.getMarket() == ticket.market;
     }
 
-    private static boolean matchesGenerationsLocked(MarketEconomyState state, WorkTicket ticket) {
-        return matchesIdentityLocked(state, ticket)
-                && state.getDeliveredGeneration() == ticket.deliveredGeneration
-                && state.getStructuralGeneration() == ticket.structuralGeneration
-                && state.getDirtyGeneration() == ticket.dirtyGeneration;
+    private static boolean matchesGenerationsLocked(
+            MarketEconomyState state, WorkTicket ticket) {
+        if (!matchesIdentityLocked(state, ticket)) return false;
+        RevisionVector current = RevisionVector.of(state);
+        return ticket.revisions.matches(current, ticket.dependencyMask);
+    }
+
+    private static boolean needsMaterializedVectorLocked(MarketEconomyState state) {
+        return state.getMaterializedCommittedStructureRevision()
+                        != state.getStructureRevision()
+                || state.getMaterializedCommittedRevision()
+                        != state.getMaterializedRevision()
+                || state.getMaterializedCommittedTemporalRevision()
+                        != state.getTemporalRevision();
+    }
+
+    private static boolean needsPriceVectorLocked(MarketEconomyState state) {
+        return state.getPriceCommittedStructureRevision()
+                        != state.getStructureRevision()
+                || state.getPriceCommittedMaterializedRevision()
+                        != state.getMaterializedRevision()
+                || state.getPriceCommittedInputRevision()
+                        != state.getPriceInputRevision()
+                || state.getPriceCommittedStockpileRevision()
+                        != state.getStockpileRevision()
+                || state.getPriceCommittedTemporalRevision()
+                        != state.getTemporalRevision();
+    }
+
+    private static boolean needsTradeVectorLocked(MarketEconomyState state) {
+        return state.getTradeCommittedStructureRevision()
+                        != state.getStructureRevision()
+                || state.getTradeCommittedMaterializedRevision()
+                        != state.getMaterializedRevision()
+                || state.getTradeCommittedAccessibilityRevision()
+                        != state.getAccessibilityRevision()
+                || state.getTradeCommittedInputRevision()
+                        != state.getTradeInputRevision()
+                || state.getTradeCommittedTemporalRevision()
+                        != state.getTemporalRevision();
+    }
+
+    private static int dependenciesForDirtyMask(int dirtyMask) {
+        int dependencies = 0;
+        if ((dirtyMask & (SchedulerBridge.DIRTY_STRUCTURE
+                | DIRTY_INITIAL_REGISTRATION)) != 0) dependencies |= DEP_STRUCTURE;
+        if ((dirtyMask & MATERIALIZED_REVISION_MASK) != 0) dependencies |= DEP_MATERIALIZED;
+        if ((dirtyMask & PRICE_REVISION_MASK) != 0) dependencies |= DEP_PRICE_INPUT;
+        if ((dirtyMask & (DIRTY_STOCKPILE | SchedulerBridge.DIRTY_STRUCTURE
+                | DIRTY_INITIAL_REGISTRATION)) != 0) dependencies |= DEP_STOCKPILE;
+        if ((dirtyMask & ACCESSIBILITY_REVISION_MASK) != 0) dependencies |= DEP_ACCESSIBILITY;
+        if ((dirtyMask & TRADE_REVISION_MASK) != 0) dependencies |= DEP_TRADE_INPUT;
+        if ((dirtyMask & DIRTY_TIME_DELIVERED) != 0) dependencies |= DEP_TEMPORAL;
+        return dependencies;
+    }
+
+    private static void commitVectorsForMaskLocked(
+            MarketEconomyState state, int dirtyMask) {
+        if ((dirtyMask & MATERIALIZED_WORK_MASK) != 0) state.commitMaterializedVector();
+        if ((dirtyMask & (PRICE_WORK_MASK | PRICE_REVISION_MASK
+                | DIRTY_TIME_DELIVERED)) != 0) state.commitPriceVector();
+        if ((dirtyMask & TRADE_WORK_MASK) != 0) state.commitTradeVector();
     }
 
     private static long nextPositive(long value) {
         long next = value + 1L;
         return next <= 0L ? 1L : next;
+    }
+
+    public enum RegistryLifecycle { EMPTY, BUILDING, READY }
+    public enum CommitStatus {
+        COMMITTED, UNKNOWN_MARKET, SNAPSHOT_BUILDING, RUNNING, RESULT_READY
+    }
+    private enum TicketKind { PRICE, GENERAL }
+    private enum OutputDomain { MATERIALIZED, TRADE }
+
+    public static final class RevisionVector {
+        public final long structureRevision;
+        public final long materializedRevision;
+        public final long priceInputRevision;
+        public final long stockpileRevision;
+        public final long accessibilityRevision;
+        public final long tradeInputRevision;
+        public final long temporalRevision;
+
+        private RevisionVector(long structureRevision, long materializedRevision,
+                               long priceInputRevision, long stockpileRevision,
+                               long accessibilityRevision, long tradeInputRevision,
+                               long temporalRevision) {
+            this.structureRevision = structureRevision;
+            this.materializedRevision = materializedRevision;
+            this.priceInputRevision = priceInputRevision;
+            this.stockpileRevision = stockpileRevision;
+            this.accessibilityRevision = accessibilityRevision;
+            this.tradeInputRevision = tradeInputRevision;
+            this.temporalRevision = temporalRevision;
+        }
+
+        static RevisionVector of(MarketEconomyState state) {
+            return new RevisionVector(state.getStructureRevision(),
+                    state.getMaterializedRevision(), state.getPriceInputRevision(),
+                    state.getStockpileRevision(), state.getAccessibilityRevision(),
+                    state.getTradeInputRevision(), state.getTemporalRevision());
+        }
+
+        boolean matches(RevisionVector other, int dependencies) {
+            return ((dependencies & DEP_STRUCTURE) == 0
+                            || structureRevision == other.structureRevision)
+                    && ((dependencies & DEP_MATERIALIZED) == 0
+                            || materializedRevision == other.materializedRevision)
+                    && ((dependencies & DEP_PRICE_INPUT) == 0
+                            || priceInputRevision == other.priceInputRevision)
+                    && ((dependencies & DEP_STOCKPILE) == 0
+                            || stockpileRevision == other.stockpileRevision)
+                    && ((dependencies & DEP_ACCESSIBILITY) == 0
+                            || accessibilityRevision == other.accessibilityRevision)
+                    && ((dependencies & DEP_TRADE_INPUT) == 0
+                            || tradeInputRevision == other.tradeInputRevision)
+                    && ((dependencies & DEP_TEMPORAL) == 0
+                            || temporalRevision == other.temporalRevision);
+        }
+
+        long fingerprint(int dependencies) {
+            long hash = 0xcbf29ce484222325L;
+            if ((dependencies & DEP_STRUCTURE) != 0) hash = mix(hash, structureRevision);
+            if ((dependencies & DEP_MATERIALIZED) != 0) hash = mix(hash, materializedRevision);
+            if ((dependencies & DEP_PRICE_INPUT) != 0) hash = mix(hash, priceInputRevision);
+            if ((dependencies & DEP_STOCKPILE) != 0) hash = mix(hash, stockpileRevision);
+            if ((dependencies & DEP_ACCESSIBILITY) != 0) hash = mix(hash, accessibilityRevision);
+            if ((dependencies & DEP_TRADE_INPUT) != 0) hash = mix(hash, tradeInputRevision);
+            if ((dependencies & DEP_TEMPORAL) != 0) hash = mix(hash, temporalRevision);
+            return hash == 0L ? 1L : hash;
+        }
+
+        private static long mix(long hash, long value) {
+            hash ^= value;
+            hash *= 0x100000001b3L;
+            return hash;
+        }
+
+        @Override
+        public String toString() {
+            return "{structure=" + structureRevision
+                    + ", materialized=" + materializedRevision
+                    + ", price=" + priceInputRevision
+                    + ", stockpile=" + stockpileRevision
+                    + ", accessibility=" + accessibilityRevision
+                    + ", trade=" + tradeInputRevision
+                    + ", temporal=" + temporalRevision + '}';
+        }
     }
 
     public static final class WorkTicket {
@@ -789,10 +1371,20 @@ public final class MarketRegistry {
         public final int dirtyMask;
         public final int priorityHint;
         public final long dirtySinceNanos;
+        public final RevisionVector revisions;
+        public final long validationFingerprint;
+        public final AoTDRuntimeEpoch.Stamp epochStamp;
+        public final long campaignEpoch;
+        public final long economyEpoch;
+        public final long batchRevision;
+        private final TicketKind kind;
+        private final int dependencyMask;
 
         WorkTicket(String marketId, Object market, long deliveredGeneration,
                    long structuralGeneration, long dirtyGeneration, int dirtyMask,
-                   int priorityHint, long dirtySinceNanos) {
+                   int priorityHint, long dirtySinceNanos, TicketKind kind,
+                   int dependencyMask, RevisionVector revisions,
+                   AoTDRuntimeEpoch.Stamp epochStamp) {
             this.marketId = marketId;
             this.market = market;
             this.deliveredGeneration = deliveredGeneration;
@@ -801,6 +1393,14 @@ public final class MarketRegistry {
             this.dirtyMask = dirtyMask;
             this.priorityHint = priorityHint;
             this.dirtySinceNanos = dirtySinceNanos;
+            this.kind = kind;
+            this.dependencyMask = dependencyMask;
+            this.revisions = revisions;
+            this.epochStamp = epochStamp;
+            this.campaignEpoch = epochStamp == null ? 0L : epochStamp.campaignEpoch;
+            this.economyEpoch = epochStamp == null ? 0L : epochStamp.economyEpoch;
+            this.batchRevision = epochStamp == null ? 0L : epochStamp.batchRevision;
+            this.validationFingerprint = revisions.fingerprint(dependencyMask);
         }
     }
 
@@ -811,6 +1411,7 @@ public final class MarketRegistry {
         public final long derivedGeneration;
         public final long priceGeneration;
         public final long dirtyGeneration;
+        public final RevisionVector revisions;
         public final int dirtyMask;
         public final int priorityHint;
         public final boolean queued;
@@ -825,6 +1426,7 @@ public final class MarketRegistry {
             derivedGeneration = state.getDerivedGeneration();
             priceGeneration = state.getPriceGeneration();
             dirtyGeneration = state.getDirtyGeneration();
+            revisions = RevisionVector.of(state);
             dirtyMask = state.getDirtyMask();
             priorityHint = state.getPriorityHint();
             queued = state.isQueued();
@@ -833,5 +1435,48 @@ public final class MarketRegistry {
                     ? 0L : Math.max(0L, System.nanoTime() - state.getFirstDirtyNanos());
             lastComputeNanos = state.getLastComputeNanos();
         }
+    }
+
+    public static final class InvariantReport {
+        public final int expectedMarkets;
+        public final int registeredMarkets;
+        public final int states;
+        public final int identities;
+        public final int queuedEntries;
+        public final long registryGeneration;
+        public final RegistryLifecycle lifecycle;
+        public final int violationCount;
+        public final List<String> samples;
+
+        InvariantReport(int expectedMarkets, int registeredMarkets, int states,
+                        int identities, int queuedEntries, long registryGeneration,
+                        RegistryLifecycle lifecycle, int violationCount,
+                        List<String> samples) {
+            this.expectedMarkets = expectedMarkets;
+            this.registeredMarkets = registeredMarkets;
+            this.states = states;
+            this.identities = identities;
+            this.queuedEntries = queuedEntries;
+            this.registryGeneration = registryGeneration;
+            this.lifecycle = lifecycle;
+            this.violationCount = violationCount;
+            this.samples = Collections.unmodifiableList(new ArrayList<>(samples));
+        }
+
+        public boolean isClean() { return violationCount == 0; }
+
+        public String summary() {
+            return "expectedMarkets=" + expectedMarkets
+                    + ", registeredMarkets=" + registeredMarkets
+                    + ", states=" + states
+                    + ", identities=" + identities
+                    + ", queuedEntries=" + queuedEntries
+                    + ", registryGeneration=" + registryGeneration
+                    + ", lifecycle=" + lifecycle
+                    + ", violations=" + violationCount
+                    + (samples.isEmpty() ? "" : ", samples=" + samples);
+        }
+
+        @Override public String toString() { return summary(); }
     }
 }

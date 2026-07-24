@@ -1,5 +1,7 @@
 package data.kaysaar.aotd.tot.scripts.trade.models;
 
+import data.kaysaar.aotd.tot.scripts.economy.AoTDRuntimeEpoch;
+
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -7,6 +9,16 @@ import java.util.Map;
 
 /** Pure-data internal-trade batch. Campaign thread owns capture and commit. */
 public final class AoTDInternalTradeBatch {
+    public final AoTDRuntimeEpoch.Stamp epochStamp;
+
+    public AoTDInternalTradeBatch() {
+        this(AoTDRuntimeEpoch.captureBatch("internal-trade"));
+    }
+
+    public AoTDInternalTradeBatch(AoTDRuntimeEpoch.Stamp epochStamp) {
+        if (epochStamp == null) throw new IllegalArgumentException("epochStamp");
+        this.epochStamp = epochStamp;
+    }
     public static final class MarketInput {
         public final String marketId;
         public final float weight;
@@ -91,6 +103,7 @@ public final class AoTDInternalTradeBatch {
     }
 
     public void computeFaction(int index) {
+        if (!AoTDRuntimeEpoch.isCurrent(epochStamp)) return;
         long started = System.nanoTime();
         FactionResult result;
         try {

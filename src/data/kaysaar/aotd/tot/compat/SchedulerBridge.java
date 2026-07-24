@@ -12,8 +12,8 @@ import java.util.function.BiFunction;
  * target-loader calls before the class is defined.</p>
  */
 public final class SchedulerBridge {
-    public static final int BRIDGE_SCHEMA = 5;
-    public static final String BRIDGE_MARKER = "AOTD_SCHEDULER_BRIDGE_V5";
+    public static final int BRIDGE_SCHEMA = 6;
+    public static final String BRIDGE_MARKER = "AOTD_SCHEDULER_BRIDGE_V6";
 
     public static final int MUTATION_MARKET_MEMBERSHIP = 1;
     public static final int MUTATION_INDUSTRY_STRUCTURE = 1 << 1;
@@ -49,9 +49,17 @@ public final class SchedulerBridge {
     };
     private static final AtomicLong deliveredSignals = new AtomicLong();
     private static final AtomicLong deliveryListenerFailures = new AtomicLong();
+    private static final AtomicLong runtimeCapabilityRefreshes = new AtomicLong();
+    private static final AtomicLong runtimeCapabilityDowngrades = new AtomicLong();
+    private static final AtomicLong runtimeCapabilityResynchronizations = new AtomicLong();
+    private static final AtomicLong runtimeCapabilityResynchronizedMarkets = new AtomicLong();
+    private static final AtomicLong runtimeCapabilityResynchronizationFailures = new AtomicLong();
 
     private static volatile State state = State.UNINITIALIZED;
+    /** Current runtime mask. Unlike the activation snapshot, this may shrink at runtime. */
     private static volatile long negotiatedCapabilities;
+    private static volatile long initialNegotiatedCapabilities;
+    private static volatile long lastLostCapabilities;
     private static volatile String diagnostic = "not initialized";
     private static volatile DeliveryListener deliveryListener;
     private static volatile long lastDeliveredGeneration;
@@ -79,12 +87,15 @@ public final class SchedulerBridge {
     public static synchronized State activateFromPrepatcher(long negotiated) {
         if ((negotiated & PrepatcherContract.CAPABILITY_CONTRACT_HANDSHAKE) == 0L) {
             negotiatedCapabilities = 0L;
+            initialNegotiatedCapabilities = 0L;
             state = State.ABI_INCOMPATIBLE;
             diagnostic = "Prepatcher rejected AoTD scheduler ABI "
                     + PrepatcherContract.ABI_VERSION;
             return state;
         }
         negotiatedCapabilities = negotiated;
+        initialNegotiatedCapabilities = negotiated;
+        lastLostCapabilities = 0L;
         state = State.ACTIVE;
         diagnostic = "active; capabilities=0x" + Long.toHexString(negotiated);
         return state;
@@ -142,6 +153,20 @@ public final class SchedulerBridge {
         acceptMarketMutation(market, dirtyMask, sourceGeneration, 0L);
     }
 
+    /** Publishes the process-local campaign/economy identity to Prepatcher. */
+    public static void publishRuntimeEpoch(long campaignEpoch, long economyEpoch) {
+        // no-agent loader fallback
+    }
+
+    /**
+     * Returns the capability mask currently active in Prepatcher. The no-agent
+     * body returns the local activation snapshot; the javaagent replaces it
+     * with a direct target-loader call.
+     */
+    public static long getRuntimeCapabilities() {
+        return negotiatedCapabilities;
+    }
+
     /** Opens a global committed cut; hardFlush requests delivery of all pending market time. */
     public static long beforeGlobalBoundary(int reasonMask, boolean hardFlush) {
         return 0L;
@@ -181,9 +206,60 @@ public final class SchedulerBridge {
 
     public static State getState() { return state; }
     public static boolean isActive() { return state == State.ACTIVE; }
+
+    /**
+     * Refreshes the loader-local capability snapshot from the live Prepatcher
+     * runtime. A runtime downgrade is fail-stop: capabilities may disappear but
+     * are never assumed to reappear without a new bridge activation.
+     */
+    private static long refreshRuntimeCapabilities() {
+        if (state != State.ACTIVE) return negotiatedCapabilities;
+        long observed = getRuntimeCapabilities();
+        long current = negotiatedCapabilities;
+        if (observed == current) return current;
+
+        long lost;
+        boolean resynchronize = false;
+        synchronized (SchedulerBridge.class) {
+            current = negotiatedCapabilities;
+            if (observed == current) return current;
+            // Only accept a subset of the original handshake. A runtime bridge
+            // must not silently grant capabilities that were never negotiated.
+            observed &= initialNegotiatedCapabilities;
+            if (observed == current) return current;
+            lost = current & ~observed;
+            negotiatedCapabilities = observed;
+            lastLostCapabilities = lost;
+            runtimeCapabilityRefreshes.incrementAndGet();
+            if (lost != 0L) runtimeCapabilityDowngrades.incrementAndGet();
+            diagnostic = "runtime capabilities changed: current=0x"
+                    + Long.toHexString(observed) + ", lost=0x"
+                    + Long.toHexString(lost);
+            resynchronize = (lost & PrepatcherContract.CAPABILITY_NATIVE_DELIVERY_EVENTS) != 0L
+                    && (observed & PrepatcherContract.CAPABILITY_MARKET_GENERATIONS) != 0L;
+        }
+
+        if (resynchronize) {
+            runtimeCapabilityResynchronizations.incrementAndGet();
+            try {
+                int repaired = MarketRegistry.resynchronizeRuntimeGenerations();
+                runtimeCapabilityResynchronizedMarkets.addAndGet(repaired);
+                diagnostic = "native delivery events disabled at runtime; resynchronized "
+                        + repaired + " markets; capabilities=0x"
+                        + Long.toHexString(observed);
+            } catch (Throwable failure) {
+                runtimeCapabilityResynchronizationFailures.incrementAndGet();
+                diagnostic = "runtime capability downgrade resynchronization failed: "
+                        + failure.getClass().getName();
+            }
+        }
+        return observed;
+    }
+
     public static boolean hasProductionProfile() {
+        long capabilities = refreshRuntimeCapabilities();
         return state == State.ACTIVE
-                && (negotiatedCapabilities & PrepatcherContract.PRODUCTION_CAPABILITIES)
+                && (capabilities & PrepatcherContract.PRODUCTION_CAPABILITIES)
                 == PrepatcherContract.PRODUCTION_CAPABILITIES;
     }
 
@@ -193,16 +269,38 @@ public final class SchedulerBridge {
                 "StarsectorPrepatcher runtime integration is inactive or incompatible "
                         + "(required capabilities=0x"
                         + Long.toHexString(PrepatcherContract.PRODUCTION_CAPABILITIES)
-                        + ", negotiated=0x" + Long.toHexString(negotiatedCapabilities)
+                        + ", negotiated=0x" + Long.toHexString(refreshRuntimeCapabilities())
                         + "). Verify that the Prepatcher javaagent is installed and active. "
                         + "Bridge status: " + statusSummary());
     }
 
     public static boolean hasCapability(long capability) {
+        long capabilities = refreshRuntimeCapabilities();
         return state == State.ACTIVE && capability != 0L
-                && (negotiatedCapabilities & capability) == capability;
+                && (capabilities & capability) == capability;
     }
-    public static long getNegotiatedCapabilities() { return negotiatedCapabilities; }
+    public static long getNegotiatedCapabilities() {
+        return refreshRuntimeCapabilities();
+    }
+    public static long getInitialNegotiatedCapabilities() {
+        return initialNegotiatedCapabilities;
+    }
+    public static long getLastLostCapabilities() { return lastLostCapabilities; }
+    public static long getRuntimeCapabilityRefreshCount() {
+        return runtimeCapabilityRefreshes.get();
+    }
+    public static long getRuntimeCapabilityDowngradeCount() {
+        return runtimeCapabilityDowngrades.get();
+    }
+    public static long getRuntimeCapabilityResynchronizationCount() {
+        return runtimeCapabilityResynchronizations.get();
+    }
+    public static long getRuntimeCapabilityResynchronizedMarketCount() {
+        return runtimeCapabilityResynchronizedMarkets.get();
+    }
+    public static long getRuntimeCapabilityResynchronizationFailureCount() {
+        return runtimeCapabilityResynchronizationFailures.get();
+    }
     public static String getDiagnostic() { return diagnostic; }
     public static long getDeliveredSignalCount() { return deliveredSignals.get(); }
     public static long getDeliveryListenerFailureCount() {
@@ -215,7 +313,14 @@ public final class SchedulerBridge {
     public static String statusSummary() {
         return "state=" + state + ", declared=0x"
                 + Long.toHexString(PrepatcherContract.DECLARED_CAPABILITIES)
-                + ", negotiated=0x" + Long.toHexString(negotiatedCapabilities)
+                + ", initialNegotiated=0x" + Long.toHexString(initialNegotiatedCapabilities)
+                + ", runtimeNegotiated=0x" + Long.toHexString(refreshRuntimeCapabilities())
+                + ", lastLost=0x" + Long.toHexString(lastLostCapabilities)
+                + ", capabilityRefreshes=" + runtimeCapabilityRefreshes.get()
+                + ", capabilityDowngrades=" + runtimeCapabilityDowngrades.get()
+                + ", capabilityResyncs=" + runtimeCapabilityResynchronizations.get()
+                + ", capabilityResyncedMarkets=" + runtimeCapabilityResynchronizedMarkets.get()
+                + ", capabilityResyncFailures=" + runtimeCapabilityResynchronizationFailures.get()
                 + ", deliveredSignals=" + deliveredSignals.get()
                 + ", listenerFailures=" + deliveryListenerFailures.get()
                 + ", " + diagnostic;
@@ -224,10 +329,17 @@ public final class SchedulerBridge {
     static synchronized void resetForTests() {
         state = State.UNINITIALIZED;
         negotiatedCapabilities = 0L;
+        initialNegotiatedCapabilities = 0L;
+        lastLostCapabilities = 0L;
         diagnostic = "not initialized";
         deliveryListener = null;
         deliveredSignals.set(0L);
         deliveryListenerFailures.set(0L);
+        runtimeCapabilityRefreshes.set(0L);
+        runtimeCapabilityDowngrades.set(0L);
+        runtimeCapabilityResynchronizations.set(0L);
+        runtimeCapabilityResynchronizedMarkets.set(0L);
+        runtimeCapabilityResynchronizationFailures.set(0L);
         lastDeliveredGeneration = 0L;
         lastDeliverySequence = 0L;
         lastDeliveredAmount = 0f;

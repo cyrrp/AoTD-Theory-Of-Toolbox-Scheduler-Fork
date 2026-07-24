@@ -218,7 +218,8 @@ public class AoTDExcDefData {
     }
 
     public int setstockPileRecordedWhenEventHappened(int stockPile) {
-        return stockPileRecordedWhenEventHappened;
+        this.stockPileRecordedWhenEventHappened = stockPile;
+        return this.stockPileRecordedWhenEventHappened;
     }
 
     /** Clears ALL mods (use carefully). */

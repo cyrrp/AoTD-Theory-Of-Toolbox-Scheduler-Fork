@@ -12,7 +12,7 @@ public final class PrepatcherContract {
     public static final String MARKER_CLASS =
             "data.kaysaar.aotd.tot.compat.PrepatcherContract";
     public static final int ABI_VERSION = 1;
-    public static final String FORK_VERSION = "1.0.11-spp1-stage8";
+    public static final String FORK_VERSION = "1.0.14-spp1-stage11-capability-refresh";
 
     /** Loader-safe javaagent patch and capability negotiation. */
     public static final long CAPABILITY_CONTRACT_HANDSHAKE = 1L;
@@ -30,6 +30,8 @@ public final class PrepatcherContract {
     public static final long CAPABILITY_PURE_PRICE_OFFLOAD = 1L << 6;
     /** Global committed cuts and hard temporal boundaries. */
     public static final long CAPABILITY_GLOBAL_PHASE_COORDINATION = 1L << 7;
+    /** Campaign/economy epoch publication and stale-runtime invalidation. */
+    public static final long CAPABILITY_RUNTIME_EPOCH_COORDINATION = 1L << 8;
 
     /** Complete production profile required by the scheduler fork. */
     public static final long PRODUCTION_CAPABILITIES =
@@ -40,7 +42,8 @@ public final class PrepatcherContract {
                     | CAPABILITY_CLEAN_DEFICIT_SEMANTICS
                     | CAPABILITY_AUTHORITATIVE_MARKET_STATE
                     | CAPABILITY_PURE_PRICE_OFFLOAD
-                    | CAPABILITY_GLOBAL_PHASE_COORDINATION;
+                    | CAPABILITY_GLOBAL_PHASE_COORDINATION
+                    | CAPABILITY_RUNTIME_EPOCH_COORDINATION;
 
     public static final long DECLARED_CAPABILITIES = PRODUCTION_CAPABILITIES;
 

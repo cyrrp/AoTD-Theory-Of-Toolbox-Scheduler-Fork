@@ -18,9 +18,10 @@ import java.util.concurrent.Future;
 public class AoTDFinishEconomyUpdateTask extends FinishEconomyUpdateTask {
     private static final int CHUNK_SIZE = 1;
     private final Economy economy;
-    private final ArrayList<Future<?>> futures = new ArrayList<>();
+    private ArrayList<Future<?>> futures = new ArrayList<>();
     private AoTDGlobalEconomyCoordinator.Boundary boundary;
     private AoTDInternalTradeBatch batch;
+    private AoTDRuntimeEpoch.Stamp epochStamp;
     private int sequentialIndex;
     private boolean submitted;
     private boolean computed;
@@ -29,9 +30,12 @@ public class AoTDFinishEconomyUpdateTask extends FinishEconomyUpdateTask {
     public AoTDFinishEconomyUpdateTask(Economy economy) {
         super(economy);
         this.economy = economy;
+        this.epochStamp = AoTDRuntimeEpoch.captureBatch("finish-economy-trade");
     }
 
     public void doForPlayerOnly() {
+        ensureRuntimeCollections();
+        if (!ensureCurrentEpoch()) return;
         openCut();
         while (sequentialIndex < batch.size()) batch.computeFaction(sequentialIndex++);
         computed = true;
@@ -40,7 +44,9 @@ public class AoTDFinishEconomyUpdateTask extends FinishEconomyUpdateTask {
 
     @Override
     public void doNextBatch() {
+        ensureRuntimeCollections();
         if (done) return;
+        if (!ensureCurrentEpoch()) return;
         if (boundary == null) {
             openCut();
             return;
@@ -48,7 +54,8 @@ public class AoTDFinishEconomyUpdateTask extends FinishEconomyUpdateTask {
         if (!submitted) {
             if (AoTdMainWorkTask2.ENABLE_MULTITHREADED_VERSION && batch.size() > 0) {
                 futures.addAll(AoTDWorkerManager.submitDynamicBatch(
-                        "AoTD pure internal trade", batch.size(), CHUNK_SIZE,
+                        "AoTD pure internal trade", epochStamp,
+                        batch.size(), CHUNK_SIZE,
                         batch::computeFaction));
             }
             submitted = true;
@@ -72,7 +79,8 @@ public class AoTDFinishEconomyUpdateTask extends FinishEconomyUpdateTask {
 
     private void openCut() {
         boundary = AoTDGlobalEconomyCoordinator.beginCommittedCut(
-                AoTDGlobalEconomyCoordinator.BOUNDARY_INTERNAL_TRADE, false);
+                AoTDGlobalEconomyCoordinator.BOUNDARY_INTERNAL_TRADE,
+                false, epochStamp);
         batch = boundary.cut.internalTradeBatch;
         AoTDEconomySemanticBaseline.operation("global-cut.open", 1L);
         AoTDEconomySemanticBaseline.operation("internal-trade.factions", batch.size());
@@ -92,7 +100,7 @@ public class AoTDFinishEconomyUpdateTask extends FinishEconomyUpdateTask {
                         failure);
             }
         }
-        if (infrastructureFailure) {
+        if (infrastructureFailure && AoTDRuntimeEpoch.isCurrent(epochStamp)) {
             for (int i = 0; i < batch.size(); i++) {
                 if (batch.resultAt(i) == null) batch.computeFaction(i);
             }
@@ -100,6 +108,10 @@ public class AoTDFinishEconomyUpdateTask extends FinishEconomyUpdateTask {
     }
 
     private void commitAndClose() {
+        if (!AoTDRuntimeEpoch.isCurrent(epochStamp)) {
+            discardStaleEpochTask();
+            return;
+        }
         boolean modelFailure = false;
         for (int i = 0; i < batch.size(); i++) {
             AoTDInternalTradeBatch.FactionResult result = batch.resultAt(i);
@@ -125,6 +137,37 @@ public class AoTDFinishEconomyUpdateTask extends FinishEconomyUpdateTask {
         boundary.close();
         AoTDEconomySemanticBaseline.operation("global-cut.closed", 1L);
         done = true;
+    }
+
+    private void ensureRuntimeCollections() {
+        if (futures == null) futures = new ArrayList<>();
+    }
+
+    private boolean ensureCurrentEpoch() {
+        if (epochStamp == null) {
+            // Old serialized task: do not apply a pre-epoch cut to the loaded economy.
+            discardStaleEpochTask();
+            return false;
+        }
+        if (!AoTDRuntimeEpoch.isCurrent(epochStamp)) {
+            discardStaleEpochTask();
+            return false;
+        }
+        return true;
+    }
+
+    private void discardStaleEpochTask() {
+        for (Future<?> future : futures) {
+            if (future != null) future.cancel(true);
+        }
+        futures.clear();
+        if (boundary != null) {
+            boundary.close();
+            boundary = null;
+        }
+        batch = null;
+        done = true;
+        AoTDEconomySemanticBaseline.operation("internal-trade.stale-epoch-task-dropped", 1L);
     }
 
     private void refreshPlayerContractPredictionsOnMainThread() {

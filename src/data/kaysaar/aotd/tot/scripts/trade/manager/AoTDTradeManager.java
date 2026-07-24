@@ -7,6 +7,7 @@ import data.kaysaar.aotd.tot.listeners.AoTDCoreUIListener;
 import data.kaysaar.aotd.tot.misc.AoTDToolboxMisc;
 import data.kaysaar.aotd.tot.scripts.commoditydata.AoTDCommodityOnMarket;
 import data.kaysaar.aotd.tot.scripts.economy.AoTDEconomySemanticBaseline;
+import data.kaysaar.aotd.tot.scripts.economy.AoTDRuntimeEpoch;
 import data.kaysaar.aotd.tot.scripts.trade.models.AoTDFactionTradeData;
 import data.kaysaar.aotd.tot.scripts.trade.models.AoTDInternalTradeBatch;
 import data.kaysaar.aotd.tot.scripts.trade.models.AoTDMarketData;
@@ -82,6 +83,30 @@ public class AoTDTradeManager {
         AoTDTradeManager manager = (AoTDTradeManager) Global.getSector().getPersistentData().get(memkey);
         manager.ensureTransientState();
         return manager;
+    }
+
+    /** Invalidates an open cut without publishing deferred old-epoch changes. */
+    public synchronized void invalidateRuntimeEpochState() {
+        ensureTransientState();
+        settlementOpen = false;
+        activeSettlementToken = 0L;
+        pendingSnapshots.clear();
+        pendingRemovals.clear();
+    }
+
+    /** Best-effort invalidation of the manager installed in the current sector. */
+    public static void invalidateInstalledRuntimeEpochState() {
+        try {
+            if (Global.getSector() == null) return;
+            Object value = Global.getSector().getPersistentData().get(memkey);
+            if (value instanceof AoTDTradeManager manager) {
+                manager.invalidateRuntimeEpochState();
+            }
+        } catch (RuntimeException ignored) {
+            // Campaign bootstrap/teardown may not expose a sector yet. Epoch checks
+            // still make every old cut non-committable; this hook prevents a stuck
+            // settlement when the same persistent manager survives economy replacement.
+        }
     }
 
     /**
@@ -270,7 +295,16 @@ public class AoTDTradeManager {
 
     /** Opens an immutable cut. New local publications are deferred to the next cut. */
     public synchronized CommittedCut beginCommittedCut(int reasonMask) {
+        return beginCommittedCut(reasonMask,
+                AoTDRuntimeEpoch.captureBatch("committed-cut"));
+    }
+
+    public synchronized CommittedCut beginCommittedCut(
+            int reasonMask, AoTDRuntimeEpoch.Stamp epochStamp) {
         ensureTransientState();
+        if (!AoTDRuntimeEpoch.isCurrent(epochStamp)) {
+            throw new IllegalStateException("Cannot open stale AoTD committed cut: " + epochStamp);
+        }
         if (settlementOpen) {
             throw new IllegalStateException("AoTD committed cut already open: token="
                     + activeSettlementToken);
@@ -278,7 +312,7 @@ public class AoTDTradeManager {
         settlementOpen = true;
         activeSettlementToken = nextPositive(settlementSequence);
         settlementSequence = activeSettlementToken;
-        AoTDInternalTradeBatch batch = new AoTDInternalTradeBatch();
+        AoTDInternalTradeBatch batch = new AoTDInternalTradeBatch(epochStamp);
         for (Map.Entry<String, AoTDFactionTradeData> entry : factionsTradeData.entrySet()) {
             ArrayList<AoTDInternalTradeBatch.MarketInput> markets = new ArrayList<>();
             for (AoTDMarketData market : entry.getValue().getTradeData().values()) {
@@ -289,13 +323,14 @@ public class AoTDTradeManager {
         }
         batch.freeze();
         return new CommittedCut(activeSettlementToken, localPublicationRevision,
-                reasonMask, batch);
+                reasonMask, batch, epochStamp);
     }
 
     /** Applies pure results to the exact snapshots protected by the open cut. */
     public synchronized boolean commitInternalTrade(
             CommittedCut cut, AoTDInternalTradeBatch batch) {
-        if (!isActiveCutLocked(cut) || batch == null) return false;
+        if (!isActiveCutLocked(cut) || batch == null
+                || !cut.epochStamp.equals(batch.epochStamp)) return false;
         for (int factionIndex = 0; factionIndex < batch.size(); factionIndex++) {
             AoTDInternalTradeBatch.FactionResult result = batch.resultAt(factionIndex);
             if (result == null || result.failure != null) return false;
@@ -324,7 +359,10 @@ public class AoTDTradeManager {
     }
 
     private boolean isActiveCutLocked(CommittedCut cut) {
-        return cut != null && settlementOpen && activeSettlementToken == cut.token;
+        return cut != null
+                && AoTDRuntimeEpoch.isCurrent(cut.epochStamp)
+                && settlementOpen
+                && activeSettlementToken == cut.token;
     }
 
     public synchronized long getLocalPublicationRevision() {
@@ -471,13 +509,22 @@ public class AoTDTradeManager {
         public final long localPublicationRevision;
         public final int reasonMask;
         public final AoTDInternalTradeBatch internalTradeBatch;
+        public final AoTDRuntimeEpoch.Stamp epochStamp;
+        public final long campaignEpoch;
+        public final long economyEpoch;
+        public final long batchRevision;
 
         private CommittedCut(long token, long localPublicationRevision,
-                             int reasonMask, AoTDInternalTradeBatch internalTradeBatch) {
+                             int reasonMask, AoTDInternalTradeBatch internalTradeBatch,
+                             AoTDRuntimeEpoch.Stamp epochStamp) {
             this.token = token;
             this.localPublicationRevision = localPublicationRevision;
             this.reasonMask = reasonMask;
             this.internalTradeBatch = internalTradeBatch;
+            this.epochStamp = epochStamp;
+            this.campaignEpoch = epochStamp.campaignEpoch;
+            this.economyEpoch = epochStamp.economyEpoch;
+            this.batchRevision = epochStamp.batchRevision;
         }
     }
 }

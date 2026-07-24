@@ -301,11 +301,31 @@ public class AoTDToolboxTheoryPlugin extends BaseModPlugin implements MarketCont
         AoTDWorkerManager.endSave();
     }
 
+    @Override
+    public void onGameSaveFailed() {
+        afterSaveState = true;
+        AoTDEconomySemanticBaseline.flush("game-save-failed");
+        AoTDWorkerManager.endSave();
+    }
+
+    @Override
+    public void onDevModeF8Reload() {
+        AoTDWorkerManager.resetRuntime("dev-mode-f8-reload");
+        AoTDWorkerManager.bindLoadedEconomy(
+                AoTDEconomy.getInstance(), "dev-mode-f8-reload-bind");
+    }
+
+    @Override
+    public void onEnabled(boolean enabled) {
+        AoTDWorkerManager.onModEnabledState(enabled);
+    }
 
     @Override
     public void onGameLoad(boolean newGame) {
-        AoTDEconomySemanticBaseline.initialize();
         AoTDEconomy economy = AoTDEconomy.getInstance();
+        AoTDWorkerManager.beginCampaign(economy,
+                newGame ? "new-game-load" : "save-load");
+        AoTDEconomySemanticBaseline.initialize();
         if (economy != null) economy.rebuildMarketRegistry();
         AoTDCommodityEconSpecManager.loadSpecs();
         if(newGame){

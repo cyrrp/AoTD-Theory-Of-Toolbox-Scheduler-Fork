@@ -16,9 +16,14 @@ import data.kaysaar.aotd.tot.scripts.commoditydata.AoTDMarketDemandData;
 import data.kaysaar.aotd.tot.scripts.trade.manager.AoTDTradeManager;
 
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class AoTDEconomy extends Economy {
-    private static final Set<String> NEGATIVE_MARKET_LOOKUPS = new HashSet<>();
+    private static final ConcurrentHashMap<String, Long> NEGATIVE_MARKET_LOOKUPS =
+            new ConcurrentHashMap<>();
+    private static final ConcurrentHashMap<String, Object> MARKET_REPAIR_LOCKS =
+            new ConcurrentHashMap<>();
+    private static final Object MARKET_REGISTRY_LOAD_REPAIR_LOCK = new Object();
     public static boolean runningPrePlayerEconomy = false;
     public static boolean mustPruneCommodities = true;
     public static AoTDEconomy getInstance(){
@@ -41,43 +46,125 @@ public class AoTDEconomy extends Economy {
         }
 
     }
-    public MarketAPI getMarketThreadSave(String id){
+    public MarketAPI getMarketThreadSave(String id) {
         if (id == null) return null;
         Object indexed = MarketRegistry.lookupMarket(id);
         if (indexed instanceof MarketAPI) {
             AoTDEconomySemanticBaseline.operation("economy.registry-market-lookup.hit", 1L);
             return (MarketAPI) indexed;
         }
-        synchronized (NEGATIVE_MARKET_LOOKUPS) {
-            if (NEGATIVE_MARKET_LOOKUPS.contains(id)) {
-                AoTDEconomySemanticBaseline.operation("economy.registry-market-lookup.negative-hit", 1L);
+
+        // A full boundary publication keeps the previous complete snapshot visible.
+        // Do not mutate the registry or create a negative entry until it is READY.
+        if (MarketRegistry.getRegistryLifecycle()
+                == MarketRegistry.RegistryLifecycle.BUILDING) {
+            AoTDEconomySemanticBaseline.operation(
+                    "economy.registry-market-lookup.during-build", 1L);
+            return super.getMarket(id);
+        }
+
+        long generation = MarketRegistry.getRegistryGeneration();
+        Long missedAt = NEGATIVE_MARKET_LOOKUPS.get(id);
+        if (missedAt != null && missedAt == generation) {
+            MarketRegistry.recordNegativeLookupHit();
+            AoTDEconomySemanticBaseline.operation(
+                    "economy.registry-market-lookup.negative-hit", 1L);
+            return null;
+        }
+
+        Object repairLock = MARKET_REPAIR_LOCKS.computeIfAbsent(id, ignored -> new Object());
+        try {
+            synchronized (repairLock) {
+                indexed = MarketRegistry.lookupMarket(id);
+                if (indexed instanceof MarketAPI) return (MarketAPI) indexed;
+                if (MarketRegistry.getRegistryLifecycle()
+                        == MarketRegistry.RegistryLifecycle.BUILDING) {
+                    return super.getMarket(id);
+                }
+
+                generation = MarketRegistry.getRegistryGeneration();
+                missedAt = NEGATIVE_MARKET_LOOKUPS.get(id);
+                if (missedAt != null && missedAt == generation) {
+                    MarketRegistry.recordNegativeLookupHit();
+                    return null;
+                }
+
+                MarketRegistry.recordTargetedRepairAttempt();
+                MarketAPI repaired = super.getMarket(id);
+                if (repaired != null) {
+                    MarketRegistry.registerMarket(id, repaired);
+                    NEGATIVE_MARKET_LOOKUPS.remove(id);
+                    MarketRegistry.recordTargetedRepairSuccess();
+                    AoTDEconomySemanticBaseline.operation(
+                            "economy.registry-market-lookup.repair-hit", 1L);
+                    return repaired;
+                }
+
+                MarketRegistry.recordLookupMiss();
+                NEGATIVE_MARKET_LOOKUPS.put(id, MarketRegistry.getRegistryGeneration());
+                AoTDEconomySemanticBaseline.operation(
+                        "economy.registry-market-lookup.miss", 1L);
                 return null;
             }
-        }
-        // Restricted recovery: rebuild the whole registry once, then negative-cache
-        // the unresolved id until membership changes.
-        try (AoTDEconomySemanticBaseline.Scope ignored =
-                     AoTDEconomySemanticBaseline.begin(
-                             "economy.registry-market-lookup-repair", null, id)) {
-            rebuildMarketRegistry();
-            indexed = MarketRegistry.lookupMarket(id);
-            if (indexed instanceof MarketAPI) {
-                AoTDEconomySemanticBaseline.operation("economy.registry-market-lookup.repair-hit", 1L);
-                return (MarketAPI) indexed;
-            }
-            synchronized (NEGATIVE_MARKET_LOOKUPS) {
-                NEGATIVE_MARKET_LOOKUPS.add(id);
-            }
-            AoTDEconomySemanticBaseline.operation("economy.registry-market-lookup.miss", 1L);
-            return null;
+        } finally {
+            MARKET_REPAIR_LOCKS.remove(id, repairLock);
         }
     }
 
+    /** Full rebuild is permitted only at an explicit economy/load boundary. */
     public void rebuildMarketRegistry() {
-        synchronized (NEGATIVE_MARKET_LOOKUPS) { NEGATIVE_MARKET_LOOKUPS.clear(); }
-        MarketRegistry.clear();
+        LinkedHashMap<String, MarketAPI> complete = new LinkedHashMap<>();
         for (MarketAPI market : getMarkets()) {
-            MarketRegistry.registerMarket(market.getId(), market);
+            if (market != null && market.getId() != null) {
+                complete.put(market.getId(), market);
+            }
+        }
+        MarketRegistry.replaceAllMarkets(complete);
+        NEGATIVE_MARKET_LOOKUPS.clear();
+        MARKET_REPAIR_LOCKS.clear();
+    }
+
+    /**
+     * Save loading may invoke the mod plugin before the deserialized economy has
+     * restored its complete market list. Repair that early empty or partial
+     * publication once a post-save callback proves that the installed economy
+     * contains the restored market.
+     */
+    private static void repairMarketRegistryAfterLoad(MarketAPI restoredMarket) {
+        if (restoredMarket == null) return;
+
+        List<MarketAPI> restoredMarkets =
+                Global.getSector().getEconomy().getMarketsCopy();
+        if (MarketRegistry.getRegistryLifecycle()
+                    == MarketRegistry.RegistryLifecycle.READY
+                && MarketRegistry.getRegisteredMarketCount() == restoredMarkets.size()
+                && MarketRegistry.lookupMarket(restoredMarket.getId()) == restoredMarket) {
+            return;
+        }
+        synchronized (MARKET_REGISTRY_LOAD_REPAIR_LOCK) {
+            restoredMarkets = Global.getSector().getEconomy().getMarketsCopy();
+            if (MarketRegistry.getRegistryLifecycle()
+                        == MarketRegistry.RegistryLifecycle.READY
+                    && MarketRegistry.getRegisteredMarketCount() == restoredMarkets.size()
+                    && MarketRegistry.lookupMarket(restoredMarket.getId()) == restoredMarket) {
+                return;
+            }
+
+            LinkedHashMap<String, MarketAPI> complete = new LinkedHashMap<>();
+            boolean containsRestoredMarket = false;
+            for (MarketAPI market : restoredMarkets) {
+                if (market == null || market.getId() == null) continue;
+                complete.put(market.getId(), market);
+                if (market == restoredMarket) containsRestoredMarket = true;
+            }
+
+            // Do not turn another partial load snapshot into the authoritative
+            // registry. A later post-save callback will retry.
+            if (complete.isEmpty() || !containsRestoredMarket) return;
+
+            MarketRegistry.replaceAllMarkets(complete);
+            NEGATIVE_MARKET_LOOKUPS.clear();
+            MARKET_REPAIR_LOCKS.clear();
         }
     }
     public AoTDReachEconomy getReachEconomy(){
@@ -85,6 +172,7 @@ public class AoTDEconomy extends Economy {
     }
     public AoTDEconomy(boolean b, Economy currentEconomyToReplace) {
         super(b);
+        AoTDWorkerManager.replaceEconomy(this, "AoTDEconomy-constructor");
         ArrayList<MarketAPI>current = new ArrayList<>(currentEconomyToReplace.getMarkets());
         this.setEcon(new AoTDReachEconomy());
         ReflectionUtilis.setPrivateVariableFromSuperclass("stepper",this,new AoTDEconomyReachStepper(this.getEconomy()));
@@ -124,7 +212,6 @@ public class AoTDEconomy extends Economy {
 
     @Override
     public void removeMarket(MarketAPI marketAPI) {
-        synchronized (NEGATIVE_MARKET_LOOKUPS) { NEGATIVE_MARKET_LOOKUPS.clear(); }
         long token = SchedulerBridge.beforeMarketMutation(
                 marketAPI, SchedulerBridge.MUTATION_MARKET_MEMBERSHIP);
         try {
@@ -146,7 +233,6 @@ public class AoTDEconomy extends Economy {
 
     @Override
     public void addMarket(MarketAPI marketAPI, boolean addJunk) {
-        synchronized (NEGATIVE_MARKET_LOOKUPS) { NEGATIVE_MARKET_LOOKUPS.clear(); }
         long token = SchedulerBridge.beforeMarketMutation(
                 marketAPI, SchedulerBridge.MUTATION_MARKET_MEMBERSHIP);
         try {
@@ -209,6 +295,7 @@ public class AoTDEconomy extends Economy {
     }
 
     public static void pruneCommoditiesThatMightAppear(Market market) {
+        repairMarketRegistryAfterLoad(market);
         List<CommodityOnMarket> commodities = getCommodities(market);
 
         ensureAoTDDemandData(market);

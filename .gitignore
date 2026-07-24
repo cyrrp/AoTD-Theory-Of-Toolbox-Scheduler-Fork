@@ -1,0 +1,21 @@
+# IDE metadata
+.idea/
+*.iml
+out/
+
+# Build and compiler output
+build/
+target/
+*.class
+.tmp-*/
+
+# Intermediate release artifacts
+jars/*.pending-*.jar
+
+# Editor backups and local diagnostics
+*~
+*.bak
+*.log
+*.orig
+*.rej
+*.tmp

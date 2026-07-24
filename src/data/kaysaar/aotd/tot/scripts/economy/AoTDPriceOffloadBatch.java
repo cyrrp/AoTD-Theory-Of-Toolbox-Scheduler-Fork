@@ -11,6 +11,7 @@ import java.util.List;
  * Starsector API object.</p>
  */
 public final class AoTDPriceOffloadBatch {
+    public final AoTDRuntimeEpoch.Stamp epochStamp;
     public static final class ModelConfig {
         public final float referenceTradeQuantity;
         public final float normalBuyMin;
@@ -218,8 +219,15 @@ public final class AoTDPriceOffloadBatch {
     private volatile MarketResult[] results = new MarketResult[0];
 
     public AoTDPriceOffloadBatch(ModelConfig config) {
+        this(config, AoTDRuntimeEpoch.captureBatch("price-offload"));
+    }
+
+    public AoTDPriceOffloadBatch(
+            ModelConfig config, AoTDRuntimeEpoch.Stamp epochStamp) {
         if (config == null) throw new IllegalArgumentException("config");
+        if (epochStamp == null) throw new IllegalArgumentException("epochStamp");
         this.config = config;
+        this.epochStamp = epochStamp;
     }
 
     public int addMarket(MarketInput input) {
@@ -248,6 +256,7 @@ public final class AoTDPriceOffloadBatch {
     }
 
     public void computeMarket(int index) {
+        if (!AoTDRuntimeEpoch.isCurrent(epochStamp)) return;
         long started = System.nanoTime();
         MarketResult result;
         try {

@@ -1,6 +1,8 @@
 // file: data/kaysaar/aotd/tot/scripts/trade/tasks/AoTDExternalTradeSolver.java
 package data.kaysaar.aotd.tot.scripts.trade.tasks;
 
+import com.fs.starfarer.api.Global;
+import com.fs.starfarer.api.campaign.CampaignClockAPI;
 import com.fs.starfarer.api.util.WeightedRandomPicker;
 
 import data.kaysaar.aotd.tot.scripts.economy.AoTDSectorProductionDemandDataUtils;
@@ -10,8 +12,10 @@ import data.kaysaar.aotd.tot.scripts.trade.SectorSurplusConsumptionStats;
 import data.kaysaar.aotd.tot.scripts.trade.SurplusConsumptionUtils;
 
 import java.util.ArrayList;
-import java.util.HashSet;
+import java.util.Comparator;
+import java.util.Random;
 import java.util.Set;
+import java.util.TreeSet;
 
 public class AoTDExternalTradeSolver {
 
@@ -94,8 +98,10 @@ public class AoTDExternalTradeSolver {
         long toRemove = Math.min(leftoverSupply, actualNetSurplus - allowedNetSurplus);
         if (toRemove <= 0) return;
 
-        // deterministic: remove from biggest/most accessible exporters first
-        exporters.sort((a, b) -> Float.compare(b.weight, a.weight));
+        // Deterministic: remove from the highest-weight exporters first.
+        // Stable market-id tie breaking prevents load/insertion order from changing
+        // which producer absorbs the surplus cap when weights are equal.
+        exporters.sort(AoTDExternalTradeSolver::compareSurplusPriority);
 
         for (AoTDSectorExternalIndex.Offer e : exporters) {
             if (toRemove <= 0) break;
@@ -132,7 +138,9 @@ public class AoTDExternalTradeSolver {
      * Runs month-end matching.
      */
     public void runMonthEndExternalTrade(AoTDSectorExternalIndex idx) {
-        Set<String> commodities = new HashSet<>();
+        // A stable global order makes diagnostics and any cross-commodity side effects
+        // reproducible as well. Each commodity also has its own independent PRNG seed.
+        Set<String> commodities = new TreeSet<>();
         commodities.addAll(idx.exportersByCommodity.keySet());
         commodities.addAll(idx.importersByCommodity.keySet());
 
@@ -155,8 +163,13 @@ public class AoTDExternalTradeSolver {
         exporters = idx.exportersByCommodity.get(commodityId);
         if (exporters == null || exporters.isEmpty()) return;
 
-        WeightedRandomPicker<AoTDSectorExternalIndex.Offer> expPicker = new WeightedRandomPicker<>();
-        WeightedRandomPicker<AoTDSectorExternalIndex.Offer> impPicker = new WeightedRandomPicker<>();
+        // WeightedRandomPicker is order-sensitive even with a fixed PRNG. Canonicalize
+        // offer order first, then use one commodity-local deterministic random stream.
+        exporters.sort(Comparator.comparing(AoTDExternalTradeSolver::stableOfferId));
+        importers.sort(Comparator.comparing(AoTDExternalTradeSolver::stableOfferId));
+        Random random = new Random(computeExternalTradeSeed(commodityId));
+        WeightedRandomPicker<AoTDSectorExternalIndex.Offer> expPicker = new WeightedRandomPicker<>(random);
+        WeightedRandomPicker<AoTDSectorExternalIndex.Offer> impPicker = new WeightedRandomPicker<>(random);
 
         for (AoTDSectorExternalIndex.Offer e : exporters) {
             if (e != null && e.amount > 0) expPicker.add(e, e.weight);
@@ -180,7 +193,6 @@ public class AoTDExternalTradeSolver {
 
             // exporter moves toward 0
             exp.data.remainingNet.merge(commodityId, -moved, Integer::sum);
-     ;
             if (exp.data.remainingNet.getOrDefault(commodityId, 0) == 0) {
                 exp.data.remainingNet.remove(commodityId);
             }
@@ -200,6 +212,89 @@ public class AoTDExternalTradeSolver {
         }
 
         // IMPORTANT: surplus cap happens AFTER matching, and only touches leftover supply.
+        applySurplusCapAfterMatching(commodityId, exporters);
+    }
 
+    /**
+     * Stable identity used for canonical ordering. A normal market id is unique for
+     * one commodity. Synthetic scavenger supply receives its own fixed identity.
+     */
+    private static int compareSurplusPriority(
+            AoTDSectorExternalIndex.Offer left,
+            AoTDSectorExternalIndex.Offer right) {
+        if (left == right) return 0;
+        if (left == null) return 1;
+        if (right == null) return -1;
+        int weight = Float.compare(right.weight, left.weight);
+        if (weight != 0) return weight;
+        return stableOfferId(left).compareTo(stableOfferId(right));
+    }
+
+    private static String stableOfferId(AoTDSectorExternalIndex.Offer offer) {
+        if (offer == null) return "\uffff:null";
+        if (offer.isScavenger) return "\u0000:scavenger";
+        if (offer.market != null && offer.market.getId() != null) {
+            return offer.market.getId();
+        }
+        if (offer.data != null && offer.data.marketId != null) {
+            return offer.data.marketId;
+        }
+        return "\uffff:unknown";
+    }
+
+    /**
+     * Seed contract: campaign seed + economy month-cycle + commodity id.
+     * The month-cycle is cycle*12+month, so each monthly settlement has a unique,
+     * replayable seed while remaining independent of thread and collection order.
+     */
+    private static long computeExternalTradeSeed(String commodityId) {
+        String campaignSeed = "";
+        long economyCycle = 0L;
+        if (Global.getSector() != null) {
+            String configuredSeed = Global.getSector().getSeedString();
+            if (configuredSeed != null) campaignSeed = configuredSeed;
+            CampaignClockAPI clock = Global.getSector().getClock();
+            if (clock != null) {
+                economyCycle = ((long) clock.getCycle() * 12L) + clock.getMonth();
+            }
+        }
+
+        long hash = 0xcbf29ce484222325L;
+        hash = mixString(hash, campaignSeed);
+        hash = mixLong(hash, economyCycle);
+        hash = mixString(hash, commodityId == null ? "" : commodityId);
+        return avalanche(hash);
+    }
+
+    private static long mixString(long hash, String value) {
+        hash ^= 0xffL;
+        hash *= 0x100000001b3L;
+        for (int i = 0; i < value.length(); i++) {
+            char c = value.charAt(i);
+            hash ^= c & 0xffL;
+            hash *= 0x100000001b3L;
+            hash ^= (c >>> 8) & 0xffL;
+            hash *= 0x100000001b3L;
+        }
+        return hash;
+    }
+
+    private static long mixLong(long hash, long value) {
+        hash ^= 0xfeL;
+        hash *= 0x100000001b3L;
+        for (int shift = 0; shift < 64; shift += 8) {
+            hash ^= (value >>> shift) & 0xffL;
+            hash *= 0x100000001b3L;
+        }
+        return hash;
+    }
+
+    private static long avalanche(long value) {
+        value ^= value >>> 33;
+        value *= 0xff51afd7ed558ccdL;
+        value ^= value >>> 33;
+        value *= 0xc4ceb9fe1a85ec53L;
+        value ^= value >>> 33;
+        return value;
     }
 }

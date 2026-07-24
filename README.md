@@ -1,51 +1,85 @@
-# Ashes of The Domain - Theory of Toolbox
+# Ashes of The Domain — Theory of Toolbox: Scheduler Fork
 
-## Getting Started
+Scheduler-focused fork of **AoTD — Theory of Toolbox** for Starsector
+`0.98a-RC8`. The current release is `1.0.14`.
 
-### Dependencies
+The fork keeps the original game `starfarer.api.jar`; it does not require or
+ship an AoTD replacement for any Starsector core JAR.
 
-| Mod | Download Source |
-|------|----------------|
-| **LazyLib** | [Forum Thread](https://fractalsoftworks.com/forum/index.php?topic=5444) |
-| **Ashlib** | [Forum Thread](https://fractalsoftworks.com/forum/index.php?topic=30808) |
-| **Building Menu Overhaul** | [Forum Thread](https://fractalsoftworks.com/forum/index.php?topic=31308) |
-| **Nexerelin** | [Forum Thread](https://fractalsoftworks.com/forum/index.php?topic=9175) |
-| **HMI (Hazard Mining Incorporated)** | [Forum Thread](https://fractalsoftworks.com/forum/index.php?topic=13236) |
+## What this fork changes
 
-### Installation
+- publishes market state atomically and validates work with domain-specific
+  revision vectors;
+- moves price, stockpile and trade calculations to workers using immutable
+  inputs and campaign-thread commits;
+- rejects stale results across campaign or economy replacement with runtime
+  epochs;
+- restarts workers safely around load, reset, save and shutdown boundaries;
+- refreshes Prepatcher capabilities at runtime and resynchronizes market
+  generations before falling back when native delivery events become
+  unavailable.
 
-- Keep the original game `starfarer.api.jar`. This fork requires StarsectorPrepatcher 0.11.0+ and must not be used with the obsolete AoTD core-JAR replacement.
-## Scheduler fork Stage 4
+## Requirements
 
-This build retains the Stage 1 semantic baseline collector and the Stage 2
-no-reflection loader-safe contract. Stage 4 adds post-success delivered-market-
-time events, delivered/structural generations and exact temporal barriers for
-covered source-level structural mutations. Ordinary AoTD calculations consume
-the current delivered state and do not force scheduler replay. See
-`docs/SCHEDULER_FORK_STAGE3_TEMPORAL_CONTRACT.md`.
+The runtime dependencies declared by `mod_info.json` are:
 
-The legacy core-JAR requirement remains until the later clean BaseIndustry
-deficit stage; Stage 4 does not alter deficit semantics.
+| Mod | Minimum version |
+| --- | --- |
+| StarsectorPrepatcher | 0.11.3 |
+| LazyLib | 3.0 |
+| AshLib | 2.2.0 |
+| Building Menu Overhaul | 2.1.0 |
 
-## Scheduler fork Stage 4 audit
+Nexerelin and Hazard Mining Incorporated integrations are enabled when those
+mods are present, but neither is declared as a required dependency.
 
-The audited build completes branch-local condition/commodity structural boundaries,
-hardens market identity replacement and stale-result detection, and removes the
-registry monitor from the hot market-id lookup. Worker offload and the clean
-`BaseIndustry` path remain later stages.
+## Installation
 
-## Scheduler fork Stage 6
+1. Keep the original Starsector core JARs, especially
+   `starsector-core/starfarer.api.jar`.
+2. Remove any obsolete AoTD core-JAR replacement left by an older build.
+3. Install the required dependencies listed above.
+4. Place this directory under `Starsector/mods/` and enable the mod.
 
-The price/stockpile phase now uses immutable per-market inputs, two persistent
-dynamic batch workers and generation-validated campaign-thread commits. The
-same model can run sequentially for A/B comparison, while the legacy pipeline
-remains available as a fallback. See
-`docs/SCHEDULER_FORK_STAGE6_PURE_OFFLOAD.md`.
+At startup the fork requires an active, compatible Prepatcher javaagent and the
+production capability mask `0x1ff`. Merely having the Prepatcher mod directory
+installed is not sufficient. If the native delivery callback is lost later at
+runtime, the fork performs a one-time generation resynchronization and switches
+price capture to its dirty-state fallback.
 
-## Scheduler Fork Stage 7
+## Repository layout
 
-Stage 7 replaces the remaining live internal-trade worker phase with pure DTO computation and introduces immutable global committed cuts. Prepatcher delivers pending market time; AoTD refreshes dirty local revisions and publishes settlement from complete market snapshots. The automatic live legacy price fallback and the full legacy price pipeline have been removed.
+- `src/` — Java sources;
+- `data/` and `graphics/` — Starsector data and assets;
+- `jars/AoTDToolboxTheory.jar` — distributable release JAR referenced by
+  `mod_info.json`;
+- `CHANGELOG.md` — release history and consolidated scheduler implementation
+  notes;
+- `SHA256SUMS.txt` — checksums for the repository payload.
 
-## Production requirement
+The repository intentionally excludes local IDE metadata, module files,
+temporary compiler output and intermediate patch JARs.
 
-StarsectorPrepatcher 0.11.0+ is declared as a required mod dependency. The fork also verifies the active runtime capability mask `0xff`, because a present mod directory does not prove that its javaagent was installed and activated. It fails early only when that runtime integration is inactive or incompatible.
+## Development
+
+There is currently no repository-local Gradle or Maven build. Configure a
+Java 17 project with `src/` as the source root and add the Starsector API plus
+the required and compatibility mod JARs to the compile classpath. Build output
+should stay outside the repository; replace
+`jars/AoTDToolboxTheory.jar` only when preparing a distributable build.
+
+See [CHANGELOG.md](CHANGELOG.md) for implementation details and release
+verification notes.
+
+## Integrity
+
+`SHA256SUMS.txt` uses the standard `sha256sum` format. From a shell that
+provides GNU coreutils, verify the payload with:
+
+```text
+sha256sum -c SHA256SUMS.txt
+```
+
+## License
+
+See [LICENSE](LICENSE).

@@ -29,14 +29,23 @@ public final class AoTDGlobalEconomyCoordinator {
     }
 
     public static Boundary beginCommittedCut(int reasonMask, boolean hardFlush) {
+        return beginCommittedCut(reasonMask, hardFlush,
+                AoTDRuntimeEpoch.captureBatch("global-boundary"));
+    }
+
+    public static Boundary beginCommittedCut(
+            int reasonMask, boolean hardFlush, AoTDRuntimeEpoch.Stamp epochStamp) {
+        if (!AoTDRuntimeEpoch.isCurrent(epochStamp)) {
+            throw new IllegalStateException("Cannot open stale AoTD global boundary: " + epochStamp);
+        }
         long runtimeToken = SchedulerBridge.beforeGlobalBoundary(reasonMask, hardFlush);
         try {
             if (hardFlush) MarketRegistry.resynchronizeRuntimeGenerations();
             AoTDTradeManager.CommittedCut cut =
-                    AoTDTradeManager.getInstance().beginCommittedCut(reasonMask);
+                    AoTDTradeManager.getInstance().beginCommittedCut(reasonMask, epochStamp);
             long revision = nextPositive(localGlobalRevision);
             localGlobalRevision = revision;
-            return new Boundary(runtimeToken, revision, cut);
+            return new Boundary(runtimeToken, revision, cut, epochStamp);
         } catch (RuntimeException | Error failure) {
             SchedulerBridge.afterGlobalBoundary(runtimeToken, localGlobalRevision);
             throw failure;
@@ -52,12 +61,20 @@ public final class AoTDGlobalEconomyCoordinator {
         public final long runtimeToken;
         public final long revision;
         public final AoTDTradeManager.CommittedCut cut;
+        public final AoTDRuntimeEpoch.Stamp epochStamp;
         private boolean closed;
 
-        private Boundary(long runtimeToken, long revision, AoTDTradeManager.CommittedCut cut) {
+        private Boundary(long runtimeToken, long revision,
+                         AoTDTradeManager.CommittedCut cut,
+                         AoTDRuntimeEpoch.Stamp epochStamp) {
             this.runtimeToken = runtimeToken;
             this.revision = revision;
             this.cut = cut;
+            this.epochStamp = epochStamp;
+        }
+
+        public boolean isCurrent() {
+            return AoTDRuntimeEpoch.isCurrent(epochStamp);
         }
 
         @Override
@@ -65,7 +82,9 @@ public final class AoTDGlobalEconomyCoordinator {
             if (closed) return;
             closed = true;
             try {
-                AoTDTradeManager.getInstance().endCommittedCut(cut);
+                if (AoTDRuntimeEpoch.isCurrent(epochStamp)) {
+                    AoTDTradeManager.getInstance().endCommittedCut(cut);
+                }
             } finally {
                 SchedulerBridge.afterGlobalBoundary(runtimeToken, revision);
             }

@@ -1,0 +1,5 @@
+# Keep release-payload checksums stable across platforms.
+* text=auto eol=lf
+
+*.jar binary
+*.png binary

@@ -85,7 +85,7 @@ public class AoTDCommodityOnMarket extends CommodityOnMarket {
 
     @Override
     public int getMaxDemand() {
-        return Math.min(1, demand);
+        return demand;
     }
 
     @Override

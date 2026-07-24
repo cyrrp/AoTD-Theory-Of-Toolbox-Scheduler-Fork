@@ -73,6 +73,7 @@ public class AoTdMainWorkTask2 extends MainWorkTask2 {
     private int mtSequentialComputeIndex = 0;
     private int mtCommitIndex = 0;
     private transient AoTDPriceOffloadBatch mtOffloadBatch;
+    private transient AoTDRuntimeEpoch.Stamp mtEpochStamp;
     private transient ArrayList<MarketPriceCommitPlan> mtCommitPlans = new ArrayList<>();
     private ArrayList<Future<?>> mtFutures = new ArrayList<>();
 
@@ -202,8 +203,11 @@ public class AoTdMainWorkTask2 extends MainWorkTask2 {
     @Override
     public void doNextBatch() {
         ensureRuntimeCollections();
+        if (mtEpochStamp != null && !AoTDRuntimeEpoch.isCurrent(mtEpochStamp)) {
+            discardStaleEpochTask();
+            return;
+        }
         recoverAfterTransientStateLoss();
-
         doMultithreadedNextBatch();
     }
 
@@ -230,6 +234,33 @@ public class AoTdMainWorkTask2 extends MainWorkTask2 {
         mtFutures.clear();
     }
 
+
+    private void discardStaleEpochTask() {
+        for (Future<?> future : mtFutures) {
+            if (future != null) future.cancel(true);
+        }
+        for (MarketPriceCommitPlan plan : mtCommitPlans) {
+            if (plan != null && plan.ticket != null) {
+                MarketRegistry.abandon(plan.ticket, false);
+            }
+        }
+        mtFutures.clear();
+        mtCommitPlans.clear();
+        mtMarketPrepDone = true;
+        mtDataCreated = true;
+        mtCaptureDone = true;
+        mtWorkersSubmitted = true;
+        mtWorkersFinished = true;
+        mtCommitDone = true;
+        mtListenersNotified = true;
+        runOnce = true;
+        if (baselineTaskScope != null) {
+            baselineTaskScope.close();
+            baselineTaskScope = null;
+        }
+        baselineTaskClosed = true;
+        AoTDEconomySemanticBaseline.operation("price-offload.stale-epoch-task-dropped", 1L);
+    }
 
     private void doMultithreadedNextBatch() {
         if (!aotdStarted) {
@@ -293,7 +324,7 @@ public class AoTdMainWorkTask2 extends MainWorkTask2 {
             mtFutures.clear();
             if (ENABLE_MULTITHREADED_VERSION) {
                 mtFutures.addAll(AoTDWorkerManager.submitDynamicBatch(
-                        "AoTD pure price batch", mtOffloadBatch.size(),
+                        "AoTD pure price batch", mtEpochStamp, mtOffloadBatch.size(),
                         PRICE_WORKER_CHUNK_SIZE, mtOffloadBatch::computeMarket));
             }
             mtWorkersSubmitted = true;
@@ -385,7 +416,8 @@ public class AoTdMainWorkTask2 extends MainWorkTask2 {
         mtCommitIndex = 0;
         mtFutures.clear();
         mtCommitPlans.clear();
-        mtOffloadBatch = new AoTDPriceOffloadBatch(createPriceModelConfig());
+        mtEpochStamp = AoTDRuntimeEpoch.captureBatch("price-economy-task");
+        mtOffloadBatch = new AoTDPriceOffloadBatch(createPriceModelConfig(), mtEpochStamp);
 
         aotdStarted = true;
     }
@@ -455,6 +487,10 @@ public class AoTdMainWorkTask2 extends MainWorkTask2 {
     /** Legacy entry retained for binary/source compatibility; Stage 6 uses dynamic batches. */
     private void finishPurePriceComputePhase() {
         if (mtWorkersFinished) return;
+        if (!AoTDRuntimeEpoch.isCurrent(mtEpochStamp)) {
+            discardStaleEpochTask();
+            return;
+        }
         mtWorkersFinished = true;
         for (MarketPriceCommitPlan plan : mtCommitPlans) {
             if (plan.ticket != null) MarketRegistry.markResultReady(plan.ticket);
@@ -462,6 +498,10 @@ public class AoTdMainWorkTask2 extends MainWorkTask2 {
     }
 
     private void waitForMarketPriceWorkers() {
+        if (!AoTDRuntimeEpoch.isCurrent(mtEpochStamp)) {
+            discardStaleEpochTask();
+            return;
+        }
         boolean infrastructureFailure = false;
         try (AoTDEconomySemanticBaseline.Scope ignored =
                      AoTDEconomySemanticBaseline.begin(
@@ -479,7 +519,7 @@ public class AoTdMainWorkTask2 extends MainWorkTask2 {
                 }
             }
         }
-        if (infrastructureFailure) {
+        if (infrastructureFailure && AoTDRuntimeEpoch.isCurrent(mtEpochStamp)) {
             for (int i = 0; i < mtOffloadBatch.size(); i++) {
                 if (mtOffloadBatch.resultAt(i) == null) mtOffloadBatch.computeMarket(i);
             }
@@ -587,7 +627,8 @@ public class AoTdMainWorkTask2 extends MainWorkTask2 {
             return;
         }
 
-        MarketRegistry.WorkTicket ticket = MarketRegistry.claimMarketForPrice(market);
+        MarketRegistry.WorkTicket ticket =
+                MarketRegistry.claimMarketForPrice(market, mtEpochStamp);
         if (ticket == null) {
             AoTDEconomySemanticBaseline.operation("price-offload.capture-skipped", market);
             return;
@@ -850,6 +891,10 @@ public class AoTdMainWorkTask2 extends MainWorkTask2 {
 
     private void commitMarketPricePlan(MarketPriceCommitPlan plan) {
         long started = System.nanoTime();
+        if (!AoTDRuntimeEpoch.isCurrent(mtEpochStamp)) {
+            MarketRegistry.abandon(plan.ticket, false);
+            return;
+        }
         if (!MarketRegistry.isCurrent(plan.ticket)) {
             AoTDEconomySemanticBaseline.operation("price-offload.stale-result", plan.market);
             MarketRegistry.commitPriceDerived(plan.ticket, 0L);
@@ -988,6 +1033,10 @@ public class AoTdMainWorkTask2 extends MainWorkTask2 {
 
     /** Used by synchronous economy entry points to avoid a hot polling loop. */
     public void awaitWorkersIfSubmitted() {
+        if (mtEpochStamp != null && !AoTDRuntimeEpoch.isCurrent(mtEpochStamp)) {
+            discardStaleEpochTask();
+            return;
+        }
         if (!mtWorkersSubmitted || mtWorkersFinished) return;
         if (ENABLE_MULTITHREADED_VERSION) {
             waitForMarketPriceWorkers();
