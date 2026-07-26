@@ -1,10 +1,17 @@
 # Ashes of The Domain — Theory of Toolbox: Scheduler Fork
 
 Scheduler-focused fork of **AoTD — Theory of Toolbox** for Starsector
-`0.98a-RC8`. The current release is `1.0.14`.
+`0.98a-RC8`. The first public Scheduler Fork release is `1.0.14-spp1`.
+The runtime mod version remains numeric `1.0.14` for Starsector version-parser
+compatibility.
 
 The fork keeps the original game `starfarer.api.jar`; it does not require or
 ship an AoTD replacement for any Starsector core JAR.
+
+When AoTD Theory of Toolbox is used with StarsectorPrepatcher, this maintained
+fork is required for optimal performance and for the supported native
+scheduler/capability contract. Prepatcher does not require AoTD or this fork in
+setups where AoTD is absent.
 
 ## What this fork changes
 
@@ -25,7 +32,7 @@ The runtime dependencies declared by `mod_info.json` are:
 
 | Mod | Minimum version |
 | --- | --- |
-| StarsectorPrepatcher | 0.11.3 |
+| StarsectorPrepatcher | 0.12.0 |
 | LazyLib | 3.0 |
 | AshLib | 2.2.0 |
 | Building Menu Overhaul | 2.1.0 |
@@ -47,6 +54,11 @@ installed is not sufficient. If the native delivery callback is lost later at
 runtime, the fork performs a one-time generation resynchronization and switches
 price capture to its dirty-state fallback.
 
+Use the release archive rather than overlaying it onto the original AoTD
+directory. The archive has one top-level
+`AoTD-Theory-Of-Toolbox-Scheduler-Fork` directory and includes the complete
+source payload covered by `SHA256SUMS.txt`.
+
 ## Repository layout
 
 - `src/` — Java sources;
@@ -55,7 +67,9 @@ price capture to its dirty-state fallback.
   `mod_info.json`;
 - `CHANGELOG.md` — release history and consolidated scheduler implementation
   notes;
-- `SHA256SUMS.txt` — checksums for the repository payload.
+- `build-release.ps1` — reproducible Windows release packager;
+- `releases/` — local generated archives and release instructions;
+- `SHA256SUMS.txt` — checksums for the release source/runtime payload.
 
 The repository intentionally excludes local IDE metadata, module files,
 temporary compiler output and intermediate patch JARs.
@@ -70,6 +84,17 @@ should stay outside the repository; replace
 
 See [CHANGELOG.md](CHANGELOG.md) for implementation details and release
 verification notes.
+
+To rebuild the distributable archive after updating the release JAR and
+metadata:
+
+```powershell
+.\build-release.ps1
+```
+
+The command refreshes `SHA256SUMS.txt`, creates the versioned ZIP below
+`releases/`, and writes an external `.sha256` file. Generated archives and
+their external hashes are intentionally ignored by Git.
 
 ## Integrity
 

@@ -16,6 +16,10 @@ jars/*.pending-*.jar
 *~
 *.bak
 *.log
+
+# Local release artifacts (upload to GitHub Releases, do not commit).
+releases/*.zip
+releases/*.zip.sha256
 *.orig
 *.rej
 *.tmp

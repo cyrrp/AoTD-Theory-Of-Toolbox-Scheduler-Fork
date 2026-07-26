@@ -2,7 +2,11 @@
 
 All notable changes to the Scheduler Fork are documented here.
 
-## 1.0.14
+## 1.0.14-spp1 - 2026-07-26
+
+First public release of the maintained Scheduler Fork. The Starsector-facing
+runtime version remains `1.0.14`; `spp1` identifies this fork package and its
+Prepatcher integration revision.
 
 ### Scheduler correctness
 
@@ -37,7 +41,7 @@ All notable changes to the Scheduler Fork are documented here.
 
 ### Prepatcher integration
 
-- Raised the minimum StarsectorPrepatcher version to `0.11.3` and the required
+- Raised the minimum StarsectorPrepatcher version to `0.12.0` and the required
   production capability mask to `0x1ff`, including runtime epoch
   coordination.
 - Updated `SchedulerBridge` to schema V6 and made capability-dependent
@@ -61,6 +65,8 @@ All notable changes to the Scheduler Fork are documented here.
   harnesses.
 - The complete source tree, including the clean `BaseIndustry` source, compiles
   with Java 17 against the Starsector and compatibility-mod classpath.
+- The release archive includes the complete checksummed source/runtime payload
+  under one top-level mod directory.
 
 ## Earlier releases
 
