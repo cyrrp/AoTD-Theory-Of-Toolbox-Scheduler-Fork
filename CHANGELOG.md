@@ -2,6 +2,18 @@
 
 All notable changes to the Scheduler Fork are documented here.
 
+## 1.0.14-spp2 - 2026-07-27
+
+- Added a revision-gated, single-market UI economy refresh path.
+- Market opening now receives the target market before vanilla publishes
+  `currentlyOpenMarket`, through a finally-cleared Prepatcher context.
+- Removed global `commodity × econGroup` construction from synchronous UI steps.
+- Limited immigration trade snapshots to the market whose UI is being opened.
+- Coalesced the immediately following Cargo `tripleStep` when no registry revision changed.
+- Deferred global internal-trade settlement to the normal economy cadence while
+  preserving one `economyUpdated` listener boundary.
+- Corrected subset registry auditing for local post-immigration snapshots.
+
 ## 1.0.14-spp1 - 2026-07-26
 
 First public release of the maintained Scheduler Fork. The Starsector-facing

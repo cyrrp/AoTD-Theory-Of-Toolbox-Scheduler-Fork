@@ -153,6 +153,14 @@ public final class SchedulerBridge {
         acceptMarketMutation(market, dirtyMask, sourceGeneration, 0L);
     }
 
+    /**
+     * Consumes the market being opened by CampaignEngine before vanilla publishes
+     * it through getCurrentlyOpenMarket(). The no-agent body is deliberately null.
+     */
+    public static Object consumeOpeningMarket() {
+        return null;
+    }
+
     /** Publishes the process-local campaign/economy identity to Prepatcher. */
     public static void publishRuntimeEpoch(long campaignEpoch, long economyEpoch) {
         // no-agent loader fallback

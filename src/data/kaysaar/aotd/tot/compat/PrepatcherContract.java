@@ -12,7 +12,7 @@ public final class PrepatcherContract {
     public static final String MARKER_CLASS =
             "data.kaysaar.aotd.tot.compat.PrepatcherContract";
     public static final int ABI_VERSION = 1;
-    public static final String FORK_VERSION = "1.0.14-spp1-stage11-capability-refresh";
+    public static final String FORK_VERSION = "1.0.14-spp2-ui-local-refresh";
 
     /** Loader-safe javaagent patch and capability negotiation. */
     public static final long CAPABILITY_CONTRACT_HANDSHAKE = 1L;

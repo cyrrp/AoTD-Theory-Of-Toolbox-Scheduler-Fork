@@ -55,6 +55,8 @@ public class AoTdMainWorkTask2 extends MainWorkTask2 {
     private int aotdMarketIndex = 0;
 
     public MarketAPI singleMarketToUpdate;
+    /** New fields default false when an old serialized global task is restored. */
+    private boolean uiLocalMode;
 
     private boolean runOnce = false;
     private transient AoTDEconomySemanticBaseline.Scope baselineTaskScope;
@@ -153,6 +155,7 @@ public class AoTdMainWorkTask2 extends MainWorkTask2 {
         super(markets, reachEconomy, econWorkParams);
 
         this.singleMarketToUpdate = singleMarket;
+        this.uiLocalMode = singleMarket != null;
         this.aotdMarkets = new ArrayList<>(markets);
         this.aotdParams = econWorkParams;
     }
@@ -282,9 +285,9 @@ public class AoTdMainWorkTask2 extends MainWorkTask2 {
         }
 
         /*
-         * 2) Build global commodity-market data on the campaign thread, but
-         * preserve the multi-frame budget: one commodity/econ-group set per
-         * invocation instead of one full-sector burst.
+         * 2) Build global commodity-market data only for a real global economy
+         * boundary. UI-local tasks mark this phase complete in startTaskState()
+         * and use the last committed global snapshot.
          */
         if (!mtDataCreated) {
             if (mtDataCommodityIndex < aotdCommodities.size()) {
@@ -374,7 +377,8 @@ public class AoTdMainWorkTask2 extends MainWorkTask2 {
         baselineTaskScope = AoTDEconomySemanticBaseline.begin(
                 "main-work.task",
                 singleMarketToUpdate,
-                singleMarketToUpdate == null ? "all-markets" : "single-market"
+                singleMarketToUpdate == null ? "all-markets"
+                        : (uiLocalMode ? "ui-local-market" : "single-market")
         );
         baselineTaskClosed = false;
         AoTDEconomySemanticBaseline.operation(
@@ -403,8 +407,16 @@ public class AoTdMainWorkTask2 extends MainWorkTask2 {
 
         runOnce = false;
 
-        mtMarketPrepDone = false;
-        mtDataCreated = false;
+        boolean currentUiMarket = uiLocalMode
+                && singleMarketToUpdate != null
+                && !MarketRegistry.needsMaterializedReconciliation(singleMarketToUpdate)
+                && !MarketRegistry.needsPriceRefresh(singleMarketToUpdate);
+
+        mtMarketPrepDone = currentUiMarket;
+        // A UI refresh must never construct global + every-econGroup
+        // CommodityMarketData. Local AoTD supply/demand and price snapshots are
+        // published by the later market-specific capture phase.
+        mtDataCreated = uiLocalMode;
         mtDataCommodityIndex = 0;
         mtCaptureDone = false;
         mtWorkersSubmitted = false;
@@ -418,6 +430,17 @@ public class AoTdMainWorkTask2 extends MainWorkTask2 {
         mtCommitPlans.clear();
         mtEpochStamp = AoTDRuntimeEpoch.captureBatch("price-economy-task");
         mtOffloadBatch = new AoTDPriceOffloadBatch(createPriceModelConfig(), mtEpochStamp);
+
+        if (currentUiMarket) {
+            mtCaptureDone = true;
+            mtWorkersSubmitted = true;
+            mtWorkersFinished = true;
+            mtCommitDone = true;
+            mtListenersNotified = true;
+            runOnce = true;
+            AoTDEconomySemanticBaseline.operation(
+                    "main-work.ui-local-skipped-current", singleMarketToUpdate);
+        }
 
         aotdStarted = true;
     }
@@ -484,7 +507,7 @@ public class AoTdMainWorkTask2 extends MainWorkTask2 {
         }
     }
 
-    /** Legacy entry retained for binary/source compatibility; Stage 6 uses dynamic batches. */
+    /** Legacy entry retained for binary/source compatibility; workers use dynamic batches. */
     private void finishPurePriceComputePhase() {
         if (mtWorkersFinished) return;
         if (!AoTDRuntimeEpoch.isCurrent(mtEpochStamp)) {
@@ -610,7 +633,7 @@ public class AoTdMainWorkTask2 extends MainWorkTask2 {
                             ? MarketRegistry.PRIORITY_PLAYER : MarketRegistry.PRIORITY_NORMAL);
         }
 
-        // Stage 8.2: publish one complete market-wide supply/demand revision
+        // Publish one complete market-wide supply/demand revision
         // before claiming the price ticket. buildMarketPricePlan() is now read-only.
         try {
             materializeMarketSupplyDemand(market);

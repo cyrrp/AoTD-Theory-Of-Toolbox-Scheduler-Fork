@@ -142,7 +142,13 @@ public final class AoTDPostImmigrationTradeSnapshotTask extends MultiFrameTask {
         for (MarketAPI market : markets) {
             if (market != null && market.getId() != null) expected.put(market.getId(), market);
         }
-        registryInvariantReport = MarketRegistry.auditInvariants(expected);
+        // A UI-local task deliberately contains only one market; treating that
+        // subset as the complete economy would manufacture thousands of false
+        // registry violations. Use the exact economy comparison only for a full
+        // set and retain the internal registry audit for subsets.
+        registryInvariantReport = expected.size() == MarketRegistry.size()
+                ? MarketRegistry.auditInvariants(expected)
+                : MarketRegistry.auditInvariants();
 
         for (int i = 0; i < prepared.size(); i++) {
             AoTDTradeManager.PreparedSnapshot snapshot = prepared.get(i);

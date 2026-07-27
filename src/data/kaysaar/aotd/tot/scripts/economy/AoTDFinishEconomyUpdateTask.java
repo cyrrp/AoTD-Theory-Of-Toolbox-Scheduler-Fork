@@ -177,12 +177,32 @@ public class AoTDFinishEconomyUpdateTask extends FinishEconomyUpdateTask {
     }
 
     private void notifyEconomyListeners() {
+        notifyEconomyListenersOnly(economy, "global-cut");
+    }
+
+    /**
+     * Publishes the vanilla Economy.nextStep listener boundary without opening a
+     * new global internal-trade cut. UI-local refreshes use the last complete
+     * committed global cut and notify listeners exactly once.
+     */
+    public static void notifyEconomyListenersOnly(Economy economy, String context) {
+        if (economy == null) return;
         try (AoTDEconomySemanticBaseline.Scope ignored =
-                     AoTDEconomySemanticBaseline.begin("finish-economy.notify-listeners")) {
-            List<EconomyAPI.EconomyUpdateListener> listeners = economy.getUpdateListeners();
-            listeners.removeIf(l -> l == null || l.isEconomyListenerExpired());
-            AoTDEconomySemanticBaseline.operation("listener.economyUpdated", listeners.size());
-            listeners.forEach(EconomyUpdateListener::economyUpdated);
+                     AoTDEconomySemanticBaseline.begin(
+                             "finish-economy.notify-listeners", null, context)) {
+            List<EconomyAPI.EconomyUpdateListener> listeners =
+                    new ArrayList<>(economy.getUpdateListeners());
+            int notified = 0;
+            for (EconomyUpdateListener listener : listeners) {
+                if (listener == null) continue;
+                if (listener.isEconomyListenerExpired()) {
+                    economy.removeUpdateListener(listener);
+                    continue;
+                }
+                listener.economyUpdated();
+                notified++;
+            }
+            AoTDEconomySemanticBaseline.operation("listener.economyUpdated", notified);
         }
     }
 

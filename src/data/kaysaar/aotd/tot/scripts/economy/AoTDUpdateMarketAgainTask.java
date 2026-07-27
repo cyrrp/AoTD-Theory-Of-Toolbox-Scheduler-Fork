@@ -15,7 +15,7 @@ import java.util.List;
 /**
  * Finalizes one market's authoritative AoTD state after the price phase.
  *
- * <p>Stage 5 removes the unconditional second reconciliation pass. Industry
+ * <p>The optimized path removes the unconditional second reconciliation pass. Industry
  * apply/unapply is now executed only for pending/active transitions; a full
  * local supply/demand refresh is performed only when such a transition changed
  * the materialized industry state.</p>

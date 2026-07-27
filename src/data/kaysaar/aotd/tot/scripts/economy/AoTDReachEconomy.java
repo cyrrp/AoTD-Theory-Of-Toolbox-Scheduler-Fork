@@ -4,113 +4,157 @@ import com.fs.starfarer.api.Global;
 import com.fs.starfarer.api.campaign.econ.MarketAPI;
 import com.fs.starfarer.api.characters.PersonAPI;
 import com.fs.starfarer.campaign.econ.Economy;
-import com.fs.starfarer.campaign.econ.reach.*;
+import com.fs.starfarer.campaign.econ.reach.FinishEconomyUpdateTask;
+import com.fs.starfarer.campaign.econ.reach.ImmigrationTask;
+import com.fs.starfarer.campaign.econ.reach.MainWorkTask;
+import com.fs.starfarer.campaign.econ.reach.ReachEconomy;
+import data.kaysaar.aotd.tot.compat.MarketRegistry;
 
 import java.util.ArrayList;
 import java.util.List;
 
 public class AoTDReachEconomy extends ReachEconomy {
     public void nextStepForPlayer(MainWorkTask.EconWorkParams econWorkParams) {
-        final List<MarketAPI> markets = this.getMarkets().stream().filter(x -> x.isPlayerOwned() || x.getFaction().isPlayerFaction()).toList();
-        for (MarketAPI market : markets) {
-            final PersonAPI admin = market.getAdmin();
-            admin.getStats().refreshCharacterStatsEffects();
-            admin.getStats().refreshGovernedOutpostEffects(market);
-        }
-        final AoTdMainWorkTask2 workTask = new AoTdMainWorkTask2(markets, this, econWorkParams);
+        econWorkParams = normalizeWorkParams(econWorkParams);
+        final List<MarketAPI> markets = this.getMarkets().stream()
+                .filter(x -> x.isPlayerOwned() || x.getFaction().isPlayerFaction())
+                .toList();
+        refreshAdministrators(markets);
+        runMainTask(markets, econWorkParams, null);
 
-        while (!workTask.isDone()) {
-            workTask.doNextBatch();
-            workTask.awaitWorkersIfSubmitted();
-        }
-
-        final AoTDUpdateMarketAgainTask marketUpdateTask = new AoTDUpdateMarketAgainTask((Economy) Global.getSector().getEconomy());
-        while (!marketUpdateTask.isDone()) {
-            marketUpdateTask.doNextBatch();
-        }
+        final AoTDUpdateMarketAgainTask marketUpdateTask =
+                new AoTDUpdateMarketAgainTask((Economy) Global.getSector().getEconomy());
+        drain(marketUpdateTask);
         if (econWorkParams.withImmigration) {
-            final ImmigrationTask immigrationTask = new ImmigrationTask(markets, this, !econWorkParams.forceNonUIStep);
-
-            while (!immigrationTask.isDone()) {
-                immigrationTask.doNextBatch();
-            }
+            drain(new ImmigrationTask(markets, this, !econWorkParams.forceNonUIStep));
         }
+        drain(new AoTDPostImmigrationTradeSnapshotTask(markets, "player-step"));
 
-        final AoTDPostImmigrationTradeSnapshotTask tradeSnapshotTask =
-                new AoTDPostImmigrationTradeSnapshotTask(markets, "player-step");
-        while (!tradeSnapshotTask.isDone()) {
-            tradeSnapshotTask.doNextBatch();
-        }
-
-        final AoTDFinishEconomyUpdateTask finishUpdateTask = new AoTDFinishEconomyUpdateTask((Economy) Global.getSector().getEconomy());
+        final AoTDFinishEconomyUpdateTask finishUpdateTask =
+                new AoTDFinishEconomyUpdateTask((Economy) Global.getSector().getEconomy());
         finishUpdateTask.doForPlayerOnly();
+    }
+
+    /**
+     * Synchronous UI refresh for exactly one market.
+     *
+     * <p>This path intentionally does not rebuild global commodity-market data or
+     * settle global internal trade. It publishes a complete local market revision,
+     * runs immigration and its trade snapshot only for that market, then performs
+     * one local follow-up when the snapshot dirtied price/stockpile outputs.</p>
+     */
+    public void nextStepForUiMarket(
+            MainWorkTask.EconWorkParams econWorkParams,
+            MarketAPI market,
+            String context) {
+        if (market == null) return;
+        econWorkParams = normalizeWorkParams(econWorkParams);
+        final ArrayList<MarketAPI> localMarkets = new ArrayList<>(1);
+        localMarkets.add(market);
+        refreshAdministrator(market);
+
+        runMainTask(localMarkets, econWorkParams, market);
+        drain(new AoTDUpdateMarketAgainTask(
+                (Economy) Global.getSector().getEconomy(), market));
+
+        if (econWorkParams.withImmigration) {
+            drain(new ImmigrationTask(
+                    localMarkets, this, !econWorkParams.forceNonUIStep));
+        }
+
+        // The old implementation accidentally passed every market here even in
+        // the single-market branch. Keep the atomic publication contract, but
+        // limit capture to the market whose UI is being opened.
+        drain(new AoTDPostImmigrationTradeSnapshotTask(
+                localMarkets, "ui-" + (context == null ? "market" : context)));
+
+        // Immigration/net-production publication may create a fresh local price
+        // revision. Finish it before the UI observes the market and before the
+        // duplicate Cargo tripleStep is eligible for coalescing.
+        if (MarketRegistry.needsMaterializedReconciliation(market)
+                || MarketRegistry.needsPriceRefresh(market)) {
+            runMainTask(localMarkets, econWorkParams, market);
+            drain(new AoTDUpdateMarketAgainTask(
+                    (Economy) Global.getSector().getEconomy(), market));
+        }
+
+        // Preserve the observable Economy.nextStep listener boundary while
+        // leaving global internal-trade settlement on the real economy cadence.
+        AoTDFinishEconomyUpdateTask.notifyEconomyListenersOnly(
+                (Economy) Global.getSector().getEconomy(),
+                "ui-" + (context == null ? "market" : context));
     }
 
     @Override
     public void nextStep(MainWorkTask.EconWorkParams econWorkParams) {
-        final List<MarketAPI> markets = new ArrayList<>(this.getMarkets());
-
+        econWorkParams = normalizeWorkParams(econWorkParams);
         final MarketAPI openMarket = Global.getSector().getCurrentlyOpenMarket();
         if (openMarket != null) {
-            final PersonAPI admin = openMarket.getAdmin();
-            admin.getStats().refreshCharacterStatsEffects();
-            admin.getStats().refreshGovernedOutpostEffects(openMarket);
-
-            final AoTdMainWorkTask2 workTask = new AoTdMainWorkTask2(markets, this, econWorkParams, openMarket);
-
-            while (!workTask.isDone()) {
-                workTask.doNextBatch();
-                workTask.awaitWorkersIfSubmitted();
-            }
-
-            final AoTDUpdateMarketAgainTask marketUpdateTask = new AoTDUpdateMarketAgainTask((Economy) Global.getSector().getEconomy(), openMarket);
-            while (!marketUpdateTask.isDone()) {
-                marketUpdateTask.doNextBatch();
-            }
-
-        } else {
-            for (MarketAPI market : markets) {
-                final PersonAPI admin = market.getAdmin();
-                admin.getStats().refreshCharacterStatsEffects();
-                admin.getStats().refreshGovernedOutpostEffects(market);
-            }
-
-            final AoTdMainWorkTask2 workTask = new AoTdMainWorkTask2(markets, this, econWorkParams);
-
-            while (!workTask.isDone()) {
-                workTask.doNextBatch();
-                workTask.awaitWorkersIfSubmitted();
-            }
-
-            final AoTDUpdateMarketAgainTask marketUpdateTask = new AoTDUpdateMarketAgainTask((Economy) Global.getSector().getEconomy());
-            while (!marketUpdateTask.isDone()) {
-                marketUpdateTask.doNextBatch();
-            }
+            nextStepForUiMarket(econWorkParams, openMarket, "current-market");
+            return;
         }
+
+        final List<MarketAPI> markets = new ArrayList<>(this.getMarkets());
+        refreshAdministrators(markets);
+        runMainTask(markets, econWorkParams, null);
+
+        final AoTDUpdateMarketAgainTask marketUpdateTask =
+                new AoTDUpdateMarketAgainTask((Economy) Global.getSector().getEconomy());
+        drain(marketUpdateTask);
 
         if (econWorkParams.withImmigration) {
-            final ImmigrationTask immigrationTask = new ImmigrationTask(markets, this, !econWorkParams.forceNonUIStep);
-
-            while (!immigrationTask.isDone()) {
-                immigrationTask.doNextBatch();
-            }
+            drain(new ImmigrationTask(markets, this, !econWorkParams.forceNonUIStep));
         }
 
-        final AoTDPostImmigrationTradeSnapshotTask tradeSnapshotTask =
-                new AoTDPostImmigrationTradeSnapshotTask(markets, "manual-step");
-        while (!tradeSnapshotTask.isDone()) {
-            tradeSnapshotTask.doNextBatch();
-        }
+        drain(new AoTDPostImmigrationTradeSnapshotTask(markets, "manual-step"));
 
-        final FinishEconomyUpdateTask finishUpdateTask = new AoTDFinishEconomyUpdateTask((Economy) Global.getSector().getEconomy());
-        while (!finishUpdateTask.isDone()) {
-            finishUpdateTask.doNextBatch();
+        final FinishEconomyUpdateTask finishUpdateTask =
+                new AoTDFinishEconomyUpdateTask((Economy) Global.getSector().getEconomy());
+        drain(finishUpdateTask);
+    }
+
+    private void runMainTask(
+            List<MarketAPI> markets,
+            MainWorkTask.EconWorkParams params,
+            MarketAPI singleMarket) {
+        final AoTdMainWorkTask2 task = singleMarket == null
+                ? new AoTdMainWorkTask2(markets, this, params)
+                : new AoTdMainWorkTask2(markets, this, params, singleMarket);
+        while (!task.isDone()) {
+            task.doNextBatch();
+            task.awaitWorkersIfSubmitted();
         }
+    }
+
+    private static void refreshAdministrators(List<MarketAPI> markets) {
+        for (MarketAPI market : markets) refreshAdministrator(market);
+    }
+
+    private static MainWorkTask.EconWorkParams normalizeWorkParams(
+            MainWorkTask.EconWorkParams params) {
+        if (params != null) return params;
+        MainWorkTask.EconWorkParams normalized = new MainWorkTask.EconWorkParams();
+        normalized.withIncomeAndUpkeep = false;
+        normalized.withStockpileUpdate = true;
+        normalized.withImmigration = true;
+        return normalized;
+    }
+
+    private static void refreshAdministrator(MarketAPI market) {
+        if (market == null) return;
+        final PersonAPI admin = market.getAdmin();
+        if (admin == null) return;
+        admin.getStats().refreshCharacterStatsEffects();
+        admin.getStats().refreshGovernedOutpostEffects(market);
+    }
+
+    private static void drain(com.fs.starfarer.campaign.econ.contract.iter.MultiFrameTask task) {
+        while (!task.isDone()) task.doNextBatch();
     }
 
     @Override
     public void addMarket(MarketAPI marketAPI) {
         super.addMarket(marketAPI);
-        //Here swap of all commodities into AoTDcommoidtyData
+        // Here swap of all commodities into AoTDCommodityData.
     }
 }

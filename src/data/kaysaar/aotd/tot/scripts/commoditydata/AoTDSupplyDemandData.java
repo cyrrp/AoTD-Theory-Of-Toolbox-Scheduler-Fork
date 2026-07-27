@@ -18,7 +18,7 @@ import java.util.LinkedHashMap;
 /**
  * Authoritative supply/demand state for one market commodity.
  *
- * <p>Stage 8.2 uses a two-phase refresh. The complete next revision is first
+ * <p>The scheduler uses a two-phase refresh. The complete next revision is first
  * calculated into reusable staging maps. Only after every industry calculation
  * succeeds are the map references and aggregate values published. A failed
  * refresh therefore leaves the previous committed revision untouched.</p>
@@ -77,7 +77,7 @@ public class AoTDSupplyDemandData {
     }
 
     /**
-     * Compatibility entry point used outside the staged market-price pipeline.
+     * Compatibility entry point used outside the market-price pipeline.
      * The refresh is still atomic for this commodity. Failures are logged and
      * the previous committed revision is preserved.
      */

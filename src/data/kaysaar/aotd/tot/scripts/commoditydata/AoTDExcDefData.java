@@ -109,7 +109,7 @@ public class AoTDExcDefData {
     }
     /**
      * Builds the sudden-demand change without mutating the live commodity.
-     * Stage 8.2 carries this proposal with the price snapshot and only applies
+     * The price pipeline carries this proposal with the snapshot and only applies
      * it after the work ticket has passed generation validation.
      */
     public PreparedSuddenDemandUpdate prepareDeficitDueToSuddenChangeOfDemand(

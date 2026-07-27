@@ -24,6 +24,7 @@ public class AoTDEconomy extends Economy {
     private static final ConcurrentHashMap<String, Object> MARKET_REPAIR_LOCKS =
             new ConcurrentHashMap<>();
     private static final Object MARKET_REGISTRY_LOAD_REPAIR_LOCK = new Object();
+    private transient AoTDUIEconomyRefreshCoordinator uiRefreshCoordinator;
     public static boolean runningPrePlayerEconomy = false;
     public static boolean mustPruneCommodities = true;
     public static AoTDEconomy getInstance(){
@@ -192,26 +193,82 @@ public class AoTDEconomy extends Economy {
 
     @Override
     public void nextStep(MainWorkTask.EconWorkParams econWorkParams) {
-        for (MarketAPI market : getMarkets()) ((Market)market).updatePrevStability();
-
-        MainWorkTask.EconWorkParams var4 = new MainWorkTask.EconWorkParams();
-        var4.withIncomeAndUpkeep = false;
-        var4.withStockpileUpdate = true;
-        var4.withImmigration = true;
-        if (econWorkParams != null) {
-            var4 = econWorkParams;
+        MainWorkTask.EconWorkParams params = normalizeWorkParams(econWorkParams);
+        AoTDUIEconomyRefreshCoordinator coordinator = uiRefreshCoordinator();
+        MarketAPI openingMarket = coordinator.consumeOpeningMarket();
+        String uiReason = "open-market";
+        if (!isLiveMarket(openingMarket)) {
+            openingMarket = Global.getSector().getCurrentlyOpenMarket();
+            uiReason = "current-market";
         }
-        this.getEconomy().nextStep(var4);
+        if (isLiveMarket(openingMarket)) {
+            runUiMarketRefresh(openingMarket, params, uiReason, true);
+            return;
+        }
+
+        coordinator.invalidate("global-next-step");
+        for (MarketAPI market : getMarkets()) ((Market) market).updatePrevStability();
+        this.getEconomy().nextStep(params);
     }
 
     @Override
     public void doubleStep() {
+        MarketAPI openMarket = Global.getSector().getCurrentlyOpenMarket();
+        if (isLiveMarket(openMarket)) {
+            runUiMarketRefresh(openMarket, normalizeWorkParams(null),
+                    "double-step", true);
+            return;
+        }
+        uiRefreshCoordinator().invalidate("global-double-step");
         super.nextStep();
+    }
+
+    private MainWorkTask.EconWorkParams normalizeWorkParams(
+            MainWorkTask.EconWorkParams params) {
+        if (params != null) return params;
+        MainWorkTask.EconWorkParams normalized = new MainWorkTask.EconWorkParams();
+        normalized.withIncomeAndUpkeep = false;
+        normalized.withStockpileUpdate = true;
+        normalized.withImmigration = true;
+        return normalized;
+    }
+
+    private AoTDUIEconomyRefreshCoordinator uiRefreshCoordinator() {
+        if (uiRefreshCoordinator == null) {
+            uiRefreshCoordinator = new AoTDUIEconomyRefreshCoordinator();
+        }
+        return uiRefreshCoordinator;
+    }
+
+    private boolean isLiveMarket(MarketAPI market) {
+        if (market == null || market.getId() == null) return false;
+        return MarketRegistry.lookupMarket(market.getId()) == market;
+    }
+
+    private void runUiMarketRefresh(
+            MarketAPI market, MainWorkTask.EconWorkParams params,
+            String reason, boolean allowCoalescing) {
+        AoTDUIEconomyRefreshCoordinator coordinator = uiRefreshCoordinator();
+        if (allowCoalescing && coordinator.isCurrent(market)) {
+            coordinator.recordSkip();
+            AoTDEconomySemanticBaseline.operation("ui-economy.refresh-coalesced", market);
+            return;
+        }
+
+        ((Market) market).updatePrevStability();
+        getReachEconomy().nextStepForUiMarket(params, market, reason);
+        coordinator.recordCompleted(market);
+        AoTDEconomySemanticBaseline.operation("ui-economy.refresh-completed", market);
+    }
+
+    public String getUiRefreshStatusSummary() {
+        return uiRefreshCoordinator().statusSummary();
     }
 
 
     @Override
     public void removeMarket(MarketAPI marketAPI) {
+        uiRefreshCoordinator().invalidate("remove-market");
         long token = SchedulerBridge.beforeMarketMutation(
                 marketAPI, SchedulerBridge.MUTATION_MARKET_MEMBERSHIP);
         try {
@@ -233,6 +290,7 @@ public class AoTDEconomy extends Economy {
 
     @Override
     public void addMarket(MarketAPI marketAPI, boolean addJunk) {
+        uiRefreshCoordinator().invalidate("add-market");
         long token = SchedulerBridge.beforeMarketMutation(
                 marketAPI, SchedulerBridge.MUTATION_MARKET_MEMBERSHIP);
         try {
@@ -285,6 +343,13 @@ public class AoTDEconomy extends Economy {
     }
     @Override
     public void tripleStep() {
+        MarketAPI openMarket = Global.getSector().getCurrentlyOpenMarket();
+        if (isLiveMarket(openMarket)) {
+            runUiMarketRefresh(openMarket, normalizeWorkParams(null),
+                    "triple-step", true);
+            return;
+        }
+        uiRefreshCoordinator().invalidate("global-triple-step");
         super.nextStep();
     }
 

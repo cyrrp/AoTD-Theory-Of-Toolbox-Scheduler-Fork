@@ -1,6 +1,6 @@
 $ErrorActionPreference = "Stop"
 
-$releaseLabel = "1.0.14-spp1"
+$releaseLabel = "1.0.14-spp2"
 $packageDirectoryName = "AoTD-Theory-Of-Toolbox-Scheduler-Fork"
 $repositoryRoot = [IO.Path]::GetFullPath($PSScriptRoot)
 $releaseDirectory = Join-Path $repositoryRoot "releases"
@@ -8,7 +8,7 @@ $archiveName = "$packageDirectoryName-$releaseLabel.zip"
 $archivePath = Join-Path $releaseDirectory $archiveName
 $externalChecksumPath = "$archivePath.sha256"
 $utf8NoBom = [Text.UTF8Encoding]::new($false)
-$releaseTimestamp = [DateTimeOffset]::new(2026, 7, 26, 0, 0, 0, [TimeSpan]::Zero)
+$releaseTimestamp = [DateTimeOffset]::new(2026, 7, 27, 0, 0, 0, [TimeSpan]::Zero)
 
 function Get-RepositoryPayload {
     $tracked = @(& git -C $repositoryRoot ls-files)
