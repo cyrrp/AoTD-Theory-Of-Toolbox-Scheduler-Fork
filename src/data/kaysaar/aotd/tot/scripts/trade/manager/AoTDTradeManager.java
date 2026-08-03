@@ -69,7 +69,7 @@ public class AoTDTradeManager {
 
     public static int getExportIncome(CommodityOnMarketAPI comOnMarket) {
         if (comOnMarket instanceof AoTDCommodityOnMarket commodity) {
-            return AoTDCoreUIListener.isInCore
+            return AoTDCoreUIListener.isInCore()
                     ? AoTDToolboxMisc.getExpectedMonthlyIncomeFromCommodity(commodity)
                     : AoTDToolboxMisc.getIncomeFromSelling(commodity);
         }

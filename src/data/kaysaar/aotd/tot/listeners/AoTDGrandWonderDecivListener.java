@@ -17,8 +17,20 @@ public class AoTDGrandWonderDecivListener implements ColonyDecivListener {
                 GrandWonderManager.getInstance().removeBuiltSoFar(industry.getId());
             }
         }
+        if (amWonders == 0) {
+            return;
+        }
+
+        float penalty = -amWonders * 3f;
         for (MarketAPI factionMarket : Misc.getFactionMarkets(market.getFaction())) {
-            factionMarket.getStability().addTemporaryModFlat(365,"aotd_wonder_loss","Loss of Grand Wonders",-amWonders*3);
+            if (factionMarket == market) {
+                continue;
+            }
+            factionMarket.getStability().addTemporaryModFlat(
+                    365f,
+                    "aotd_wonder_loss",
+                    "Loss of Grand Wonders",
+                    penalty);
         }
     }
 

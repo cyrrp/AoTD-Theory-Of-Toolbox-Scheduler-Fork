@@ -23,6 +23,17 @@ All notable changes to the Scheduler Fork are documented here.
 - Made the required UI dispatcher capability independent of optional Prepatcher switches; safe
   profile activation receives `0x3ff`, while optional UI market-mutation refresh extends it to
   `0x7ff`.
+- Unified vanilla and Nexerelin stockpile limits behind one calculation. Open and military markets
+  now use the current remaining deficit and increase with stability, while black markets retain
+  the inverse stability curve; selling enough goods resolves a shortage consistently in both
+  configurations.
+- Prevented wonder-free colony decivilization from replacing an active faction-wide Grand Wonder
+  stability penalty with a zero-value temporary modifier, and stopped applying the penalty to the
+  colony being removed.
+- Reset process-local core-UI state at every campaign load while preserving the legacy public flag
+  for binary compatibility, preventing one save's UI state from affecting another save.
+- Made market UI listener registration and dispatch safe against concurrent or callback-driven
+  modification, and retained callback causes in logs and propagated failures.
 
 ## 1.0.14-spp6 - 2026-07-29
 

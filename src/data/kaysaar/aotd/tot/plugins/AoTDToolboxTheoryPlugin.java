@@ -322,6 +322,7 @@ public class AoTDToolboxTheoryPlugin extends BaseModPlugin implements MarketCont
 
     @Override
     public void onGameLoad(boolean newGame) {
+        AoTDCoreUIListener.resetCampaignState();
         AoTDEconomy economy = AoTDEconomy.getInstance();
         AoTDWorkerManager.beginCampaign(economy,
                 newGame ? "new-game-load" : "save-load");
@@ -395,7 +396,6 @@ public class AoTDToolboxTheoryPlugin extends BaseModPlugin implements MarketCont
         ColonyUIListener.addMarketListener(new GrandProjectLabelInjector());
     }
 }
-
 
 
 
