@@ -1,9 +1,9 @@
 # Ashes of The Domain — Theory of Toolbox: Scheduler Fork
 
 Scheduler-focused fork of **AoTD — Theory of Toolbox** for Starsector
-`0.98a-RC8`. The current Scheduler Fork release is `1.0.14-spp2`.
-The runtime mod version remains numeric `1.0.14` for Starsector version-parser
-compatibility.
+`0.98a-RC8`. The current Scheduler Fork release is `1.0.14-spp7`.
+The mod metadata, release archive, bridge contract, and update manifest all use
+the canonical `1.0.14-spp7` fork release identifier.
 
 The fork keeps the original game `starfarer.api.jar`; it does not require or
 ship an AoTD replacement for any Starsector core JAR.
@@ -24,7 +24,13 @@ setups where AoTD is absent.
 - restarts workers safely around load, reset, save and shutdown boundaries;
 - refreshes Prepatcher capabilities at runtime and resynchronizes market
   generations before falling back when native delivery events become
-  unavailable.
+  unavailable;
+- skips unrelated full-sector economy steps created by detached campaign Cargo,
+  generated loot transfer panels and condition-only planet interaction while preserving real
+  market UI refreshes and actual colony initialization;
+- exposes one explicit dispatcher for classified Prepatcher market-open, Cargo and market-mutation
+  intents, rebuilding global/econ-group records only for affected commodities;
+- renders Local Resources from a call-local, read-only stockpile snapshot.
 
 ## Requirements
 
@@ -32,7 +38,7 @@ The runtime dependencies declared by `mod_info.json` are:
 
 | Mod | Minimum version |
 | --- | --- |
-| StarsectorPrepatcher | 0.13.0 |
+| StarsectorPrepatcher | 0.17.0 |
 | LazyLib | 3.0 |
 | AshLib | 2.2.0 |
 | Building Menu Overhaul | 2.1.0 |
@@ -49,8 +55,10 @@ mods are present, but neither is declared as a required dependency.
 4. Place this directory under `Starsector/mods/` and enable the mod.
 
 At startup the fork requires an active, compatible Prepatcher javaagent and the
-production capability mask `0x1ff`. Merely having the Prepatcher mod directory
-installed is not sufficient. If the native delivery callback is lost later at
+required production capability mask `0x3ff`. Scheduler Bridge V9 additionally negotiates the
+atomic UI market-mutation refresh capability (`0x7ff`) when both sides support it. Merely having
+the Prepatcher mod directory installed is not
+sufficient. If the native delivery callback is lost later at
 runtime, the fork performs a one-time generation resynchronization and switches
 price capture to its dirty-state fallback.
 
@@ -111,9 +119,32 @@ See [LICENSE](LICENSE).
 
 ## Single-market UI economy refresh
 
-The fork now treats market/Cargo UI refreshes as a single-market committed cut.
-The matching Prepatcher publishes the market argument before vanilla calls
-`Economy.nextStep()`, because `currentlyOpenMarket` is otherwise assigned too late.
-A second UI step is skipped only when campaign/economy epochs, registry revision,
-global dirty revision and the market dirty revision are unchanged. Global economy
-steps and the normal multi-frame monthly pipeline retain their original scope.
+The standard API keeps one meaning: `AoTDEconomy.nextStep(...)`, `doubleStep()`, `tripleStep()` and
+`AoTDReachEconomy.nextStep(...)` always execute the full global pipeline. `doubleStep()` and
+`tripleStep()` preserve vanilla two/three-step multiplicity. None of these methods infer UI intent
+from `currentlyOpenMarket`, a null payload or a Prepatcher context.
+
+Matching Prepatcher call-site guards invoke the public final
+`dispatchPrepatcherUiEconomyStep(int, MarketAPI, long, String[])` method with a classified
+market-open, Cargo or market-mutation action. An accepted action performs the single-market
+committed cut. If dispatch returns `false` or throws, or if a barrier/capability is unavailable, the
+guard executes the preserved original virtual call, whose semantics are therefore always global.
+Market-open and Cargo wrappers publish no fork context.
+
+
+## UI market-mutation handoff
+
+Prepatcher keeps its weak one-shot mutation context internal between an exact vanilla setter and its
+shared helper. The helper passes only an already classified action, packed reason/scope value and an
+immutable sorted commodity-ID array to the dispatcher. Supported local scopes use the existing
+single-market scheduler; targeted scopes additionally rebuild `AoTDCommodityMarketData` only for
+the affected IDs across global and econ-group views. `GLOBAL_TOPOLOGY`, administrator transfer,
+construction queue, custom providers, unknown actions and missing capability/barrier all return
+`false` and retain the original global virtual step. No second scheduler, per-commodity revision
+vector, persistent market reference, or static reflection/classloader cache is added.
+
+Only the exact `1.0.14-spp7` contract registers. The bridge declares the exact current mask
+`0x7ff`; older, future and partially declared fork revisions are logged and rejected as a whole
+instead of receiving partial or implicit UI semantics. Optional Prepatcher switches may omit bit
+10, but never the required dispatcher bit, so an exact current fork still receives `0x3ff` in the
+safe profile.

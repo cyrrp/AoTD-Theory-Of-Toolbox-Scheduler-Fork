@@ -78,6 +78,8 @@ public class AoTdMainWorkTask2 extends MainWorkTask2 {
     private transient AoTDRuntimeEpoch.Stamp mtEpochStamp;
     private transient ArrayList<MarketPriceCommitPlan> mtCommitPlans = new ArrayList<>();
     private ArrayList<Future<?>> mtFutures = new ArrayList<>();
+    // Boxed for save compatibility: null from an older serialized task means enabled.
+    private Boolean notifyCommodityListeners = Boolean.TRUE;
 
     private static final int PRICE_WORKER_CHUNK_SIZE = 16;
     private static final int MAIN_THREAD_COMMIT_MARKETS_PER_BATCH = 8;
@@ -152,12 +154,23 @@ public class AoTdMainWorkTask2 extends MainWorkTask2 {
             MainWorkTask.EconWorkParams econWorkParams,
             MarketAPI singleMarket
     ) {
+        this(markets, reachEconomy, econWorkParams, singleMarket, true);
+    }
+
+    public AoTdMainWorkTask2(
+            List<MarketAPI> markets,
+            ReachEconomy reachEconomy,
+            MainWorkTask.EconWorkParams econWorkParams,
+            MarketAPI singleMarket,
+            boolean notifyCommodityListeners
+    ) {
         super(markets, reachEconomy, econWorkParams);
 
         this.singleMarketToUpdate = singleMarket;
         this.uiLocalMode = singleMarket != null;
         this.aotdMarkets = new ArrayList<>(markets);
         this.aotdParams = econWorkParams;
+        this.notifyCommodityListeners = Boolean.valueOf(notifyCommodityListeners);
     }
 
     @Override
@@ -365,7 +378,9 @@ public class AoTdMainWorkTask2 extends MainWorkTask2 {
         }
 
         if (!mtListenersNotified) {
-            notifyCommoditiesUpdated(aotdCommodities);
+            if (!Boolean.FALSE.equals(notifyCommodityListeners)) {
+                notifyCommoditiesUpdated(aotdCommodities);
+            }
             mtListenersNotified = true;
             runOnce = singleMarketToUpdate != null;
             aotdIndex = aotdCommodities.size();

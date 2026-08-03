@@ -1,6 +1,7 @@
 package data.kaysaar.aotd.tot.scripts.economy;
 
 import com.fs.starfarer.api.Global;
+import com.fs.starfarer.api.campaign.econ.EconomyAPI;
 import com.fs.starfarer.api.campaign.econ.MarketAPI;
 import com.fs.starfarer.api.characters.PersonAPI;
 import com.fs.starfarer.campaign.econ.Economy;
@@ -9,9 +10,12 @@ import com.fs.starfarer.campaign.econ.reach.ImmigrationTask;
 import com.fs.starfarer.campaign.econ.reach.MainWorkTask;
 import com.fs.starfarer.campaign.econ.reach.ReachEconomy;
 import data.kaysaar.aotd.tot.compat.MarketRegistry;
+import data.kaysaar.aotd.tot.compat.SchedulerBridge;
+import data.kaysaar.aotd.tot.scripts.commoditydata.AoTDCommodityMarketData;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.TreeSet;
 
 public class AoTDReachEconomy extends ReachEconomy {
     public void nextStepForPlayer(MainWorkTask.EconWorkParams econWorkParams) {
@@ -43,7 +47,7 @@ public class AoTDReachEconomy extends ReachEconomy {
      * runs immigration and its trade snapshot only for that market, then performs
      * one local follow-up when the snapshot dirtied price/stockpile outputs.</p>
      */
-    public void nextStepForUiMarket(
+    final void nextStepForUiMarket(
             MainWorkTask.EconWorkParams econWorkParams,
             MarketAPI market,
             String context) {
@@ -85,15 +89,100 @@ public class AoTDReachEconomy extends ReachEconomy {
                 "ui-" + (context == null ? "market" : context));
     }
 
-    @Override
-    public void nextStep(MainWorkTask.EconWorkParams econWorkParams) {
+    /**
+     * UI mutation refresh: materialize one market, rebuild global/econ-group data
+     * only for the sorted affected IDs, then publish the local price/snapshot
+     * revision and listener boundary.
+     */
+    final void nextStepForUiMarketMutation(
+            MainWorkTask.EconWorkParams econWorkParams,
+            MarketAPI market,
+            String[] affectedCommodityIds,
+            int scope,
+            String context) {
+        if (market == null || affectedCommodityIds == null
+                || affectedCommodityIds.length == 0) return;
         econWorkParams = normalizeWorkParams(econWorkParams);
-        final MarketAPI openMarket = Global.getSector().getCurrentlyOpenMarket();
-        if (openMarket != null) {
-            nextStepForUiMarket(econWorkParams, openMarket, "current-market");
-            return;
+        final ArrayList<MarketAPI> localMarkets = new ArrayList<>(1);
+        localMarkets.add(market);
+        refreshAdministrator(market);
+
+        // Fork-native local materialization retains the exact AoTD industry and
+        // pure-price commit semantics while limiting live market work to one market.
+        runMainTask(localMarkets, econWorkParams, market, false);
+        drain(new AoTDUpdateMarketAgainTask(
+                (Economy) Global.getSector().getEconomy(), market));
+
+        if ((scope & SchedulerBridge.REFRESH_IMMIGRATION) != 0
+                && econWorkParams.withImmigration) {
+            drain(new ImmigrationTask(
+                    localMarkets, this, !econWorkParams.forceNonUIStep));
+        }
+        drain(new AoTDPostImmigrationTradeSnapshotTask(
+                localMarkets, "targeted-ui-"
+                        + (context == null ? "market" : context)));
+
+        if (MarketRegistry.needsMaterializedReconciliation(market)
+                || MarketRegistry.needsPriceRefresh(market)) {
+            runMainTask(localMarkets, econWorkParams, market, false);
+            drain(new AoTDUpdateMarketAgainTask(
+                    (Economy) Global.getSector().getEconomy(), market));
         }
 
+        rebuildAffectedCommodityData(affectedCommodityIds);
+        notifyAffectedCommodityListeners(affectedCommodityIds);
+        AoTDFinishEconomyUpdateTask.notifyEconomyListenersOnly(
+                (Economy) Global.getSector().getEconomy(),
+                "targeted-ui-" + (context == null ? "market" : context));
+    }
+
+    private static void notifyAffectedCommodityListeners(String[] ids) {
+        Economy economy = (Economy) Global.getSector().getEconomy();
+        ArrayList<EconomyAPI.EconomyUpdateListener> activeListeners = new ArrayList<>();
+        for (EconomyAPI.EconomyUpdateListener listener
+                : new ArrayList<>(economy.getUpdateListeners())) {
+            if (listener == null) continue;
+            if (listener.isEconomyListenerExpired()) {
+                economy.removeUpdateListener(listener);
+            } else {
+                activeListeners.add(listener);
+            }
+        }
+        for (String id : new TreeSet<>(java.util.Arrays.asList(ids))) {
+            if (id == null || id.isBlank()) continue;
+            for (EconomyAPI.EconomyUpdateListener listener : activeListeners) {
+                listener.commodityUpdated(id);
+            }
+        }
+    }
+
+    private void rebuildAffectedCommodityData(String[] affectedCommodityIds) {
+        TreeSet<String> ids = new TreeSet<>();
+        for (String id : affectedCommodityIds) {
+            if (id != null && !id.isBlank()) ids.add(id);
+        }
+        TreeSet<String> groups = new TreeSet<>();
+        for (MarketAPI candidate : getMarkets()) {
+            if (candidate == null) continue;
+            String group = candidate.getEconGroup();
+            if (group != null && !group.isBlank()) groups.add(group);
+        }
+        for (String id : ids) {
+            new AoTDCommodityMarketData(id, null);
+            for (String group : groups) {
+                new AoTDCommodityMarketData(id, group);
+            }
+        }
+    }
+
+    @Override
+    public void nextStep(MainWorkTask.EconWorkParams econWorkParams) {
+        nextStepGlobally(econWorkParams);
+    }
+
+    /** Full all-market economy step; it never consults currentlyOpenMarket. */
+    private void nextStepGlobally(MainWorkTask.EconWorkParams econWorkParams) {
+        econWorkParams = normalizeWorkParams(econWorkParams);
         final List<MarketAPI> markets = new ArrayList<>(this.getMarkets());
         refreshAdministrators(markets);
         runMainTask(markets, econWorkParams, null);
@@ -117,9 +206,18 @@ public class AoTDReachEconomy extends ReachEconomy {
             List<MarketAPI> markets,
             MainWorkTask.EconWorkParams params,
             MarketAPI singleMarket) {
+        runMainTask(markets, params, singleMarket, true);
+    }
+
+    private void runMainTask(
+            List<MarketAPI> markets,
+            MainWorkTask.EconWorkParams params,
+            MarketAPI singleMarket,
+            boolean notifyCommodityListeners) {
         final AoTdMainWorkTask2 task = singleMarket == null
                 ? new AoTdMainWorkTask2(markets, this, params)
-                : new AoTdMainWorkTask2(markets, this, params, singleMarket);
+                : new AoTdMainWorkTask2(
+                        markets, this, params, singleMarket, notifyCommodityListeners);
         while (!task.isDone()) {
             task.doNextBatch();
             task.awaitWorkersIfSubmitted();

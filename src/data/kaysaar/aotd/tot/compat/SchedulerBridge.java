@@ -12,13 +12,33 @@ import java.util.function.BiFunction;
  * target-loader calls before the class is defined.</p>
  */
 public final class SchedulerBridge {
-    public static final int BRIDGE_SCHEMA = 6;
-    public static final String BRIDGE_MARKER = "AOTD_SCHEDULER_BRIDGE_V6";
+    public static final int BRIDGE_SCHEMA = 9;
+    public static final String BRIDGE_MARKER = "AOTD_SCHEDULER_BRIDGE_V9";
 
     public static final int MUTATION_MARKET_MEMBERSHIP = 1;
     public static final int MUTATION_INDUSTRY_STRUCTURE = 1 << 1;
     public static final int MUTATION_CONDITION_STRUCTURE = 1 << 2;
     public static final int MUTATION_COMMODITY_STRUCTURE = 1 << 3;
+    public static final int MUTATION_IMMIGRATION_POLICY = 1 << 4;
+    public static final int MUTATION_STOCKPILE_POLICY = 1 << 5;
+    public static final int MUTATION_STABILIZATION = 1 << 6;
+    public static final int MUTATION_FREE_PORT = 1 << 7;
+    public static final int MUTATION_ADMIN_ASSIGNMENT = 1 << 8;
+    public static final int MUTATION_INDUSTRY_QUEUE = 1 << 9;
+    public static final int MUTATION_INDUSTRY_MODIFIER = 1 << 11;
+    public static final int MUTATION_CUSTOM_INDUSTRY_OPTION = 1 << 12;
+    public static final int MUTATION_TRADE_TRANSACTION = 1 << 13;
+
+    public static final int REFRESH_LOCAL_STATS = 1;
+    public static final int REFRESH_LOCAL_COMMODITIES = 1 << 1;
+    public static final int REFRESH_LOCAL_PRICE_STOCKPILE = 1 << 2;
+    public static final int REFRESH_IMMIGRATION = 1 << 3;
+    public static final int REFRESH_ACCESSIBILITY = 1 << 4;
+    public static final int REFRESH_INDUSTRY_STATE = 1 << 5;
+    public static final int REFRESH_LISTENER_BOUNDARY = 1 << 6;
+    public static final int REFRESH_AFFECTED_GLOBAL_COMMODITIES = 1 << 7;
+    public static final int REFRESH_GLOBAL_TOPOLOGY = 1 << 8;
+
     public static final int DIRTY_STRUCTURE = 1;
     public static final int DIRTY_INDUSTRIES = 1 << 1;
     public static final int DIRTY_CONDITIONS = 1 << 2;
@@ -89,8 +109,8 @@ public final class SchedulerBridge {
             negotiatedCapabilities = 0L;
             initialNegotiatedCapabilities = 0L;
             state = State.ABI_INCOMPATIBLE;
-            diagnostic = "Prepatcher rejected AoTD scheduler ABI "
-                    + PrepatcherContract.ABI_VERSION;
+            diagnostic = "Prepatcher rejected AoTD Scheduler Fork contract "
+                    + PrepatcherContract.FORK_VERSION;
             return state;
         }
         negotiatedCapabilities = negotiated;
@@ -153,12 +173,12 @@ public final class SchedulerBridge {
         acceptMarketMutation(market, dirtyMask, sourceGeneration, 0L);
     }
 
-    /**
-     * Consumes the market being opened by CampaignEngine before vanilla publishes
-     * it through getCurrentlyOpenMarket(). The no-agent body is deliberately null.
-     */
-    public static Object consumeOpeningMarket() {
-        return null;
+    public static int mutationReason(long packed) {
+        return (int) (packed >>> 32);
+    }
+
+    public static int mutationScope(long packed) {
+        return (int) packed;
     }
 
     /** Publishes the process-local campaign/economy identity to Prepatcher. */

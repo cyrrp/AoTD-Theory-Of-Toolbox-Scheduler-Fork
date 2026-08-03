@@ -2,7 +2,6 @@ package data.kaysaar.aotd.tot.scripts.economy;
 
 import com.fs.starfarer.api.campaign.econ.MarketAPI;
 import data.kaysaar.aotd.tot.compat.MarketRegistry;
-import data.kaysaar.aotd.tot.compat.SchedulerBridge;
 
 /**
  * Owner-local revision gate for synchronous UI economy refreshes.
@@ -24,12 +23,9 @@ final class AoTDUIEconomyRefreshCoordinator {
 
     private long completedRefreshes;
     private long skippedRefreshes;
+    private long syntheticCargoSkips;
+    private long conditionOnlySkips;
     private long invalidations;
-
-    MarketAPI consumeOpeningMarket() {
-        Object candidate = SchedulerBridge.consumeOpeningMarket();
-        return candidate instanceof MarketAPI ? (MarketAPI) candidate : null;
-    }
 
     boolean isCurrent(MarketAPI market) {
         if (market == null || completedMarketId == null) return false;
@@ -72,6 +68,14 @@ final class AoTDUIEconomyRefreshCoordinator {
         skippedRefreshes++;
     }
 
+    void recordSyntheticCargoSkip() {
+        syntheticCargoSkips++;
+    }
+
+    void recordConditionOnlySkip() {
+        conditionOnlySkips++;
+    }
+
     void invalidate(String reason) {
         completedCampaignEpoch = 0L;
         completedEconomyEpoch = 0L;
@@ -87,6 +91,8 @@ final class AoTDUIEconomyRefreshCoordinator {
     String statusSummary() {
         return "completed=" + completedRefreshes
                 + ", skipped=" + skippedRefreshes
+                + ", syntheticCargoSkipped=" + syntheticCargoSkips
+                + ", conditionOnlySkipped=" + conditionOnlySkips
                 + ", invalidations=" + invalidations
                 + ", market=" + completedMarketId
                 + ", campaignEpoch=" + completedCampaignEpoch

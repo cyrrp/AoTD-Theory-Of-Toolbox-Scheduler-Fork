@@ -8,12 +8,10 @@ import com.fs.starfarer.api.combat.MutableStat;
 import com.fs.starfarer.api.impl.campaign.ids.Strings;
 import com.fs.starfarer.api.impl.campaign.shared.SharedData;
 import com.fs.starfarer.api.impl.campaign.submarkets.LocalResourcesSubmarketPlugin;
-import com.fs.starfarer.api.ui.Alignment;
 import com.fs.starfarer.api.ui.TooltipMakerAPI;
 import com.fs.starfarer.api.util.Misc;
 import data.kaysaar.aotd.tot.plugins.AoTDCommodityEconSpecManager;
 import data.kaysaar.aotd.tot.scripts.commoditydata.AoTDCommodityOnMarket;
-import data.kaysaar.aotd.tot.scripts.economy.AoTdMainWorkTask2;
 
 import java.util.*;
 
@@ -123,56 +121,20 @@ public class AoTDLocalResourcesSubmarketPlugin extends LocalResourcesSubmarketPl
         }
     }
 
-    protected void createTooltipAfterDescription(TooltipMakerAPI tooltip, boolean expanded) {
-        List<CommodityOnMarketAPI> all = new ArrayList<CommodityOnMarketAPI>(market.getAllCommodities());
+    @Override
+    protected void createTooltipAfterDescription(
+            TooltipMakerAPI tooltip, boolean expanded) {
+        AoTDLocalResourcesTooltipSnapshot.render(
+                this, tooltip, this::getStockpileLimitForTooltip);
+    }
 
-        Collections.sort(all, new Comparator<CommodityOnMarketAPI>() {
-            public int compare(CommodityOnMarketAPI o1, CommodityOnMarketAPI o2) {
-                int limit1 = getStockpileLimit(o1);
-                int limit2 = getStockpileLimit(o2);
-                return limit2 - limit1;
-            }
-        });
-
-        float opad = 10f;
-
-        tooltip.beginGridFlipped(400f, 1, 70f, opad);
-        int j = 0;
-        for (CommodityOnMarketAPI com : all) {
-            if (com.isNonEcon()) continue;
-            if (com.getCommodity().isMeta()) continue;
-
-            if (!shouldHaveCommodity(com)) continue;
-
-            int limit = (int) Math.round(getStockpileLimit(com) * getStockpilingAddRateMult(com));
-            if (limit <= 0) continue;
-
-            tooltip.addToGrid(0, j++,
-                    com.getCommodity().getName(),
-                    Misc.getWithDGS(limit));
-            //Misc.getWithDGS(curr) + " / " + Misc.getWithDGS(limit));
+    private int getStockpileLimitForTooltip(CommodityOnMarketAPI commodity) {
+        if (commodity instanceof AoTDCommodityOnMarket aoTDCommodity) {
+            Integer snapshot = AoTDLocalResourcesTooltipSnapshot
+                    .peekAoTDStockpileLimit(aoTDCommodity, stockpilingBonus);
+            if (snapshot != null) return snapshot;
         }
-
-        tooltip.addPara("A portion of the resources produced by the colony will be made available here. " +
-                        "These resources can be extracted from the colony's economy for a cost equal to %s of their base value. " +
-                        "This cost will be deducted at the end of the month.", opad,
-                Misc.getHighlightColor(), "" + (int) Math.round(STOCKPILE_COST_MULT * 100f) + "%");
-
-        tooltip.addPara("These resources can also be used to counter temporary shortages, for a " +
-                        "cost equal to %s of their base value. If additional resources are placed here, they " +
-                        "will be used as well, at no cost.", opad,
-                Misc.getHighlightColor(), "" + (int) Math.round(STOCKPILE_SHORTAGE_COST_MULT * 100f) + "%");
-
-
-        tooltip.addSectionHeading("Stockpiled per month", market.getFaction().getBaseUIColor(), market.getFaction().getDarkUIColor(), Alignment.MID, opad);
-        if (j > 0) {
-            tooltip.addGrid(opad);
-
-            tooltip.addPara("Stockpiles are limited to %s the monthly rate.", opad,
-                    Misc.getHighlightColor(), "" + (int) STOCKPILE_MAX_MONTHS + Strings.X);
-        } else {
-            tooltip.addPara("No stockpiling.", opad);
-        }
+        return getStockpileLimit(commodity);
     }
 
 }

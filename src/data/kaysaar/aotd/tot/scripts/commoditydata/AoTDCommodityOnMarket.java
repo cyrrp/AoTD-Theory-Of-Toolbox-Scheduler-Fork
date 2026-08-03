@@ -108,6 +108,11 @@ public class AoTDCommodityOnMarket extends CommodityOnMarket {
         return getAoTDAvailableStat().getSupplyDemandData(this);
     }
 
+    /** Read-only UI accessor; never constructs or refreshes supply/demand data. */
+    public AoTDSupplyDemandData peekSupplyDemandData() {
+        return getAoTDAvailableStat().peekSupplyDemandData();
+    }
+
     public boolean doesImport() {
         return getSupplyDemandData().getExport(this) < 0;
     }

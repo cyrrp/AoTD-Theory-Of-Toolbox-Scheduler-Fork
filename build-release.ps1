@@ -1,6 +1,6 @@
 $ErrorActionPreference = "Stop"
 
-$releaseLabel = "1.0.14-spp2"
+$releaseLabel = "1.0.14-spp7"
 $packageDirectoryName = "AoTD-Theory-Of-Toolbox-Scheduler-Fork"
 $repositoryRoot = [IO.Path]::GetFullPath($PSScriptRoot)
 $releaseDirectory = Join-Path $repositoryRoot "releases"
@@ -8,7 +8,27 @@ $archiveName = "$packageDirectoryName-$releaseLabel.zip"
 $archivePath = Join-Path $releaseDirectory $archiveName
 $externalChecksumPath = "$archivePath.sha256"
 $utf8NoBom = [Text.UTF8Encoding]::new($false)
-$releaseTimestamp = [DateTimeOffset]::new(2026, 7, 27, 0, 0, 0, [TimeSpan]::Zero)
+$releaseTimestamp = [DateTimeOffset]::new(2026, 8, 3, 0, 0, 0, [TimeSpan]::Zero)
+
+if ($releaseLabel -cnotmatch '^\d+\.\d+\.\d+-spp\d+$') {
+    throw "Fork release label must use {upstream-version}-spp{patch}: $releaseLabel"
+}
+$modInfo = Get-Content -LiteralPath (Join-Path $repositoryRoot 'mod_info.json') -Raw -Encoding UTF8 | ConvertFrom-Json
+$updateInfo = Get-Content -LiteralPath (Join-Path $repositoryRoot 'aotd_tot.version') -Raw -Encoding UTF8 | ConvertFrom-Json
+$updateLabel = '{0}.{1}.{2}' -f $updateInfo.modVersion.major,
+    $updateInfo.modVersion.minor, $updateInfo.modVersion.patch
+if ($modInfo.version -cne $releaseLabel -or $updateLabel -cne $releaseLabel) {
+    throw "Fork version metadata mismatch: release=$releaseLabel; mod_info=$($modInfo.version); update=$updateLabel"
+}
+if ($updateInfo.directDownloadURL -notlike "*/$archiveName") {
+    throw "Fork update URL does not end in the canonical archive name: $archiveName"
+}
+foreach ($document in @('README.md', 'CHANGELOG.md')) {
+    $documentText = Get-Content -LiteralPath (Join-Path $repositoryRoot $document) -Raw -Encoding UTF8
+    if ($documentText.IndexOf($releaseLabel, [StringComparison]::Ordinal) -lt 0) {
+        throw "Fork release identifier is missing from ${document}: $releaseLabel"
+    }
+}
 
 function Get-RepositoryPayload {
     $tracked = @(& git -C $repositoryRoot ls-files)
@@ -26,7 +46,9 @@ function Get-RepositoryPayload {
             $_ -and
             $_ -ne ".gitattributes" -and
             $_ -ne ".gitignore" -and
+            $_ -ne "AGENTS.md" -and
             $_ -ne "SHA256SUMS.txt" -and
+            -not $_.StartsWith(".build/", [StringComparison]::Ordinal) -and
             -not $_.StartsWith("releases/", [StringComparison]::Ordinal)
         } |
         Sort-Object -Unique)
@@ -50,6 +72,86 @@ foreach ($relativePath in $requiredFiles) {
     }
 }
 
+$forbiddenJarEntries = @(
+    'data/kaysaar/aotd/tot/scripts/submarket/aotd/AoTDLocalResourcesSubmarketPlugin$1.class',
+    'data/kaysaar/aotd/tot/scripts/submarket/nex/AoTDxNexLocalResourcesSubmarketPlugin$1.class'
+)
+$requiredJarSymbols = @{
+    'data/kaysaar/aotd/tot/compat/PrepatcherContract.class' = @(
+        '1.0.14-spp7'
+    )
+    'data/kaysaar/aotd/tot/compat/SchedulerBridge.class' = @(
+        'AOTD_SCHEDULER_BRIDGE_V9'
+    )
+    'data/kaysaar/aotd/tot/scripts/economy/AoTDEconomy.class' = @(
+        'dispatchPrepatcherUiEconomyStep'
+    )
+}
+$forbiddenJarSymbols = @{
+    'data/kaysaar/aotd/tot/compat/PrepatcherContract.class' = @(
+        'ABI_VERSION',
+        'CAPABILITY_UI_CALL_CONTEXTS'
+    )
+    'data/kaysaar/aotd/tot/compat/SchedulerBridge.class' = @(
+        'consumeOpeningMarket',
+        'consumeDetachedCargoOpen',
+        'consumeUiMarketMutation',
+        'consumeUiMarketMutationPayload'
+    )
+}
+Add-Type -AssemblyName System.IO.Compression
+$jarPath = Join-Path $repositoryRoot 'jars\AoTDToolboxTheory.jar'
+$jarStream = [IO.File]::OpenRead($jarPath)
+try {
+    $jar = [IO.Compression.ZipArchive]::new(
+        $jarStream,
+        [IO.Compression.ZipArchiveMode]::Read,
+        $false)
+    try {
+        $jarEntries = @($jar.Entries | ForEach-Object FullName)
+        foreach ($entry in $forbiddenJarEntries) {
+            if ($jarEntries -contains $entry) {
+                throw "AoTD JAR contains a stale class from the removed tooltip implementation: $entry"
+            }
+        }
+        $latin1 = [Text.Encoding]::GetEncoding(28591)
+        foreach ($entryName in @($requiredJarSymbols.Keys + $forbiddenJarSymbols.Keys |
+                Sort-Object -Unique)) {
+            $classEntry = $jar.GetEntry($entryName)
+            if ($null -eq $classEntry) {
+                throw "AoTD JAR is missing current contract class: $entryName"
+            }
+            $classStream = $classEntry.Open()
+            $classBytes = [IO.MemoryStream]::new()
+            try {
+                $classStream.CopyTo($classBytes)
+                $classText = $latin1.GetString($classBytes.ToArray())
+            } finally {
+                $classBytes.Dispose()
+                $classStream.Dispose()
+            }
+            if ($requiredJarSymbols.ContainsKey($entryName)) {
+                foreach ($symbol in @($requiredJarSymbols[$entryName])) {
+                    if ($classText.IndexOf($symbol, [StringComparison]::Ordinal) -lt 0) {
+                        throw "AoTD JAR contract class is stale; missing $symbol in $entryName"
+                    }
+                }
+            }
+            if ($forbiddenJarSymbols.ContainsKey($entryName)) {
+                foreach ($symbol in @($forbiddenJarSymbols[$entryName])) {
+                    if ($classText.IndexOf($symbol, [StringComparison]::Ordinal) -ge 0) {
+                        throw "AoTD JAR contract class retains removed symbol $symbol in $entryName"
+                    }
+                }
+            }
+        }
+    } finally {
+        $jar.Dispose()
+    }
+} finally {
+    $jarStream.Dispose()
+}
+
 $checksumLines = foreach ($relativePath in $payload) {
     $sourcePath = Join-Path $repositoryRoot ($relativePath.Replace("/", [IO.Path]::DirectorySeparatorChar))
     if (-not (Test-Path -LiteralPath $sourcePath -PathType Leaf)) {
@@ -64,7 +166,6 @@ $checksumLines = foreach ($relativePath in $payload) {
     $utf8NoBom)
 
 [IO.Directory]::CreateDirectory($releaseDirectory) | Out-Null
-Add-Type -AssemblyName System.IO.Compression
 $archiveStream = [IO.File]::Open(
     $archivePath,
     [IO.FileMode]::Create,

@@ -17,6 +17,11 @@ public class AoTDAvailableStat extends MutableStatWithTempMods {
         return supplyDemandData;
     }
 
+    /** Returns the last published object without creating or refreshing it. */
+    public AoTDSupplyDemandData peekSupplyDemandData() {
+        return supplyDemandData;
+    }
+
     public AoTDExcDefData getData() {
         return data;
     }

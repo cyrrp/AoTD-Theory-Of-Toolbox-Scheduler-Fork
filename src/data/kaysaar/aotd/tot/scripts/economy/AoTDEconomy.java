@@ -11,6 +11,7 @@ import com.fs.starfarer.campaign.econ.reach.MainWorkTask;
 import data.kaysaar.aotd.tot.plugins.ReflectionUtilis;
 import data.kaysaar.aotd.tot.compat.SchedulerBridge;
 import data.kaysaar.aotd.tot.compat.MarketRegistry;
+import data.kaysaar.aotd.tot.compat.PrepatcherContract;
 import data.kaysaar.aotd.tot.scripts.commoditydata.AoTDCommodityOnMarket;
 import data.kaysaar.aotd.tot.scripts.commoditydata.AoTDMarketDemandData;
 import data.kaysaar.aotd.tot.scripts.trade.manager.AoTDTradeManager;
@@ -19,6 +20,27 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class AoTDEconomy extends Economy {
+    private static final int SUPPORTED_UI_MUTATION_REASON_MASK =
+            (1 << 4) | (1 << 5) | (1 << 6) | (1 << 7) | (1 << 8)
+                    | (1 << 9) | (1 << 10) | (1 << 11) | (1 << 12) | (1 << 13);
+    private static final int SUPPORTED_UI_REFRESH_SCOPE_MASK =
+            SchedulerBridge.REFRESH_LOCAL_STATS
+                    | SchedulerBridge.REFRESH_LOCAL_COMMODITIES
+                    | SchedulerBridge.REFRESH_LOCAL_PRICE_STOCKPILE
+                    | SchedulerBridge.REFRESH_IMMIGRATION
+                    | SchedulerBridge.REFRESH_ACCESSIBILITY
+                    | SchedulerBridge.REFRESH_INDUSTRY_STATE
+                    | SchedulerBridge.REFRESH_LISTENER_BOUNDARY
+                    | SchedulerBridge.REFRESH_AFFECTED_GLOBAL_COMMODITIES
+                    | SchedulerBridge.REFRESH_GLOBAL_TOPOLOGY;
+    private static final int ACTIONABLE_UI_REFRESH_SCOPE_MASK =
+            SchedulerBridge.REFRESH_LOCAL_STATS
+                    | SchedulerBridge.REFRESH_LOCAL_COMMODITIES
+                    | SchedulerBridge.REFRESH_LOCAL_PRICE_STOCKPILE
+                    | SchedulerBridge.REFRESH_IMMIGRATION
+                    | SchedulerBridge.REFRESH_ACCESSIBILITY
+                    | SchedulerBridge.REFRESH_INDUSTRY_STATE
+                    | SchedulerBridge.REFRESH_AFFECTED_GLOBAL_COMMODITIES;
     private static final ConcurrentHashMap<String, Long> NEGATIVE_MARKET_LOOKUPS =
             new ConcurrentHashMap<>();
     private static final ConcurrentHashMap<String, Object> MARKET_REPAIR_LOCKS =
@@ -193,34 +215,19 @@ public class AoTDEconomy extends Economy {
 
     @Override
     public void nextStep(MainWorkTask.EconWorkParams econWorkParams) {
-        MainWorkTask.EconWorkParams params = normalizeWorkParams(econWorkParams);
-        AoTDUIEconomyRefreshCoordinator coordinator = uiRefreshCoordinator();
-        MarketAPI openingMarket = coordinator.consumeOpeningMarket();
-        String uiReason = "open-market";
-        if (!isLiveMarket(openingMarket)) {
-            openingMarket = Global.getSector().getCurrentlyOpenMarket();
-            uiReason = "current-market";
-        }
-        if (isLiveMarket(openingMarket)) {
-            runUiMarketRefresh(openingMarket, params, uiReason, true);
-            return;
-        }
-
-        coordinator.invalidate("global-next-step");
-        for (MarketAPI market : getMarkets()) ((Market) market).updatePrevStability();
-        this.getEconomy().nextStep(params);
+        runGlobalEconomyStep(econWorkParams, "global-next-step");
     }
 
     @Override
     public void doubleStep() {
-        MarketAPI openMarket = Global.getSector().getCurrentlyOpenMarket();
-        if (isLiveMarket(openMarket)) {
-            runUiMarketRefresh(openMarket, normalizeWorkParams(null),
-                    "double-step", true);
-            return;
-        }
-        uiRefreshCoordinator().invalidate("global-double-step");
-        super.nextStep();
+        runGlobalEconomyStep(null, "global-double-step-1");
+        runGlobalEconomyStep(null, "global-double-step-2");
+    }
+
+    private void runGlobalEconomyStep(
+            MainWorkTask.EconWorkParams econWorkParams, String reason) {
+        uiRefreshCoordinator().invalidate(reason);
+        super.nextStep(econWorkParams);
     }
 
     private MainWorkTask.EconWorkParams normalizeWorkParams(
@@ -238,6 +245,12 @@ public class AoTDEconomy extends Economy {
             uiRefreshCoordinator = new AoTDUIEconomyRefreshCoordinator();
         }
         return uiRefreshCoordinator;
+    }
+
+    private boolean isConditionOnlyOpeningMarket(MarketAPI market) {
+        if (market == null || !market.isPlanetConditionMarketOnly()) return false;
+        String id = market.getId();
+        return id == null || MarketRegistry.lookupMarket(id) != market;
     }
 
     private boolean isLiveMarket(MarketAPI market) {
@@ -343,14 +356,138 @@ public class AoTDEconomy extends Economy {
     }
     @Override
     public void tripleStep() {
-        MarketAPI openMarket = Global.getSector().getCurrentlyOpenMarket();
-        if (isLiveMarket(openMarket)) {
-            runUiMarketRefresh(openMarket, normalizeWorkParams(null),
-                    "triple-step", true);
-            return;
+        runGlobalEconomyStep(null, "global-triple-step-1");
+        runGlobalEconomyStep(null, "global-triple-step-2");
+        runGlobalEconomyStep(null, "global-triple-step-3");
+    }
+
+    /**
+     * Executes only an exact UI action already classified by Prepatcher. The
+     * normal Economy step methods above deliberately never infer UI intent.
+     */
+    public final boolean dispatchPrepatcherUiEconomyStep(
+            int action, MarketAPI market, long detail,
+            String[] affectedCommodityIds) {
+        if (!SchedulerBridge.hasCapability(
+                PrepatcherContract.CAPABILITY_UI_ECONOMY_DISPATCH)) {
+            return false;
         }
-        uiRefreshCoordinator().invalidate("global-triple-step");
-        super.nextStep();
+        if (action == PrepatcherContract.UI_ECONOMY_ACTION_MARKET_OPEN) {
+            if (detail != 0L || !hasNoCommodityIds(affectedCommodityIds)) return false;
+            if (market != null && market.isPlanetConditionMarketOnly()) {
+                if (!isConditionOnlyOpeningMarket(market)) return false;
+                uiRefreshCoordinator().recordConditionOnlySkip();
+                AoTDEconomySemanticBaseline.operation(
+                        "ui-economy.condition-only-global-step-skipped", 1L);
+                return true;
+            }
+            if (!isLiveMarket(market)) return false;
+            runUiMarketRefresh(market, normalizeWorkParams(null),
+                    "open-market", true);
+            return true;
+        }
+        if (action == PrepatcherContract.UI_ECONOMY_ACTION_CARGO) {
+            if (!hasNoCommodityIds(affectedCommodityIds)) return false;
+            if (detail == PrepatcherContract.UI_ECONOMY_CARGO_SYNTHETIC) {
+                if (market != null) return false;
+                uiRefreshCoordinator().recordSyntheticCargoSkip();
+                AoTDEconomySemanticBaseline.operation(
+                        "ui-economy.synthetic-cargo-global-step-skipped", 1L);
+                return true;
+            }
+            if (detail != PrepatcherContract.UI_ECONOMY_CARGO_LIVE_MARKET
+                    || !isLiveMarket(market)) {
+                return false;
+            }
+            runUiMarketRefresh(market, normalizeWorkParams(null),
+                    "cargo", true);
+            return true;
+        }
+        if (action != PrepatcherContract.UI_ECONOMY_ACTION_MARKET_MUTATION) {
+            return false;
+        }
+
+        int reason = SchedulerBridge.mutationReason(detail);
+        int scope = SchedulerBridge.mutationScope(detail);
+        if (!SchedulerBridge.hasCapability(
+                PrepatcherContract.CAPABILITY_UI_MARKET_MUTATION_REFRESH)
+                || !isLiveMarket(market)
+                || reason == 0
+                || (reason & ~SUPPORTED_UI_MUTATION_REASON_MASK) != 0
+                || scope == 0
+                || (scope & ~SUPPORTED_UI_REFRESH_SCOPE_MASK) != 0
+                || (scope & ACTIONABLE_UI_REFRESH_SCOPE_MASK) == 0
+                || (scope & SchedulerBridge.REFRESH_GLOBAL_TOPOLOGY) != 0) {
+            return false;
+        }
+
+        boolean targeted = (scope
+                & SchedulerBridge.REFRESH_AFFECTED_GLOBAL_COMMODITIES) != 0;
+        String[] affected = affectedCommodityIds == null
+                ? new String[0] : affectedCommodityIds.clone();
+        if (targeted ? !areSortedUniqueCommodityIds(affected)
+                : affected.length != 0) {
+            return false;
+        }
+
+        MarketRegistry.markDirty(market, dirtyMaskForUiMutationScope(scope),
+                MarketRegistry.PRIORITY_IMMEDIATE);
+
+        if (targeted) {
+            ((Market) market).updatePrevStability();
+            getReachEconomy().nextStepForUiMarketMutation(
+                    normalizeWorkParams(null), market, affected, scope,
+                    "mutation-reason-0x" + Integer.toHexString(reason));
+            uiRefreshCoordinator().recordCompleted(market);
+            AoTDEconomySemanticBaseline.operation(
+                    "ui-economy.mutation-targeted-commodities",
+                    ((long) reason << 32) | (scope & 0xffffffffL));
+            return true;
+        }
+
+        runUiMarketRefresh(market, normalizeWorkParams(null),
+                "mutation-reason-0x" + Integer.toHexString(reason), false);
+        AoTDEconomySemanticBaseline.operation(
+                "ui-economy.mutation-reason-localized",
+                ((long) reason << 32) | (scope & 0xffffffffL));
+        return true;
+    }
+
+    private static boolean hasNoCommodityIds(String[] commodityIds) {
+        return commodityIds == null || commodityIds.length == 0;
+    }
+
+    private static boolean areSortedUniqueCommodityIds(String[] commodityIds) {
+        if (commodityIds == null || commodityIds.length == 0) return false;
+        String previous = null;
+        for (String id : commodityIds) {
+            if (id == null || id.isBlank()
+                    || (previous != null && previous.compareTo(id) >= 0)) {
+                return false;
+            }
+            previous = id;
+        }
+        return true;
+    }
+
+    private static int dirtyMaskForUiMutationScope(int scope) {
+        int dirty = 0;
+        if ((scope & (SchedulerBridge.REFRESH_LOCAL_STATS
+                | SchedulerBridge.REFRESH_IMMIGRATION
+                | SchedulerBridge.REFRESH_LOCAL_COMMODITIES)) != 0) {
+            dirty |= MarketRegistry.DIRTY_VALUE_STATE
+                    | SchedulerBridge.DIRTY_DERIVED_ECONOMY;
+        }
+        if ((scope & SchedulerBridge.REFRESH_LOCAL_PRICE_STOCKPILE) != 0) {
+            dirty |= MarketRegistry.DIRTY_PRICE | MarketRegistry.DIRTY_STOCKPILE;
+        }
+        if ((scope & SchedulerBridge.REFRESH_ACCESSIBILITY) != 0) {
+            dirty |= MarketRegistry.DIRTY_ACCESSIBILITY;
+        }
+        if ((scope & SchedulerBridge.REFRESH_INDUSTRY_STATE) != 0) {
+            dirty |= SchedulerBridge.DIRTY_INDUSTRIES;
+        }
+        return dirty == 0 ? MarketRegistry.DIRTY_VALUE_STATE : dirty;
     }
 
     public static void pruneCommodities(){
