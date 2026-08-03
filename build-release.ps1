@@ -1,6 +1,6 @@
 $ErrorActionPreference = "Stop"
 
-$releaseLabel = "1.0.14-spp7"
+$releaseLabel = "1.0.14-spp8"
 $packageDirectoryName = "AoTD-Theory-Of-Toolbox-Scheduler-Fork"
 $repositoryRoot = [IO.Path]::GetFullPath($PSScriptRoot)
 $releaseDirectory = Join-Path $repositoryRoot "releases"
@@ -19,6 +19,14 @@ $updateLabel = '{0}.{1}.{2}' -f $updateInfo.modVersion.major,
     $updateInfo.modVersion.minor, $updateInfo.modVersion.patch
 if ($modInfo.version -cne $releaseLabel -or $updateLabel -cne $releaseLabel) {
     throw "Fork version metadata mismatch: release=$releaseLabel; mod_info=$($modInfo.version); update=$updateLabel"
+}
+$ashlibDependency = @($modInfo.dependencies | Where-Object { $_.id -ceq 'ashlib' })
+if ($ashlibDependency.Count -ne 1 -or $ashlibDependency[0].version -cne '2.2.3') {
+    throw "The Domain UI hotfix requires exactly one AshLib dependency at minimum version 2.2.3."
+}
+$prepatcherDependency = @($modInfo.dependencies | Where-Object { $_.id -ceq 'starsector_prepatcher' })
+if ($prepatcherDependency.Count -ne 1 -or $prepatcherDependency[0].version -cne '0.17.1') {
+    throw "Scheduler Fork 1.0.14-spp8 requires exactly one Prepatcher dependency at version 0.17.1."
 }
 if ($updateInfo.directDownloadURL -notlike "*/$archiveName") {
     throw "Fork update URL does not end in the canonical archive name: $archiveName"
@@ -76,9 +84,14 @@ $forbiddenJarEntries = @(
     'data/kaysaar/aotd/tot/scripts/submarket/aotd/AoTDLocalResourcesSubmarketPlugin$1.class',
     'data/kaysaar/aotd/tot/scripts/submarket/nex/AoTDxNexLocalResourcesSubmarketPlugin$1.class'
 )
+$requiredJarEntries = @(
+    'data/kaysaar/aotd/tot/ui/core/DomainTabListener.class',
+    'data/kaysaar/aotd/tot/ui/core/DomainTabListener$1.class',
+    'data/kaysaar/aotd/tot/ui/DomainUIPanel.class'
+)
 $requiredJarSymbols = @{
     'data/kaysaar/aotd/tot/compat/PrepatcherContract.class' = @(
-        '1.0.14-spp7'
+        '1.0.14-spp8'
     )
     'data/kaysaar/aotd/tot/compat/SchedulerBridge.class' = @(
         'AOTD_SCHEDULER_BRIDGE_V9'
@@ -109,6 +122,11 @@ try {
         $false)
     try {
         $jarEntries = @($jar.Entries | ForEach-Object FullName)
+        foreach ($entry in $requiredJarEntries) {
+            if ($jarEntries -notcontains $entry) {
+                throw "AoTD JAR is missing required Domain UI class: $entry"
+            }
+        }
         foreach ($entry in $forbiddenJarEntries) {
             if ($jarEntries -contains $entry) {
                 throw "AoTD JAR contains a stale class from the removed tooltip implementation: $entry"

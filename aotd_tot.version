@@ -1,11 +1,11 @@
 {
     "masterVersionFile": "https://raw.githubusercontent.com/cyrrp/AoTD-Theory-Of-Toolbox-Scheduler-Fork/refs/heads/master/aotd_tot.version",
     "modName": "AoTD - Theory of Toolbox - Scheduler Fork",
-    "directDownloadURL": "https://github.com/cyrrp/AoTD-Theory-Of-Toolbox-Scheduler-Fork/releases/latest/download/AoTD-Theory-Of-Toolbox-Scheduler-Fork-1.0.14-spp7.zip",
+    "directDownloadURL": "https://github.com/cyrrp/AoTD-Theory-Of-Toolbox-Scheduler-Fork/releases/latest/download/AoTD-Theory-Of-Toolbox-Scheduler-Fork-1.0.14-spp8.zip",
     "modThreadId": 26307,
     "modVersion": {
         "major": 1,
         "minor": 0,
-        "patch": "14-spp7"
+        "patch": "14-spp8"
     }
 }

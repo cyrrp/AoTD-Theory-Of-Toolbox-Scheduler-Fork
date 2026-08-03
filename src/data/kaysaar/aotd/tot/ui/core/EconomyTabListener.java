@@ -77,11 +77,24 @@ public class EconomyTabListener implements CommandTabListener {
 
     @Override
     public void performRecalculations(UIComponentAPI uiComponentAPI) {
+        recalculatePanelSize(uiComponentAPI);
+    }
+
+    static void recalculatePanelSize(UIComponentAPI uiComponentAPI) {
+        if (uiComponentAPI == null || uiComponentAPI.getPosition() == null) {
+            return;
+        }
+
         ButtonAPI button = tryToGetButtonProd("domain");
-        if(button==null){
+        if (button == null) {
             button = tryToGetButtonProd("colonies");
         }
-        WIDTH = Global.getSettings().getScreenWidth() - button.getPosition().getX();
+
+        if (button != null && button.getPosition() != null) {
+            WIDTH = Global.getSettings().getScreenWidth() - button.getPosition().getX();
+        } else {
+            WIDTH = uiComponentAPI.getPosition().getWidth();
+        }
         HEIGHT = uiComponentAPI.getPosition().getHeight();
     }
 

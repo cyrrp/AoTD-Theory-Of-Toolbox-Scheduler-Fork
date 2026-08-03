@@ -3,7 +3,7 @@
   "name": "zz AoTD - Theory of Toolbox - Scheduler Fork",
   "author": "Kaysaar",
   "utility": "false",
-  "version": "1.0.14-spp7",
+  "version": "1.0.14-spp8",
   "description": "Prepatcher-friendly AoTD scheduler fork with atomic registry publication, revision-gated UI market-mutation refresh, condition-only/detached-Cargo/loot suppression, read-only Local Resources tooltip snapshots, deterministic trade, runtime epochs, restartable workers, and live capability downgrade recovery without replacing any core game JAR.",
   "gameVersion": "0.98a-RC8",
   "jars": [
@@ -13,7 +13,7 @@
     {
       "id": "starsector_prepatcher",
       "name": "StarsectorPrepatcher",
-      "version": "0.17.0"
+      "version": "0.17.1"
     },
     {
       "id": "lw_lazylib",
@@ -23,7 +23,7 @@
     {
       "id": "ashlib",
       "name": "Ashlib",
-      "version": "2.2.0"
+      "version": "2.2.3"
     },
     {
       "id": "bmo",

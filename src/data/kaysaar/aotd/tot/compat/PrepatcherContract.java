@@ -11,7 +11,7 @@ public final class PrepatcherContract {
     public static final String MOD_ID = "aotd_theory_of_toolbox";
     public static final String MARKER_CLASS =
             "data.kaysaar.aotd.tot.compat.PrepatcherContract";
-    public static final String FORK_VERSION = "1.0.14-spp7";
+    public static final String FORK_VERSION = "1.0.14-spp8";
 
     /** Loader-safe javaagent patch and capability negotiation. */
     public static final long CAPABILITY_CONTRACT_HANDSHAKE = 1L;

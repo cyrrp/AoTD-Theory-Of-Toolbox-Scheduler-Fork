@@ -2,6 +2,18 @@
 
 All notable changes to the Scheduler Fork are documented here.
 
+## 1.0.14-spp8 - 2026-08-03
+
+- Requires StarsectorPrepatcher 0.17.1 and AshLib 2.2.3.
+- Restored the compiled Domain tab listener, panel and transitive UI classes that were present in
+  the official AoTD archive but missing from the fork JAR. This fixes the fatal
+  `NoClassDefFoundError: DomainTabListener` during campaign load.
+- AshLib 2.2.3's command-tab tracker no longer initializes custom
+  strategic-view plugins twice.
+- Made Domain/Economy panel sizing tolerate a temporarily unavailable replacement button and fall
+  back to the host component width instead of dereferencing `null`.
+- Added release-time checks for the Domain listener/panel bytecode and the AshLib 2.2.3 dependency.
+
 ## 1.0.14-spp7 - 2026-08-03
 
 - Restored standard economy semantics: `AoTDEconomy.nextStep(...)`, `doubleStep()`, `tripleStep()`

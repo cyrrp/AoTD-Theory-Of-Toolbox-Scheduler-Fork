@@ -2,7 +2,6 @@ package data.kaysaar.aotd.tot.ui.core;
 
 import ashlib.data.plugins.coreui.CommandTabListener;
 import ashlib.data.plugins.coreui.CommandUIPlugin;
-import com.fs.starfarer.api.Global;
 import com.fs.starfarer.api.ui.Alignment;
 import com.fs.starfarer.api.ui.ButtonAPI;
 import com.fs.starfarer.api.ui.TooltipMakerAPI;
@@ -12,7 +11,6 @@ import org.lwjgl.input.Keyboard;
 
 import java.awt.*;
 
-import static ashlib.data.plugins.coreui.CommandTabTracker.tryToGetButtonProd;
 import static data.kaysaar.aotd.tot.ui.core.EconomyTabListener.HEIGHT;
 import static data.kaysaar.aotd.tot.ui.core.EconomyTabListener.WIDTH;
 
@@ -72,12 +70,7 @@ public class DomainTabListener implements CommandTabListener {
 
     @Override
     public void performRecalculations(UIComponentAPI uiComponentAPI) {
-        ButtonAPI button = tryToGetButtonProd("domain");
-        if(button==null){
-            button = tryToGetButtonProd("colonies");
-        }
-        WIDTH = Global.getSettings().getScreenWidth() - button.getPosition().getX();
-        HEIGHT = uiComponentAPI.getPosition().getHeight();
+        EconomyTabListener.recalculatePanelSize(uiComponentAPI);
     }
 
     @Override
