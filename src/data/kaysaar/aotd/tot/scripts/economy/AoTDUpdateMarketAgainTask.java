@@ -114,20 +114,21 @@ public class AoTDUpdateMarketAgainTask extends UpdateMarketsAgainTask {
 
         int reconciled = 0;
         for (Industry industry : industries) {
-            if (!data.needsReconciliation(industry.getId())) continue;
+            String industryId = industry.getId();
+            if (!data.needsReconciliation(industryId)) continue;
 
             try (AoTDEconomySemanticBaseline.Scope ignored =
                          AoTDEconomySemanticBaseline.beginMarketMutation(
-                                 "update-market-again.reconcile-industry", market,
-                                 industry.getId())) {
-                if (data.isPending(industry.getId())) {
+                                  "update-market-again.reconcile-industry", market,
+                                  industryId)) {
+                if (data.isPending(industryId)) {
                     AoTDEconomySemanticBaseline.operation("industry.pending-suppression", market);
                     applyPendingIndustrySuppression(industry);
                 } else {
                     AoTDEconomySemanticBaseline.operation("industry.restore-active", market);
                     restoreIndustry(industry);
                 }
-                data.markReconciled(industry.getId());
+                data.markReconciled(industryId);
                 reconciled++;
             }
         }
@@ -169,9 +170,9 @@ public class AoTDUpdateMarketAgainTask extends UpdateMarketsAgainTask {
         industry.getDemandReductionFromOther().modifyFlat(
                 AoTDIndustryData.source, getReduction(), INITIAL_STAGE_DESC);
 
-        AoTDEconomySemanticBaseline.operation("industry.apply.pending", industry.getMarket());
+        AoTDEconomySemanticBaseline.operation("industry.apply.pending", 1L);
         industry.apply();
-        AoTDEconomySemanticBaseline.operation("industry.unapply.pending", industry.getMarket());
+        AoTDEconomySemanticBaseline.operation("industry.unapply.pending", 1L);
         industry.unapply();
     }
 
@@ -179,9 +180,9 @@ public class AoTDUpdateMarketAgainTask extends UpdateMarketsAgainTask {
         industry.getSupplyBonusFromOther().unmodifyFlat(AoTDIndustryData.source);
         industry.getDemandReductionFromOther().unmodifyFlat(AoTDIndustryData.source);
 
-        AoTDEconomySemanticBaseline.operation("industry.unapply.active", industry.getMarket());
+        AoTDEconomySemanticBaseline.operation("industry.unapply.active", 1L);
         industry.unapply();
-        AoTDEconomySemanticBaseline.operation("industry.apply.active", industry.getMarket());
+        AoTDEconomySemanticBaseline.operation("industry.apply.active", 1L);
         industry.apply();
     }
 

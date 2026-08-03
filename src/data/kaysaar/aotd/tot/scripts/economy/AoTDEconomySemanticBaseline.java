@@ -8,7 +8,6 @@ import data.kaysaar.aotd.tot.scripts.commoditydata.AoTDCommodityOnMarket;
 import data.kaysaar.aotd.tot.scripts.trade.manager.AoTDTradeManager;
 import data.kaysaar.aotd.tot.scripts.trade.models.AoTDFactionTradeData;
 import data.kaysaar.aotd.tot.scripts.trade.models.AoTDMarketData;
-import org.apache.log4j.Logger;
 
 import java.lang.management.ManagementFactory;
 import java.nio.charset.StandardCharsets;
@@ -48,7 +47,6 @@ public final class AoTDEconomySemanticBaseline {
     public static final String SETTING_EVENT_LIMIT = "aotd_semantic_baseline_event_limit";
     public static final String SETTING_DIFF_LIMIT = "aotd_semantic_baseline_diff_limit";
 
-    private static final Logger LOG = Global.getLogger(AoTDEconomySemanticBaseline.class);
     private static final Object LOCK = new Object();
     private static final AtomicLong SEQUENCE = new AtomicLong();
     private static final DateTimeFormatter SESSION_TIME = DateTimeFormatter
@@ -80,52 +78,66 @@ public final class AoTDEconomySemanticBaseline {
     private static long droppedDiffs;
 
     public static void initialize() {
-        synchronized (LOCK) {
-            if (initialized) return;
-            initialized = true;
-            enabled = readBoolean(SETTING_ENABLED, false);
-            deepSnapshots = enabled && readBoolean(SETTING_DEEP, true);
-            marketSampleLimit = readPositiveInt(SETTING_MARKET_LIMIT, marketSampleLimit);
-            eventLimit = readPositiveInt(SETTING_EVENT_LIMIT, eventLimit);
-            diffLimit = readPositiveInt(SETTING_DIFF_LIMIT, diffLimit);
-            sessionStartedNanos = System.nanoTime();
-            sessionStartedUtc = Instant.now().toString();
-            if (!enabled) return;
+        try {
+            synchronized (LOCK) {
+                if (initialized) return;
+                initialized = true;
+                enabled = readBoolean(SETTING_ENABLED, false);
+                deepSnapshots = enabled && readBoolean(SETTING_DEEP, true);
+                marketSampleLimit = readPositiveInt(SETTING_MARKET_LIMIT, marketSampleLimit);
+                eventLimit = readPositiveInt(SETTING_EVENT_LIMIT, eventLimit);
+                diffLimit = readPositiveInt(SETTING_DIFF_LIMIT, diffLimit);
+                sessionStartedNanos = System.nanoTime();
+                sessionStartedUtc = Instant.now().toString();
+                if (!enabled) return;
 
-            try {
                 String root = Global.getSettings().getModManager().getModSpec(MOD_ID).getPath();
                 sessionDirectory = Path.of(root, "logs", "semantic-baseline",
                         "session-" + SESSION_TIME.format(Instant.now()));
                 Files.createDirectories(sessionDirectory);
-                LOG.info("AoTD semantic baseline enabled: " + sessionDirectory);
-            } catch (Throwable failure) {
-                enabled = false;
-                LOG.error("Could not initialize AoTD semantic baseline", failure);
+                logInfoBestEffort("AoTD semantic baseline enabled: " + sessionDirectory);
             }
+        } catch (Throwable failure) {
+            disableBestEffort();
+            logErrorBestEffort("Could not initialize AoTD semantic baseline", failure);
         }
     }
 
     public static boolean isEnabled() {
-        if (!initialized) initialize();
-        return enabled;
+        try {
+            if (!initialized) initialize();
+            return enabled;
+        } catch (Throwable ignored) {
+            disableBestEffort();
+            return false;
+        }
     }
 
     public static long beginEconomyRevision(String reason) {
-        if (!isEnabled()) return 0L;
-        long revision;
-        synchronized (LOCK) {
-            revision = ++economyRevision;
+        try {
+            if (!isEnabled()) return 0L;
+            long revision;
+            synchronized (LOCK) {
+                revision = ++economyRevision;
+            }
+            operation("economy.revision.begin", null);
+            event("economy-revision", null, reason, 0L, 0L, "BEGIN", revision);
+            return revision;
+        } catch (Throwable ignored) {
+            disableBestEffort();
+            return 0L;
         }
-        operation("economy.revision.begin", null);
-        event("economy-revision", null, reason, 0L, 0L, "BEGIN", revision);
-        return revision;
     }
 
     public static void endEconomyRevision(long revision, String reason) {
-        if (!isEnabled() || revision <= 0L) return;
-        operation("economy.revision.end", null);
-        event("economy-revision", null, reason, 0L, 0L, "END", revision);
-        flush("economy-revision-" + revision + '-' + safeName(reason));
+        try {
+            if (!isEnabled() || revision <= 0L) return;
+            operation("economy.revision.end", null);
+            event("economy-revision", null, reason, 0L, 0L, "END", revision);
+            flush("economy-revision-" + revision + '-' + safeName(reason));
+        } catch (Throwable ignored) {
+            disableBestEffort();
+        }
     }
 
     public static Scope begin(String phase) {
@@ -145,31 +157,45 @@ public final class AoTDEconomySemanticBaseline {
     }
 
     private static Scope begin(String phase, MarketAPI market, String detail, boolean snapshot) {
-        if (!isEnabled()) return Scope.NOOP;
-        MarketSnapshot before = snapshot && shouldSample(market)
-                ? MarketSnapshot.capture(market) : null;
-        return new Scope(phase, marketId(market), detail, System.nanoTime(), allocatedBytes(), before);
+        try {
+            if (!isEnabled()) return Scope.NOOP;
+            MarketSnapshot before = snapshot && shouldSample(market)
+                    ? MarketSnapshot.capture(market) : null;
+            return new Scope(phase, marketId(market), detail,
+                    System.nanoTime(), allocatedBytes(), before);
+        } catch (Throwable ignored) {
+            disableBestEffort();
+            return Scope.NOOP;
+        }
     }
 
     public static void operation(String operation, MarketAPI market) {
-        if (!isEnabled()) return;
-        String key = operation + (market == null ? "" : "|market");
-        synchronized (LOCK) {
-            OPERATIONS.put(key, OPERATIONS.getOrDefault(key, 0L) + 1L);
+        try {
+            if (!isEnabled()) return;
+            String key = operation + (market == null ? "" : "|market");
+            synchronized (LOCK) {
+                OPERATIONS.put(key, OPERATIONS.getOrDefault(key, 0L) + 1L);
+            }
+        } catch (Throwable ignored) {
+            disableBestEffort();
         }
     }
 
     public static void operation(String operation, long count) {
-        if (!isEnabled() || count <= 0L) return;
-        synchronized (LOCK) {
-            OPERATIONS.put(operation, OPERATIONS.getOrDefault(operation, 0L) + count);
+        try {
+            if (!isEnabled() || count <= 0L) return;
+            synchronized (LOCK) {
+                OPERATIONS.put(operation, OPERATIONS.getOrDefault(operation, 0L) + count);
+            }
+        } catch (Throwable ignored) {
+            disableBestEffort();
         }
     }
 
     /** Captures the AoTD-owned trade snapshot after it is published for a market. */
     public static void captureTradeSnapshot(String phase, MarketAPI market) {
-        if (!isEnabled() || market == null || !shouldSample(market)) return;
         try {
+            if (!isEnabled() || market == null || !shouldSample(market)) return;
             AoTDTradeManager manager = AoTDTradeManager.getInstance();
             AoTDFactionTradeData faction = manager == null
                     ? null : manager.getFactionTradeData(market.getFactionId());
@@ -211,34 +237,34 @@ public final class AoTDEconomySemanticBaseline {
                     }
                 }
             }
-        } catch (Throwable failure) {
-            operation("trade-snapshot.capture-failure", market);
+        } catch (Throwable ignored) {
+            disableBestEffort();
         }
     }
 
     public static void flush(String reason) {
-        if (!isEnabled()) return;
-        Path directory = sessionDirectory;
-        if (directory == null) return;
-
-        String summary;
-        String operations;
-        String events;
-        String snapshots;
-        String diffs;
-        String tradeSnapshots;
-        String metadata;
-        synchronized (LOCK) {
-            summary = phaseSummaryCsv();
-            operations = operationsCsv();
-            events = eventsCsv();
-            snapshots = snapshotsCsv();
-            diffs = diffsCsv();
-            tradeSnapshots = tradeSnapshotsCsv();
-            metadata = metadataJson(reason);
-        }
-
         try {
+            if (!isEnabled()) return;
+            Path directory = sessionDirectory;
+            if (directory == null) return;
+
+            String summary;
+            String operations;
+            String events;
+            String snapshots;
+            String diffs;
+            String tradeSnapshots;
+            String metadata;
+            synchronized (LOCK) {
+                summary = phaseSummaryCsv();
+                operations = operationsCsv();
+                events = eventsCsv();
+                snapshots = snapshotsCsv();
+                diffs = diffsCsv();
+                tradeSnapshots = tradeSnapshotsCsv();
+                metadata = metadataJson(reason);
+            }
+
             write(directory.resolve("phase-summary.csv"), summary);
             write(directory.resolve("operation-counts.csv"), operations);
             write(directory.resolve("phase-events.csv"), events);
@@ -247,7 +273,8 @@ public final class AoTDEconomySemanticBaseline {
             write(directory.resolve("trade-snapshots.csv"), tradeSnapshots);
             write(directory.resolve("session.json"), metadata);
         } catch (Throwable failure) {
-            LOG.error("Could not flush AoTD semantic baseline", failure);
+            disableBestEffort();
+            logErrorBestEffort("Could not flush AoTD semantic baseline", failure);
         }
     }
 
@@ -453,6 +480,32 @@ public final class AoTDEconomySemanticBaseline {
                 StandardOpenOption.WRITE);
     }
 
+    private static void disableBestEffort() {
+        try {
+            enabled = false;
+            initialized = true;
+            deepSnapshots = false;
+        } catch (Throwable ignored) {
+            // Diagnostic state has no semantic authority.
+        }
+    }
+
+    private static void logInfoBestEffort(String message) {
+        try {
+            Global.getLogger(AoTDEconomySemanticBaseline.class).info(message);
+        } catch (Throwable ignored) {
+            // Logging is part of the optional diagnostic surface.
+        }
+    }
+
+    private static void logErrorBestEffort(String message, Throwable failure) {
+        try {
+            Global.getLogger(AoTDEconomySemanticBaseline.class).error(message, failure);
+        } catch (Throwable ignored) {
+            // Logging is part of the optional diagnostic surface.
+        }
+    }
+
     private static boolean readBoolean(String key, boolean fallback) {
         try {
             return Global.getSettings().getBoolean(key);
@@ -582,7 +635,11 @@ public final class AoTDEconomySemanticBaseline {
         public void close() {
             if (closed) return;
             closed = true;
-            finish(this);
+            try {
+                finish(this);
+            } catch (Throwable ignored) {
+                disableBestEffort();
+            }
         }
     }
 

@@ -258,20 +258,80 @@ public class AoTDEconomy extends Economy {
         return MarketRegistry.lookupMarket(market.getId()) == market;
     }
 
-    private void runUiMarketRefresh(
+    private boolean runUiMarketRefresh(
             MarketAPI market, MainWorkTask.EconWorkParams params,
-            String reason, boolean allowCoalescing) {
-        AoTDUIEconomyRefreshCoordinator coordinator = uiRefreshCoordinator();
+            String reason, boolean allowCoalescing,
+            String completionDiagnostic, long completionDetail) {
+        AoTDUIEconomyRefreshCoordinator coordinator = prepareUiRefreshCoordinator();
         if (allowCoalescing && coordinator.isCurrent(market)) {
-            coordinator.recordSkip();
-            AoTDEconomySemanticBaseline.operation("ui-economy.refresh-coalesced", market);
-            return;
+            return recordUiRefreshSkipNoThrow(coordinator);
         }
 
         ((Market) market).updatePrevStability();
         getReachEconomy().nextStepForUiMarket(params, market, reason);
-        coordinator.recordCompleted(market);
-        AoTDEconomySemanticBaseline.operation("ui-economy.refresh-completed", market);
+        return recordUiRefreshCompletedNoThrow(
+                coordinator, market, completionDiagnostic, completionDetail);
+    }
+
+    private AoTDUIEconomyRefreshCoordinator prepareUiRefreshCoordinator() {
+        // Force optional baseline class initialization before semantic work. If
+        // class initialization itself fails, the dispatcher still owns no commit
+        // and Prepatcher may safely execute its preserved global fallback.
+        AoTDEconomySemanticBaseline.isEnabled();
+        return uiRefreshCoordinator();
+    }
+
+    private static boolean recordUiRefreshCompletedNoThrow(
+            AoTDUIEconomyRefreshCoordinator coordinator, MarketAPI market,
+            String diagnostic, long detail) {
+        try {
+            coordinator.recordCompleted(market);
+            if (diagnostic == null) {
+                AoTDEconomySemanticBaseline.operation(
+                        "ui-economy.refresh-completed", market);
+            } else {
+                AoTDEconomySemanticBaseline.operation(diagnostic, detail);
+            }
+        } catch (Throwable ignored) {
+            // The semantic local refresh has already committed.
+        }
+        return true;
+    }
+
+    private static boolean recordUiRefreshSkipNoThrow(
+            AoTDUIEconomyRefreshCoordinator coordinator) {
+        try {
+            coordinator.recordSkip();
+            AoTDEconomySemanticBaseline.operation(
+                    "ui-economy.refresh-coalesced", 1L);
+        } catch (Throwable ignored) {
+            // Coalescing was already proven before this diagnostic counter.
+        }
+        return true;
+    }
+
+    private static boolean recordConditionOnlySkipNoThrow(
+            AoTDUIEconomyRefreshCoordinator coordinator) {
+        try {
+            coordinator.recordConditionOnlySkip();
+            AoTDEconomySemanticBaseline.operation(
+                    "ui-economy.condition-only-global-step-skipped", 1L);
+        } catch (Throwable ignored) {
+            // The condition-only action was already accepted.
+        }
+        return true;
+    }
+
+    private static boolean recordSyntheticCargoSkipNoThrow(
+            AoTDUIEconomyRefreshCoordinator coordinator) {
+        try {
+            coordinator.recordSyntheticCargoSkip();
+            AoTDEconomySemanticBaseline.operation(
+                    "ui-economy.synthetic-cargo-global-step-skipped", 1L);
+        } catch (Throwable ignored) {
+            // The synthetic-Cargo action was already accepted.
+        }
+        return true;
     }
 
     public String getUiRefreshStatusSummary() {
@@ -376,32 +436,24 @@ public class AoTDEconomy extends Economy {
             if (detail != 0L || !hasNoCommodityIds(affectedCommodityIds)) return false;
             if (market != null && market.isPlanetConditionMarketOnly()) {
                 if (!isConditionOnlyOpeningMarket(market)) return false;
-                uiRefreshCoordinator().recordConditionOnlySkip();
-                AoTDEconomySemanticBaseline.operation(
-                        "ui-economy.condition-only-global-step-skipped", 1L);
-                return true;
+                return recordConditionOnlySkipNoThrow(uiRefreshCoordinator());
             }
             if (!isLiveMarket(market)) return false;
-            runUiMarketRefresh(market, normalizeWorkParams(null),
-                    "open-market", true);
-            return true;
+            return runUiMarketRefresh(market, normalizeWorkParams(null),
+                    "open-market", true, null, 0L);
         }
         if (action == PrepatcherContract.UI_ECONOMY_ACTION_CARGO) {
             if (!hasNoCommodityIds(affectedCommodityIds)) return false;
             if (detail == PrepatcherContract.UI_ECONOMY_CARGO_SYNTHETIC) {
                 if (market != null) return false;
-                uiRefreshCoordinator().recordSyntheticCargoSkip();
-                AoTDEconomySemanticBaseline.operation(
-                        "ui-economy.synthetic-cargo-global-step-skipped", 1L);
-                return true;
+                return recordSyntheticCargoSkipNoThrow(uiRefreshCoordinator());
             }
             if (detail != PrepatcherContract.UI_ECONOMY_CARGO_LIVE_MARKET
                     || !isLiveMarket(market)) {
                 return false;
             }
-            runUiMarketRefresh(market, normalizeWorkParams(null),
-                    "cargo", true);
-            return true;
+            return runUiMarketRefresh(market, normalizeWorkParams(null),
+                    "cargo", true, null, 0L);
         }
         if (action != PrepatcherContract.UI_ECONOMY_ACTION_MARKET_MUTATION) {
             return false;
@@ -430,6 +482,7 @@ public class AoTDEconomy extends Economy {
             return false;
         }
 
+        AoTDUIEconomyRefreshCoordinator coordinator = prepareUiRefreshCoordinator();
         MarketRegistry.markDirty(market, dirtyMaskForUiMutationScope(scope),
                 MarketRegistry.PRIORITY_IMMEDIATE);
 
@@ -438,19 +491,16 @@ public class AoTDEconomy extends Economy {
             getReachEconomy().nextStepForUiMarketMutation(
                     normalizeWorkParams(null), market, affected, scope,
                     "mutation-reason-0x" + Integer.toHexString(reason));
-            uiRefreshCoordinator().recordCompleted(market);
-            AoTDEconomySemanticBaseline.operation(
+            return recordUiRefreshCompletedNoThrow(
+                    coordinator, market,
                     "ui-economy.mutation-targeted-commodities",
                     ((long) reason << 32) | (scope & 0xffffffffL));
-            return true;
         }
 
-        runUiMarketRefresh(market, normalizeWorkParams(null),
-                "mutation-reason-0x" + Integer.toHexString(reason), false);
-        AoTDEconomySemanticBaseline.operation(
+        return runUiMarketRefresh(market, normalizeWorkParams(null),
+                "mutation-reason-0x" + Integer.toHexString(reason), false,
                 "ui-economy.mutation-reason-localized",
                 ((long) reason << 32) | (scope & 0xffffffffL));
-        return true;
     }
 
     private static boolean hasNoCommodityIds(String[] commodityIds) {

@@ -83,7 +83,6 @@ public class AoTDFinishEconomyUpdateTask extends FinishEconomyUpdateTask {
                 false, epochStamp);
         batch = boundary.cut.internalTradeBatch;
         AoTDEconomySemanticBaseline.operation("global-cut.open", 1L);
-        AoTDEconomySemanticBaseline.operation("internal-trade.factions", batch.size());
     }
 
     /** Infrastructure failure retries the same pure DTO algorithm sequentially. */

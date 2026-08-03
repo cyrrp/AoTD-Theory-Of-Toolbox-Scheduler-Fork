@@ -119,8 +119,8 @@ public class AoTDTradeManager {
         AoTDMarketData candidate;
         try (AoTDEconomySemanticBaseline.Scope ignored =
                      AoTDEconomySemanticBaseline.begin(
-                             "trade-manager.capture-post-immigration", market,
-                             market.getFactionId())) {
+                              "trade-manager.capture-post-immigration", market,
+                              "post-immigration")) {
             candidate = AoTDMarketData.capturePostImmigration(market);
         } catch (RuntimeException failure) {
             return PreparedSnapshot.failed(market.getId(), failure.toString());
@@ -229,8 +229,8 @@ public class AoTDTradeManager {
         if (market == null) return;
         try (AoTDEconomySemanticBaseline.Scope ignored =
                      AoTDEconomySemanticBaseline.begin(
-                             "trade-manager.build-market-snapshot", market,
-                             market.getFactionId())) {
+                              "trade-manager.build-market-snapshot", market,
+                              "build")) {
             AoTDMarketData snapshot = new AoTDMarketData(market);
             synchronized (this) {
                 ensureTransientState();

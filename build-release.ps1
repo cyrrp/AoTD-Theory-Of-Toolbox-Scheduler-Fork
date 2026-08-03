@@ -1,6 +1,6 @@
 $ErrorActionPreference = "Stop"
 
-$releaseLabel = "1.0.14-spp8"
+$releaseLabel = "1.0.14-spp9"
 $packageDirectoryName = "AoTD-Theory-Of-Toolbox-Scheduler-Fork"
 $repositoryRoot = [IO.Path]::GetFullPath($PSScriptRoot)
 $releaseDirectory = Join-Path $repositoryRoot "releases"
@@ -8,7 +8,7 @@ $archiveName = "$packageDirectoryName-$releaseLabel.zip"
 $archivePath = Join-Path $releaseDirectory $archiveName
 $externalChecksumPath = "$archivePath.sha256"
 $utf8NoBom = [Text.UTF8Encoding]::new($false)
-$releaseTimestamp = [DateTimeOffset]::new(2026, 8, 3, 0, 0, 0, [TimeSpan]::Zero)
+$releaseTimestamp = [DateTimeOffset]::new(2026, 8, 4, 0, 0, 0, [TimeSpan]::Zero)
 
 if ($releaseLabel -cnotmatch '^\d+\.\d+\.\d+-spp\d+$') {
     throw "Fork release label must use {upstream-version}-spp{patch}: $releaseLabel"
@@ -25,8 +25,8 @@ if ($ashlibDependency.Count -ne 1 -or $ashlibDependency[0].version -cne '2.2.3')
     throw "The Domain UI hotfix requires exactly one AshLib dependency at minimum version 2.2.3."
 }
 $prepatcherDependency = @($modInfo.dependencies | Where-Object { $_.id -ceq 'starsector_prepatcher' })
-if ($prepatcherDependency.Count -ne 1 -or $prepatcherDependency[0].version -cne '0.17.1') {
-    throw "Scheduler Fork 1.0.14-spp8 requires exactly one Prepatcher dependency at version 0.17.1."
+if ($prepatcherDependency.Count -ne 1 -or $prepatcherDependency[0].version -cne '0.17.2') {
+    throw "Scheduler Fork 1.0.14-spp9 requires exactly one Prepatcher dependency at version 0.17.2."
 }
 if ($updateInfo.directDownloadURL -notlike "*/$archiveName") {
     throw "Fork update URL does not end in the canonical archive name: $archiveName"
@@ -91,7 +91,7 @@ $requiredJarEntries = @(
 )
 $requiredJarSymbols = @{
     'data/kaysaar/aotd/tot/compat/PrepatcherContract.class' = @(
-        '1.0.14-spp8'
+        '1.0.14-spp9'
     )
     'data/kaysaar/aotd/tot/compat/SchedulerBridge.class' = @(
         'AOTD_SCHEDULER_BRIDGE_V9'

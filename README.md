@@ -1,9 +1,9 @@
 # Ashes of The Domain — Theory of Toolbox: Scheduler Fork
 
 Scheduler-focused fork of **AoTD — Theory of Toolbox** for Starsector
-`0.98a-RC8`. The current Scheduler Fork release is `1.0.14-spp8`.
+`0.98a-RC8`. The current Scheduler Fork release is `1.0.14-spp9`.
 The mod metadata, release archive, bridge contract, and update manifest all use
-the canonical `1.0.14-spp8` fork release identifier.
+the canonical `1.0.14-spp9` fork release identifier.
 
 The fork keeps the original game `starfarer.api.jar`; it does not require or
 ship an AoTD replacement for any Starsector core JAR.
@@ -38,7 +38,7 @@ The runtime dependencies declared by `mod_info.json` are:
 
 | Mod | Minimum version |
 | --- | --- |
-| StarsectorPrepatcher | 0.17.1 |
+| StarsectorPrepatcher | 0.17.2 |
 | LazyLib | 3.0 |
 | AshLib | 2.2.3 |
 | Building Menu Overhaul | 2.1.0 |
@@ -143,7 +143,7 @@ construction queue, custom providers, unknown actions and missing capability/bar
 `false` and retain the original global virtual step. No second scheduler, per-commodity revision
 vector, persistent market reference, or static reflection/classloader cache is added.
 
-Only the exact `1.0.14-spp8` contract registers. The bridge declares the exact current mask
+Only the exact `1.0.14-spp9` contract registers. The bridge declares the exact current mask
 `0x7ff`; older, future and partially declared fork revisions are logged and rejected as a whole
 instead of receiving partial or implicit UI semantics. Optional Prepatcher switches may omit bit
 10, but never the required dispatcher bit, so an exact current fork still receives `0x3ff` in the

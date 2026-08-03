@@ -94,7 +94,7 @@ public class AoTDEconomyReachStepper extends ReachEconomyStepper {
              AoTDEconomySemanticBaseline.Scope ignored =
                      AoTDEconomySemanticBaseline.begin(
                              "economy.month-end-preparation", null,
-                             "previous-month=" + prevMonth)) {
+                             "month-end")) {
         SectorSurplusConsumptionStats.getInstance().clear();
 
         for (AoTDFactionTradeData tradeData : AoTDTradeManager.getInstance().getAllFactionTradeData().values()) {
@@ -212,7 +212,7 @@ public class AoTDEconomyReachStepper extends ReachEconomyStepper {
                 if (baselineRevision > 0L) {
                     AoTDEconomySemanticBaseline.endEconomyRevision(
                             baselineRevision,
-                            "iteration-" + (Economy.NUM_ITER_PER_MONTH - iterLeft - 1));
+                            "iteration-complete");
                     baselineRevision = 0L;
                 }
                 state = ReachEconomyStepper.State.WAITING;
@@ -223,7 +223,7 @@ public class AoTDEconomyReachStepper extends ReachEconomyStepper {
     private void createTasks() {
         tasks = new ArrayList<>();
         baselineRevision = AoTDEconomySemanticBaseline.beginEconomyRevision(
-                "reach-stepper-iteration-" + (Economy.NUM_ITER_PER_MONTH - iterLeft));
+                "reach-stepper-iteration");
         final boolean iterationsDone = iterLeft <= 0 || monthEndRefreshPending;
         final MainWorkTask.EconWorkParams mainWork = new MainWorkTask.EconWorkParams();
         mainWork.withIncomeAndUpkeep = true;

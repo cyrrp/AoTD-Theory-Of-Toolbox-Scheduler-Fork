@@ -544,7 +544,7 @@ public class AoTdMainWorkTask2 extends MainWorkTask2 {
         try (AoTDEconomySemanticBaseline.Scope ignored =
                      AoTDEconomySemanticBaseline.begin(
                              "main-work.wait-for-price-workers", null,
-                             "futures=" + mtFutures.size())) {
+                             "price-workers")) {
             for (Future<?> future : mtFutures) {
                 if (future == null) continue;
                 try {
@@ -774,18 +774,20 @@ public class AoTdMainWorkTask2 extends MainWorkTask2 {
             throw failure;
         }
 
+        final int preparedCount = prepared.size();
+
         // These commits are reference swaps plus scalar assignments; there is no
         // industry calculation or external callback between commodity commits.
-        for (int i = 0; i < prepared.size(); i++) {
+        for (int i = 0; i < preparedCount; i++) {
             owners.get(i).commitPreparedRefresh(prepared.get(i));
         }
-        for (int i = 0; i < prepared.size(); i++) {
+        for (int i = 0; i < preparedCount; i++) {
             owners.get(i).finishPreparedRefresh(prepared.get(i));
         }
         AoTDEconomySemanticBaseline.operation(
                 "supply-demand.market-atomic-commit", market);
         AoTDEconomySemanticBaseline.operation(
-                "supply-demand.market-commodities", prepared.size());
+                "supply-demand.market-commodities", preparedCount);
     }
 
     private LinkedHashSet<String> collectDemandClasses() {
@@ -1140,7 +1142,7 @@ public class AoTdMainWorkTask2 extends MainWorkTask2 {
         try (AoTDEconomySemanticBaseline.Scope ignored =
                      AoTDEconomySemanticBaseline.begin(
                              "main-work.notify-all-commodity-listeners", null,
-                             "commodities=" + commodityIds.size())) {
+                             "commodity-batch")) {
             List<EconomyAPI.EconomyUpdateListener> listeners =
                     new ArrayList<>(Global.getSector().getEconomy().getUpdateListeners());
 

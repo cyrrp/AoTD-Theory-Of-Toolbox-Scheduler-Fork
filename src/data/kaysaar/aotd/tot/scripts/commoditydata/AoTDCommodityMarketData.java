@@ -21,7 +21,7 @@ public class AoTDCommodityMarketData extends CommodityMarketData {
         try (AoTDEconomySemanticBaseline.Scope ignored =
                      AoTDEconomySemanticBaseline.begin(
                              "commodity-market-data.constructor", null,
-                             commodityId + "|" + (econGroup == null ? "<global>" : econGroup))) {
+                             commodityId)) {
         Iterator iter = Global.getSector().getEconomy().getMarketsInGroup(econGroup).iterator();
         while (iter.hasNext()) {
             Market market = (Market) iter.next();

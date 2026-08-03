@@ -2,6 +2,17 @@
 
 All notable changes to the Scheduler Fork are documented here.
 
+## 1.0.14-spp9 - 2026-08-04
+
+- Requires StarsectorPrepatcher 0.17.2 and continues to require AshLib 2.2.3.
+- Made post-commit UI economy diagnostics fail-silent: coordinator publication and semantic
+  baseline failures can no longer make an already committed local refresh report failure and
+  trigger a duplicate global fallback.
+- Hardened optional semantic-baseline and refresh diagnostics across economy worker paths so
+  logger, snapshot, counter and flush failures have no semantic authority.
+- Kept Scheduler Bridge schema V9 and capability masks `0x3ff`/`0x7ff` unchanged; only the exact
+  `1.0.14-spp9` contract registers.
+
 ## 1.0.14-spp8 - 2026-08-03
 
 - Requires StarsectorPrepatcher 0.17.1 and AshLib 2.2.3.
