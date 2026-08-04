@@ -3,12 +3,11 @@ package data.kaysaar.aotd.tot.produciton.models;
 import com.fs.starfarer.api.Global;
 import com.fs.starfarer.api.combat.WeaponAPI;
 import com.fs.starfarer.api.loading.WeaponSpecAPI;
+import java.io.IOException;
+import java.util.ArrayList;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
-
-import java.io.IOException;
-import java.util.ArrayList;
 
 public class AoTDProductionManData {
     String manufacturerId;
@@ -47,10 +46,12 @@ public class AoTDProductionManData {
     int ac_wp_large;
     int ac_fighter_max;
 
-    public static ArrayList<AoTDProductionManData>getManufacturerDataFromCSV(){
-        ArrayList<AoTDProductionManData>data = new ArrayList<>();
+    public static ArrayList<AoTDProductionManData> getManufacturerDataFromCSV() {
+        ArrayList<AoTDProductionManData> data = new ArrayList<>();
         try {
-            JSONArray csvFile = Global.getSettings().loadCSV("data/campaign/aotd_production_manufacturer_data.csv");
+            JSONArray csvFile =
+                    Global.getSettings()
+                            .loadCSV("data/campaign/aotd_production_manufacturer_data.csv");
             for (int i = 0; i < csvFile.length(); i++) {
                 JSONObject entry = csvFile.getJSONObject(i);
                 String manId = entry.getString("man_id");
@@ -67,7 +68,6 @@ public class AoTDProductionManData {
                 daten.setAc_wp_medium(ac_wp_medium);
                 daten.setAc_wp_large(ac_wp_large);
                 data.add(daten);
-
             }
         } catch (IOException e) {
             throw new RuntimeException(e);
@@ -76,21 +76,23 @@ public class AoTDProductionManData {
         }
         return data;
     }
-    public  int getMaxACCostForShip(){
+
+    public int getMaxACCostForShip() {
         return ac_ship_max;
     }
-    public int getMaxAcCostForWeapon(WeaponSpecAPI specAPI){
-        if(specAPI.getSize().equals(WeaponAPI.WeaponSize.SMALL)){
+
+    public int getMaxAcCostForWeapon(WeaponSpecAPI specAPI) {
+        if (specAPI.getSize().equals(WeaponAPI.WeaponSize.SMALL)) {
             return ac_wp_small;
 
         } else if (specAPI.getSize().equals(WeaponAPI.WeaponSize.MEDIUM)) {
             return ac_wp_medium;
-        }
-        else{
+        } else {
             return ac_wp_large;
         }
     }
-    public  int getMaxACCostForFighter(){
+
+    public int getMaxACCostForFighter() {
         return ac_fighter_max;
     }
 }

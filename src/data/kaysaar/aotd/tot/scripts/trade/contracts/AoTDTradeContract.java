@@ -5,7 +5,6 @@ import ashlib.data.plugins.misc.AshMisc;
 import com.fs.starfarer.api.Global;
 import com.fs.starfarer.api.campaign.FactionAPI;
 import com.fs.starfarer.api.characters.PersonAPI;
-import com.fs.starfarer.api.impl.campaign.econ.impl.BaseIndustry;
 import com.fs.starfarer.api.impl.campaign.ids.Factions;
 import com.fs.starfarer.api.ui.TooltipMakerAPI;
 import com.fs.starfarer.api.util.Misc;
@@ -13,19 +12,15 @@ import com.fs.starfarer.api.util.Pair;
 import data.kaysaar.aotd.tot.misc.AoTDToolboxMisc;
 import data.kaysaar.aotd.tot.scripts.economy.AoTDSectorProductionDemandDataUtils;
 import data.kaysaar.aotd.tot.scripts.trade.contracts.rewards.TradeContractRewardDataAPI;
-import data.kaysaar.aotd.tot.scripts.trade.contracts.rewards.creators.AoTDContractRewardCreatorManager;
 import data.kaysaar.aotd.tot.scripts.trade.contracts.rewards.creators.AoTDPlayerContractCreatorManager;
 import data.kaysaar.aotd.tot.scripts.trade.contracts.rewards.creators.PlayerContractCreatorAPI;
 import data.kaysaar.aotd.tot.ui.economy.commoditydata.buttons.GraphPeriodChosenButton;
-import data.kaysaar.aotd.tot.ui.economy.tradecontracts.TradeContractDropDownButton;
-
 import java.awt.*;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
 public class AoTDTradeContract implements Cloneable {
-
 
     @Override
     public AoTDTradeContract clone() {
@@ -61,7 +56,6 @@ public class AoTDTradeContract implements Cloneable {
         toCleanUp.forEach(x -> getContractData().remove(x));
     }
 
-
     public static class TradeContractData {
         String commodityId;
         int reqMonthly;
@@ -82,7 +76,12 @@ public class AoTDTradeContract implements Cloneable {
             this.cutFromBasePrice = cutFromBasePrice;
         }
 
-        public TradeContractData(String commodityId, float attemptedAmountToTake, float cutFromBasePrice, String factionId, String contractId) {
+        public TradeContractData(
+                String commodityId,
+                float attemptedAmountToTake,
+                float cutFromBasePrice,
+                String factionId,
+                String contractId) {
             this.commodityId = commodityId;
             this.attemptedAmountToTake = attemptedAmountToTake;
             this.cutFromBasePrice = cutFromBasePrice;
@@ -100,7 +99,12 @@ public class AoTDTradeContract implements Cloneable {
                 return 0;
             }
             if (isProductionPercentageMode) {
-                int total = AoTDSectorProductionDemandDataUtils.getTotalProductionFromFaction(commodityId, factionId) - AoTDSectorProductionDemandDataUtils.getTotalDemandFromFactionBeforeContract(commodityId, factionId, contractId);
+                int total =
+                        AoTDSectorProductionDemandDataUtils.getTotalProductionFromFaction(
+                                        commodityId, factionId)
+                                - AoTDSectorProductionDemandDataUtils
+                                        .getTotalDemandFromFactionBeforeContract(
+                                                commodityId, factionId, contractId);
                 return (int) Math.floor(total * attemptedAmountToTake);
             }
             return reqMonthly;
@@ -153,7 +157,6 @@ public class AoTDTradeContract implements Cloneable {
         return getColorOfContractName().brighter();
     }
 
-
     public void setContractTypeId(String contractTypeId) {
         this.contractTypeId = contractTypeId;
     }
@@ -187,29 +190,50 @@ public class AoTDTradeContract implements Cloneable {
         if (isIssuedByPlayer()) return;
 
         FactionAPI fac = getFaction();
-        boolean isBlackMarket = isPrivate() && fac != null
-                && AoTDTradeContractBrowserCreator.blackMarketFactions.contains(fac.getId());
+        boolean isBlackMarket =
+                isPrivate()
+                        && fac != null
+                        && AoTDTradeContractBrowserCreator.blackMarketFactions.contains(
+                                fac.getId());
         boolean isFactionIssued = !isPrivate();
 
         ArrayList<String> lines = new ArrayList<>();
 
         if (isBlackMarket) {
-            lines.add("You bring me what I ask for, on schedule, and we both walk away satisfied. I don’t need details — just consistency.");
-            lines.add("I’m not interested in paperwork or explanations, only results delivered month after month without interruption.");
-            lines.add("Keep the shipments steady and quiet, and this arrangement will remain profitable for both of us.");
-            lines.add("No delays, no stories — just the agreed volume on time and we won’t have any problems.");
+            lines.add(
+                    "You bring me what I ask for, on schedule, and we both walk away satisfied. I don’t need details — just consistency.");
+            lines.add(
+                    "I’m not interested in paperwork or explanations, only results delivered month after month without interruption.");
+            lines.add(
+                    "Keep the shipments steady and quiet, and this arrangement will remain profitable for both of us.");
+            lines.add(
+                    "No delays, no stories — just the agreed volume on time and we won’t have any problems.");
         } else if (isFactionIssued) {
             String name = fac != null ? fac.getDisplayName() : "The issuing authority";
             name = AoTDToolboxMisc.capitalizeFirst(name);
-            lines.add(name + " has formally issued this procurement contract to ensure stable and predictable supply across its territories.");
-            lines.add("This public trade directive from " + name + " seeks certified suppliers capable of maintaining consistent monthly throughput.");
-            lines.add(name + " posts this standing contract to address ongoing logistical demand and reinforce regional stability.");
-            lines.add("Under regulated trade terms, " + name + " invites reliable partners to fulfill recurring supply obligations.");
+            lines.add(
+                    name
+                            + " has formally issued this procurement contract to ensure stable and predictable supply across its territories.");
+            lines.add(
+                    "This public trade directive from "
+                            + name
+                            + " seeks certified suppliers capable of maintaining consistent monthly throughput.");
+            lines.add(
+                    name
+                            + " posts this standing contract to address ongoing logistical demand and reinforce regional stability.");
+            lines.add(
+                    "Under regulated trade terms, "
+                            + name
+                            + " invites reliable partners to fulfill recurring supply obligations.");
         } else {
-            lines.add("I’m looking for a dependable supplier who can maintain steady deliveries without excuses or last-minute surprises.");
-            lines.add("Meet my quota reliably each month and you’ll have a stable, ongoing business arrangement with me.");
-            lines.add("What I value most is consistency — keep the goods flowing on schedule and we’ll both benefit.");
-            lines.add("If you can handle regular throughput without disruption, this will be a straightforward and profitable deal.");
+            lines.add(
+                    "I’m looking for a dependable supplier who can maintain steady deliveries without excuses or last-minute surprises.");
+            lines.add(
+                    "Meet my quota reliably each month and you’ll have a stable, ongoing business arrangement with me.");
+            lines.add(
+                    "What I value most is consistency — keep the goods flowing on schedule and we’ll both benefit.");
+            lines.add(
+                    "If you can handle regular throughput without disruption, this will be a straightforward and profitable deal.");
         }
 
         if (lines.isEmpty()) return;
@@ -223,7 +247,9 @@ public class AoTDTradeContract implements Cloneable {
     }
 
     public boolean canEditContract() {
-        return isIssuedByPlayer() && AoTDPlayerContractCreatorManager.getCreator(getContractTypeId()).canEditContract();
+        return isIssuedByPlayer()
+                && AoTDPlayerContractCreatorManager.getCreator(getContractTypeId())
+                        .canEditContract();
     }
 
     public boolean canTerminateContract() {
@@ -260,19 +286,26 @@ public class AoTDTradeContract implements Cloneable {
             contractData.remove(commodityId);
 
         } else {
-            contractData.put(commodityId, new TradeContractData(commodityId, reqMonthly, cutFromBasePrice));
-
+            contractData.put(
+                    commodityId, new TradeContractData(commodityId, reqMonthly, cutFromBasePrice));
         }
     }
 
-    public void addContractData(String commodityId, float percentageToTake, float cutFromBasePrice) {
+    public void addContractData(
+            String commodityId, float percentageToTake, float cutFromBasePrice) {
         if (commodityId == null) return;
         if (percentageToTake <= 0) {
             contractData.remove(commodityId);
 
         } else {
-            contractData.put(commodityId, new TradeContractData(commodityId, percentageToTake, cutFromBasePrice, getFactionId(), getId()));
-
+            contractData.put(
+                    commodityId,
+                    new TradeContractData(
+                            commodityId,
+                            percentageToTake,
+                            cutFromBasePrice,
+                            getFactionId(),
+                            getId()));
         }
     }
 
@@ -299,7 +332,8 @@ public class AoTDTradeContract implements Cloneable {
 
     public String getNameOfContract() {
         if (AshMisc.isStringValid(factionId)) {
-            return AoTDToolboxMisc.capitalizeFirst(Global.getSector().getFaction(factionId).getDisplayName());
+            return AoTDToolboxMisc.capitalizeFirst(
+                    Global.getSector().getFaction(factionId).getDisplayName());
         }
         return person.getNameString();
     }
@@ -324,13 +358,14 @@ public class AoTDTradeContract implements Cloneable {
         if (isFrozen) return new Pair<>("Frozen", Misc.getGrayColor());
 
         if (!AoTDToolboxMisc.isContractMetFully(this)) {
-            if (isIssuedByPlayer())
-                return new Pair<>("Not fulfilled", Misc.getHighlightColor());
+            if (isIssuedByPlayer()) return new Pair<>("Not fulfilled", Misc.getHighlightColor());
 
             if (doesContractHavePenalty && missedTimes >= allowedMissedTimes - 1)
                 return new Pair<>("Termination risk", Misc.getNegativeHighlightColor());
 
-            return new Pair<>("At risk (" + missedTimes + "/" + allowedMissedTimes + ")", Misc.getNegativeHighlightColor());
+            return new Pair<>(
+                    "At risk (" + missedTimes + "/" + allowedMissedTimes + ")",
+                    Misc.getNegativeHighlightColor());
         }
 
         return new Pair<>("Fulfilled", Misc.getPositiveHighlightColor());
@@ -338,9 +373,12 @@ public class AoTDTradeContract implements Cloneable {
 
     public String getSubTypeOfContractString() {
         if (isIssuedByPlayer()) {
-            return AoTDPlayerContractCreatorManager.getCreator(getContractTypeId()).getNameOfContract();
+            return AoTDPlayerContractCreatorManager.getCreator(getContractTypeId())
+                    .getNameOfContract();
         }
-        if (isPrivate() && AoTDTradeContractBrowserCreator.blackMarketFactions.contains(getFaction().getId())) {
+        if (isPrivate()
+                && AoTDTradeContractBrowserCreator.blackMarketFactions.contains(
+                        getFaction().getId())) {
             return "Black Market Contract";
         }
         return null;
@@ -368,7 +406,12 @@ public class AoTDTradeContract implements Cloneable {
         this.missedTimes = 0;
     }
 
-    public AoTDTradeContract(String id, PersonAPI person, String factionId, int monthsRemaining, boolean customEffectSection) {
+    public AoTDTradeContract(
+            String id,
+            PersonAPI person,
+            String factionId,
+            int monthsRemaining,
+            boolean customEffectSection) {
         this.id = id;
         this.person = person;
         this.hasCustomEffectSection = customEffectSection;
@@ -381,9 +424,7 @@ public class AoTDTradeContract implements Cloneable {
         return hasCustomEffectSection;
     }
 
-    public void printCustomSection(TooltipMakerAPI tooltip, float width) {
-
-    }
+    public void printCustomSection(TooltipMakerAPI tooltip, float width) {}
 
     public String getId() {
         return id;
@@ -433,12 +474,9 @@ public class AoTDTradeContract implements Cloneable {
         return doesContractHavePenalty && missedTimes >= allowedMissedTimes;
     }
 
-    public void executeEndOfContract(boolean wasTerminatedByPlayerManually) {
+    public void executeEndOfContract(boolean wasTerminatedByPlayerManually) {}
 
-    }
-
-    public void executeMonthEnd(float percentageOfEntireContractMet) {
-    }
+    public void executeMonthEnd(float percentageOfEntireContractMet) {}
 
     public void executeMonthEndForCommodity(int delivered, String commodityId) {
         for (TradeContractRewardDataAPI value : rewards.values()) {
@@ -458,7 +496,8 @@ public class AoTDTradeContract implements Cloneable {
         if (!isIssuedByPlayer()) {
             return true;
         } else {
-            PlayerContractCreatorAPI creatorAPI = AoTDPlayerContractCreatorManager.getCreator(getContractTypeId());
+            PlayerContractCreatorAPI creatorAPI =
+                    AoTDPlayerContractCreatorManager.getCreator(getContractTypeId());
 
             if (creatorAPI != null && !creatorAPI.isContractPaidByPlayer()) {
                 return true;
@@ -471,7 +510,8 @@ public class AoTDTradeContract implements Cloneable {
         if (amountMet <= 0) return 0;
         float base = Global.getSettings().getCommoditySpec(commodityId).getBasePrice();
         float cut = Math.max(0f, getCut(commodityId));
-        PlayerContractCreatorAPI creatorAPI = AoTDPlayerContractCreatorManager.getCreator(getContractTypeId());
+        PlayerContractCreatorAPI creatorAPI =
+                AoTDPlayerContractCreatorManager.getCreator(getContractTypeId());
         if (isIssuedByPlayer()) {
             if (creatorAPI != null && !creatorAPI.isContractPaidByPlayer()) {
                 return (int) Math.floor(base * amountMet * cut);

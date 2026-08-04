@@ -1,8 +1,6 @@
 package com.fs.starfarer.api.impl.campaign.rulecmd;
 
-import java.awt.Color;
-import java.util.List;
-import java.util.Map;
+import static com.fs.starfarer.api.impl.campaign.fleets.EconomyFleetRouteManager.ROUTE_DST_LOAD;
 
 import com.fs.starfarer.api.Global;
 import com.fs.starfarer.api.campaign.CampaignFleetAPI;
@@ -19,12 +17,17 @@ import com.fs.starfarer.api.impl.campaign.ids.MemFlags;
 import com.fs.starfarer.api.ui.LabelAPI;
 import com.fs.starfarer.api.util.Misc;
 import com.fs.starfarer.api.util.Misc.Token;
-
-import static com.fs.starfarer.api.impl.campaign.fleets.EconomyFleetRouteManager.ROUTE_DST_LOAD;
+import java.awt.Color;
+import java.util.List;
+import java.util.Map;
 
 public class AoTDFleetDesc extends BaseCommandPlugin {
 
-    public boolean execute(String ruleId, InteractionDialogAPI dialog, List<Token> params, Map<String, MemoryAPI> memoryMap) {
+    public boolean execute(
+            String ruleId,
+            InteractionDialogAPI dialog,
+            List<Token> params,
+            Map<String, MemoryAPI> memoryMap) {
         if (dialog == null) return false;
         if (!(dialog.getInteractionTarget() instanceof CampaignFleetAPI)) return false;
 
@@ -34,7 +37,8 @@ public class AoTDFleetDesc extends BaseCommandPlugin {
         FactionAPI faction = fleet.getFaction();
         TextPanelAPI text = dialog.getTextPanel();
 
-        if (Global.getSettings().isDevMode() && !Global.getSettings().getBoolean("playtestingMode")) {
+        if (Global.getSettings().isDevMode()
+                && !Global.getSettings().getBoolean("playtestingMode")) {
             text.addParagraph("Admiral skills:");
             for (SkillLevelAPI skill : fleet.getCommanderStats().getSkillsCopy()) {
                 if (skill.getSkill().isAdmiralSkill()) {
@@ -42,7 +46,6 @@ public class AoTDFleetDesc extends BaseCommandPlugin {
                 }
             }
         }
-
 
         MemoryAPI mem = fleet.getMemoryWithoutUpdate();
         if (!mem.contains("$shownFleetDescAlready")) {
@@ -55,7 +58,8 @@ public class AoTDFleetDesc extends BaseCommandPlugin {
         Color hl = Misc.getHighlightColor();
         Color red = Misc.getNegativeHighlightColor();
 
-        RouteData route = RouteManager.getInstance().getRoute(EconomyFleetRouteManager.SOURCE_ID, fleet);
+        RouteData route =
+                RouteManager.getInstance().getRoute(EconomyFleetRouteManager.SOURCE_ID, fleet);
         if ((trader || smuggler) && route != null) {
             EconomyRouteData data = (EconomyRouteData) route.getCustom();
 
@@ -63,7 +67,7 @@ public class AoTDFleetDesc extends BaseCommandPlugin {
 
             String from = data.from.getName();
             String to = data.to.getName();
-            //int index = route.getCurrentIndex();
+            // int index = route.getCurrentIndex();
             if (id >= ROUTE_DST_LOAD) {
                 from = data.to.getName();
                 to = data.from.getName();
@@ -72,21 +76,30 @@ public class AoTDFleetDesc extends BaseCommandPlugin {
 
             if (id <= EconomyFleetRouteManager.ROUTE_DST_UNLOAD) {
                 cargo = EconomyRouteData.getCargoList(data.cargoDeliver);
-                if (!cargo.isEmpty() && id == EconomyFleetRouteManager.ROUTE_SRC_LOAD) cargo += " (being loaded)";
+                if (!cargo.isEmpty() && id == EconomyFleetRouteManager.ROUTE_SRC_LOAD)
+                    cargo += " (being loaded)";
             } else {
                 cargo = EconomyRouteData.getCargoList(data.cargoReturn);
                 if (!cargo.isEmpty() && id == ROUTE_DST_LOAD) cargo += " (being loaded)";
             }
 
             if (trader || smuggler) {
-                LabelAPI label = text.addParagraph("You encounter " + fleet.getFaction().getPersonNamePrefixAOrAn() + " " +
-                        fleet.getFaction().getPersonNamePrefix() + " "+ fleet.getName().toLowerCase() + ".");
+                LabelAPI label =
+                        text.addParagraph(
+                                "You encounter "
+                                        + fleet.getFaction().getPersonNamePrefixAOrAn()
+                                        + " "
+                                        + fleet.getFaction().getPersonNamePrefix()
+                                        + " "
+                                        + fleet.getName().toLowerCase()
+                                        + ".");
                 label.highlightFirst(fleet.getFaction().getPersonNamePrefix());
                 label.setHighlightColor(fleet.getFaction().getBaseUIColor());
 
                 text.setFontSmallInsignia();
 
-                text.addParagraph("--------------------------------------------------------------------------------------------------------------");
+                text.addParagraph(
+                        "--------------------------------------------------------------------------------------------------------------");
                 if (data.from.isHidden()) {
                     text.addPara("Port of origin: %s", hl, "Unknown");
                 } else {
@@ -100,13 +113,14 @@ public class AoTDFleetDesc extends BaseCommandPlugin {
                     text.addPara("No cargo");
                 } else {
                     text.addPara("Cargo: %s", hl, cargo);
-                    //text.addPara(cargo);
+                    // text.addPara(cargo);
                 }
 
-                text.addParagraph("--------------------------------------------------------------------------------------------------------------");
+                text.addParagraph(
+                        "--------------------------------------------------------------------------------------------------------------");
                 text.setFontInsignia();
 
-                int penalty = (int) (data.size*10);
+                int penalty = (int) (data.size * 10);
                 boolean returning = false;
                 if (route.getCurrent() != null && route.getCurrentSegmentId() >= ROUTE_DST_LOAD) {
                     returning = true;
@@ -115,28 +129,42 @@ public class AoTDFleetDesc extends BaseCommandPlugin {
                 if (!fleet.getFaction().isPlayerFaction()) {
 
                     if (data.from.isHidden()) {
-                        text.addPara("If this fleet does not reach its destination safely, it will cause a shortage " +
-                                        "of the commodities it carries. " +
-                                        "In addition, its loss would reduce the accessibility of its port of origin by %s for up to three months.",
+                        text.addPara(
+                                "If this fleet does not reach its destination safely, it will cause a shortage "
+                                        + "of the commodities it carries. "
+                                        + "In addition, its loss would reduce the accessibility of its port of origin by %s for up to three months.",
                                 Misc.getTextColor(), Misc.getHighlightColor(), "" + penalty + "%");
                     } else {
-                        text.addPara("If this fleet does not reach its destination safely, it will cause a shortage " +
-                                        "of the commodities it carries. " +
-                                        "In addition, its loss would reduce the accessibility of " + data.from.getName() + " by %s for up to three months.",
-                                Misc.getTextColor(), Misc.getHighlightColor(), "" + penalty + "%");
+                        text.addPara(
+                                "If this fleet does not reach its destination safely, it will cause a shortage "
+                                        + "of the commodities it carries. "
+                                        + "In addition, its loss would reduce the accessibility of "
+                                        + data.from.getName()
+                                        + " by %s for up to three months.",
+                                Misc.getTextColor(),
+                                Misc.getHighlightColor(),
+                                "" + penalty + "%");
                     }
 
                     if (!returning) {
                         if (data.to.isHidden()) {
-                            text.addPara("On top of that, failing to reach its destination would also result in an excess " +
-                                            "of the commodities it is meant to collect. " +
-                                            "Its loss would further reduce the accessibility of its port of destination by %s for up to three months.",
-                                    Misc.getTextColor(), Misc.getHighlightColor(), "" + penalty + "%");
+                            text.addPara(
+                                    "On top of that, failing to reach its destination would also result in an excess "
+                                            + "of the commodities it is meant to collect. "
+                                            + "Its loss would further reduce the accessibility of its port of destination by %s for up to three months.",
+                                    Misc.getTextColor(),
+                                    Misc.getHighlightColor(),
+                                    "" + penalty + "%");
                         } else {
-                            text.addPara("On top of that, failing to reach its destination would also result in an excess " +
-                                            "of the commodities it is meant to collect. " +
-                                            "Its loss would further reduce the accessibility of " + data.to.getName() + " by %s for up to three months.",
-                                    Misc.getTextColor(), Misc.getHighlightColor(), "" + penalty + "%");
+                            text.addPara(
+                                    "On top of that, failing to reach its destination would also result in an excess "
+                                            + "of the commodities it is meant to collect. "
+                                            + "Its loss would further reduce the accessibility of "
+                                            + data.to.getName()
+                                            + " by %s for up to three months.",
+                                    Misc.getTextColor(),
+                                    Misc.getHighlightColor(),
+                                    "" + penalty + "%");
                         }
                     }
                 }
@@ -146,50 +174,48 @@ public class AoTDFleetDesc extends BaseCommandPlugin {
         if (!fleet.getFaction().isPlayerFaction() && !fleet.getFaction().isNeutralFaction()) {
             if (fleet.getMemoryWithoutUpdate().getBoolean(MemFlags.MEMORY_KEY_NO_REP_IMPACT)) {
                 if (Misc.isDecentralized(fleet.getFaction())) {
-//					text.addPara("This fleet's behavior falls outside the accepted norms of the faction it nominally belongs to. " +
-//								 "Engaging it in battle will not cause any changes to your reputation.",
-//								 Misc.getHighlightColor(), "will not cause any changes to your reputation");
-                    text.addPara("Engaging this fleet in battle will not cause any changes to your reputation with the faction it nominally belongs to.",
-                            Misc.getHighlightColor(), "will not cause any changes to your reputation");
+                    //					text.addPara("This fleet's behavior falls outside the accepted norms of
+                    // the faction it nominally belongs to. " +
+                    //								 "Engaging it in battle will not cause any changes to your
+                    // reputation.",
+                    //								 Misc.getHighlightColor(), "will not cause any changes to your
+                    // reputation");
+                    text.addPara(
+                            "Engaging this fleet in battle will not cause any changes to your reputation with the faction it nominally belongs to.",
+                            Misc.getHighlightColor(),
+                            "will not cause any changes to your reputation");
                 } else {
-                    text.addPara("This fleet is operating without official sanction from the faction it nominally belongs to. " +
-                                    "Engaging it in battle will not cause any changes to your reputation.",
-                            Misc.getHighlightColor(), "will not cause any changes to your reputation");
+                    text.addPara(
+                            "This fleet is operating without official sanction from the faction it nominally belongs to. "
+                                    + "Engaging it in battle will not cause any changes to your reputation.",
+                            Misc.getHighlightColor(),
+                            "will not cause any changes to your reputation");
                 }
-            } else if (fleet.getMemoryWithoutUpdate().getBoolean(MemFlags.MEMORY_KEY_LOW_REP_IMPACT) && fleet.knowsWhoPlayerIs()) {
+            } else if (fleet.getMemoryWithoutUpdate().getBoolean(MemFlags.MEMORY_KEY_LOW_REP_IMPACT)
+                    && fleet.knowsWhoPlayerIs()) {
                 if (Misc.isDecentralized(fleet.getFaction())) {
-//					text.addPara("This fleet's behavior falls outside the accepted norms of the faction it nominally belongs to. " +
-//							"Engaging it in battle will not cause immediate hostilities " +
-//							"with the faction it belongs to, though it will slightly strain the relationship.",
-//							Misc.getHighlightColor(), "will not cause immediate hostilities");
-                    text.addPara("Engaging this fleet in battle will not cause immediate hostilities " +
-                                    "with the faction it nominally belongs to, though it will slightly strain the relationship.",
-                            Misc.getHighlightColor(), "will not cause immediate hostilities");
+                    //					text.addPara("This fleet's behavior falls outside the accepted norms of
+                    // the faction it nominally belongs to. " +
+                    //							"Engaging it in battle will not cause immediate hostilities " +
+                    //							"with the faction it belongs to, though it will slightly strain the
+                    // relationship.",
+                    //							Misc.getHighlightColor(), "will not cause immediate hostilities");
+                    text.addPara(
+                            "Engaging this fleet in battle will not cause immediate hostilities "
+                                    + "with the faction it nominally belongs to, though it will slightly strain the relationship.",
+                            Misc.getHighlightColor(),
+                            "will not cause immediate hostilities");
                 } else {
-                    text.addPara("This fleet is either operating in a legal gray area or its behavior " +
-                                    "falls outside accepted norms. Engaging it in battle will not cause immediate hostilities " +
-                                    "with the faction it nominally belongs to, though it will slightly strain the relationship.",
-                            Misc.getHighlightColor(), "will not cause immediate hostilities");
+                    text.addPara(
+                            "This fleet is either operating in a legal gray area or its behavior "
+                                    + "falls outside accepted norms. Engaging it in battle will not cause immediate hostilities "
+                                    + "with the faction it nominally belongs to, though it will slightly strain the relationship.",
+                            Misc.getHighlightColor(),
+                            "will not cause immediate hostilities");
                 }
             }
         }
 
         return true;
     }
-
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

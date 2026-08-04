@@ -9,19 +9,18 @@ import com.fs.starfarer.api.combat.MutableStatWithTempMods;
 import data.kaysaar.aotd.tot.compat.MarketRegistry;
 import data.kaysaar.aotd.tot.plugins.AoTDCommodityEconSpec;
 import data.kaysaar.aotd.tot.plugins.AoTDCommodityEconSpecManager;
-import data.kaysaar.aotd.tot.scripts.economy.AoTDIndustryData;
 import data.kaysaar.aotd.tot.scripts.economy.AoTDEconomySemanticBaseline;
+import data.kaysaar.aotd.tot.scripts.economy.AoTDIndustryData;
 import data.kaysaar.aotd.tot.scripts.trade.manager.AoTDTradeManager;
-
 import java.util.LinkedHashMap;
 
 /**
  * Authoritative supply/demand state for one market commodity.
  *
- * <p>The scheduler uses a two-phase refresh. The complete next revision is first
- * calculated into reusable staging maps. Only after every industry calculation
- * succeeds are the map references and aggregate values published. A failed
- * refresh therefore leaves the previous committed revision untouched.</p>
+ * <p>The scheduler uses a two-phase refresh. The complete next revision is first calculated into
+ * reusable staging maps. Only after every industry calculation succeeds are the map references and
+ * aggregate values published. A failed refresh therefore leaves the previous committed revision
+ * untouched.
  */
 public class AoTDSupplyDemandData {
     public volatile LinkedHashMap<String, MutableStat> demandUnitsFromIndustries =
@@ -77,9 +76,8 @@ public class AoTDSupplyDemandData {
     }
 
     /**
-     * Compatibility entry point used outside the market-price pipeline.
-     * The refresh is still atomic for this commodity. Failures are logged and
-     * the previous committed revision is preserved.
+     * Compatibility entry point used outside the market-price pipeline. The refresh is still atomic
+     * for this commodity. Failures are logged and the previous committed revision is preserved.
      */
     public void updateSupplyDemandData(MarketAPI market, boolean force) {
         try {
@@ -89,26 +87,28 @@ public class AoTDSupplyDemandData {
             }
         } catch (RuntimeException failure) {
             AoTDEconomySemanticBaseline.operation("supply-demand.refresh-failure", market);
-            Global.getLogger(AoTDSupplyDemandData.class).error(
-                    "AoTD supply/demand refresh failed for commodity " + commodityID
-                            + " on market " + (market == null ? "<null>" : market.getId())
-                            + "; preserving the previous committed revision.", failure);
+            Global.getLogger(AoTDSupplyDemandData.class)
+                    .error(
+                            "AoTD supply/demand refresh failed for commodity "
+                                    + commodityID
+                                    + " on market "
+                                    + (market == null ? "<null>" : market.getId())
+                                    + "; preserving the previous committed revision.",
+                            failure);
         }
     }
 
     /**
-     * Calculates a complete next revision without changing authoritative state.
-     * The returned object is owned by this instance and must be committed or
-     * discarded before preparing another revision for the same commodity.
+     * Calculates a complete next revision without changing authoritative state. The returned object
+     * is owned by this instance and must be committed or discarded before preparing another
+     * revision for the same commodity.
      */
-    public synchronized PreparedRefresh prepareSupplyDemandData(
-            MarketAPI market, boolean force) {
+    public synchronized PreparedRefresh prepareSupplyDemandData(MarketAPI market, boolean force) {
         if (market == null) {
             throw new IllegalArgumentException("market must not be null");
         }
         long targetGeneration = MarketRegistry.getMarketDirtyGeneration(market);
-        if (!force && targetGeneration > 0L
-                && targetGeneration == authoritativeDirtyGeneration) {
+        if (!force && targetGeneration > 0L && targetGeneration == authoritativeDirtyGeneration) {
             AoTDEconomySemanticBaseline.operation("supply-demand.skipped-current", market);
             return PreparedRefresh.skipped(this, targetGeneration);
         }
@@ -121,8 +121,7 @@ public class AoTDSupplyDemandData {
         int nextDemand = 0;
         int pairs = 0;
         try (AoTDEconomySemanticBaseline.Scope scope =
-                     AoTDEconomySemanticBaseline.begin(
-                             "supply-demand.prepare", market, commodityID)) {
+                AoTDEconomySemanticBaseline.begin("supply-demand.prepare", market, commodityID)) {
             try {
                 for (Industry industry : market.getIndustries()) {
                     String industryId = industry.getId();
@@ -132,33 +131,39 @@ public class AoTDSupplyDemandData {
                     stagingDemandUnitsFromIndustries.put(industryId, demandStat);
                     stagingSupplyUnitsFromIndustries.put(industryId, supplyStat);
 
-                    nextSupply += getEconSpec().getCalculationScript()
-                            .getRawUnitsFromSupply(
-                                    supplyStat, null, commodityID, industry);
-                    nextDemand += getEconSpec().getCalculationScript()
-                            .getRawUnitsFromDemand(
-                                    demandStat, null, commodityID, industry);
+                    nextSupply +=
+                            getEconSpec()
+                                    .getCalculationScript()
+                                    .getRawUnitsFromSupply(supplyStat, null, commodityID, industry);
+                    nextDemand +=
+                            getEconSpec()
+                                    .getCalculationScript()
+                                    .getRawUnitsFromDemand(demandStat, null, commodityID, industry);
                     pairs++;
                 }
             } catch (RuntimeException failure) {
                 scope.failed();
                 stagingDemandUnitsFromIndustries.clear();
                 stagingSupplyUnitsFromIndustries.clear();
-                throw new SupplyDemandRefreshException(
-                        market.getId(), commodityID, failure);
+                throw new SupplyDemandRefreshException(market.getId(), commodityID, failure);
             }
         }
 
         return new PreparedRefresh(
-                this, market, targetGeneration, nextSupply, nextDemand, pairs,
+                this,
+                market,
+                targetGeneration,
+                nextSupply,
+                nextDemand,
+                pairs,
                 stagingDemandUnitsFromIndustries,
                 stagingSupplyUnitsFromIndustries,
                 false);
     }
 
     /**
-     * Publishes a previously prepared revision using reference swaps. The method
-     * performs no industry calculations and has no partial-read failure path.
+     * Publishes a previously prepared revision using reference swaps. The method performs no
+     * industry calculations and has no partial-read failure path.
      */
     public synchronized boolean commitPreparedRefresh(PreparedRefresh prepared) {
         if (prepared == null || prepared.owner != this) {
@@ -182,19 +187,19 @@ public class AoTDSupplyDemandData {
         }
 
         // Reuse the formerly authoritative maps as the next staging buffers.
-        stagingDemandUnitsFromIndustries = oldDemand == null
-                ? new LinkedHashMap<String, MutableStat>() : oldDemand;
-        stagingSupplyUnitsFromIndustries = oldSupply == null
-                ? new LinkedHashMap<String, MutableStat>() : oldSupply;
+        stagingDemandUnitsFromIndustries =
+                oldDemand == null ? new LinkedHashMap<String, MutableStat>() : oldDemand;
+        stagingSupplyUnitsFromIndustries =
+                oldSupply == null ? new LinkedHashMap<String, MutableStat>() : oldSupply;
 
         AoTDEconomySemanticBaseline.operation("supply-demand.atomic-commit", prepared.market);
         return true;
     }
 
     /**
-     * Runs auxiliary bookkeeping only after the complete authoritative revision
-     * has been published. This is deliberately separate from the reference swap
-     * so a market-wide caller can commit every commodity before any callback.
+     * Runs auxiliary bookkeeping only after the complete authoritative revision has been published.
+     * This is deliberately separate from the reference swap so a market-wide caller can commit
+     * every commodity before any callback.
      */
     public void finishPreparedRefresh(PreparedRefresh prepared) {
         if (prepared == null || prepared.owner != this || prepared.skipped) return;
@@ -206,9 +211,8 @@ public class AoTDSupplyDemandData {
             } catch (RuntimeException failure) {
                 // Recording the global candidate set is auxiliary. The local
                 // authoritative revision remains valid and must not be rolled back.
-                Global.getLogger(AoTDSupplyDemandData.class).warn(
-                        "Unable to record AoTD commodity candidate " + commodityID,
-                        failure);
+                Global.getLogger(AoTDSupplyDemandData.class)
+                        .warn("Unable to record AoTD commodity candidate " + commodityID, failure);
             }
         }
     }
@@ -243,22 +247,32 @@ public class AoTDSupplyDemandData {
         int total = 0;
         for (Industry s : market.getIndustries()) {
             if (!AoTDIndustryData.getInstance(market).isPending(s.getId())) {
-                total += getEconSpec().getCalculationScript().getRawUnitsFromDemand(
-                        s.getDemand(commodityID).getQuantity(), null, commodityID, s);
+                total +=
+                        getEconSpec()
+                                .getCalculationScript()
+                                .getRawUnitsFromDemand(
+                                        s.getDemand(commodityID).getQuantity(),
+                                        null,
+                                        commodityID,
+                                        s);
             }
         }
         return total;
     }
 
     public int getRawDemandFromIndustry(Industry industry) {
-        return getEconSpec().getCalculationScript().getRawUnitsFromDemand(
-                industry.getDemand(commodityID).getQuantity(), null, commodityID, industry);
+        return getEconSpec()
+                .getCalculationScript()
+                .getRawUnitsFromDemand(
+                        industry.getDemand(commodityID).getQuantity(), null, commodityID, industry);
     }
 
     public int getRawSupplyFromIndustry(Industry industry) {
         if (industry.isDisrupted()) return 0;
-        return getEconSpec().getCalculationScript().getRawUnitsFromSupply(
-                industry.getSupply(commodityID).getQuantity(), null, commodityID, industry);
+        return getEconSpec()
+                .getCalculationScript()
+                .getRawUnitsFromSupply(
+                        industry.getSupply(commodityID).getQuantity(), null, commodityID, industry);
     }
 
     public LinkedHashMap<String, MutableStat> getDemandUnitsFromIndustries() {
@@ -282,10 +296,9 @@ public class AoTDSupplyDemandData {
     }
 
     /**
-     * Computes the current trade input directly from live industry stats without
-     * changing the authoritative supply/demand revision. This is used after the
-     * vanilla immigration phase, where a size increase may have reapplied
-     * industries after the normal local materialization pass.
+     * Computes the current trade input directly from live industry stats without changing the
+     * authoritative supply/demand revision. This is used after the vanilla immigration phase, where
+     * a size increase may have reapplied industries after the normal local materialization pass.
      */
     public int computeRawNetForTradeSnapshot(MarketAPI market) {
         if (market == null) {
@@ -295,18 +308,25 @@ public class AoTDSupplyDemandData {
         int currentDemand = 0;
         try {
             for (Industry industry : market.getIndustries()) {
-                currentSupply += getEconSpec().getCalculationScript()
-                        .getRawUnitsFromSupply(
-                                industry.getSupply(commodityID).getQuantity(),
-                                null, commodityID, industry);
-                currentDemand += getEconSpec().getCalculationScript()
-                        .getRawUnitsFromDemand(
-                                industry.getDemand(commodityID).getQuantity(),
-                                null, commodityID, industry);
+                currentSupply +=
+                        getEconSpec()
+                                .getCalculationScript()
+                                .getRawUnitsFromSupply(
+                                        industry.getSupply(commodityID).getQuantity(),
+                                        null,
+                                        commodityID,
+                                        industry);
+                currentDemand +=
+                        getEconSpec()
+                                .getCalculationScript()
+                                .getRawUnitsFromDemand(
+                                        industry.getDemand(commodityID).getQuantity(),
+                                        null,
+                                        commodityID,
+                                        industry);
             }
         } catch (RuntimeException failure) {
-            throw new SupplyDemandRefreshException(
-                    market.getId(), commodityID, failure);
+            throw new SupplyDemandRefreshException(market.getId(), commodityID, failure);
         }
         return currentSupply - currentDemand;
     }
@@ -342,8 +362,7 @@ public class AoTDSupplyDemandData {
         additionalProduction.advance(days);
     }
 
-    public int getAvailableOnThisMarket(
-            float cargo, MarketAPI market, String commodityId) {
+    public int getAvailableOnThisMarket(float cargo, MarketAPI market, String commodityId) {
         int available = 0;
         float remainingCargo = cargo;
         AoTDIndustryData industryData = AoTDIndustryData.getInstance(market);
@@ -352,21 +371,28 @@ public class AoTDSupplyDemandData {
             if (industryData.isPending(industry.getId())) continue;
             if (remainingCargo < 1f) break;
 
-            float raw = getEconSpec().getCalculationScript().getRawUnitsFromDemand(
-                    industry.getDemand(commodityId).getQuantity(),
-                    market, commodityId, industry);
+            float raw =
+                    getEconSpec()
+                            .getCalculationScript()
+                            .getRawUnitsFromDemand(
+                                    industry.getDemand(commodityId).getQuantity(),
+                                    market,
+                                    commodityId,
+                                    industry);
             if (raw > remainingCargo) {
                 float filled = remainingCargo / raw;
-                int rem = Math.round(
-                        filled * industry.getDemand(commodityId)
-                                .getQuantity().getModifiedInt());
+                int rem =
+                        Math.round(
+                                filled
+                                        * industry.getDemand(commodityId)
+                                                .getQuantity()
+                                                .getModifiedInt());
                 available += rem;
                 break;
             }
 
             remainingCargo -= raw;
-            available += industry.getDemand(commodityId)
-                    .getQuantity().getModifiedInt();
+            available += industry.getDemand(commodityId).getQuantity().getModifiedInt();
         }
         return available;
     }
@@ -403,11 +429,9 @@ public class AoTDSupplyDemandData {
             this.skipped = skipped;
         }
 
-        private static PreparedRefresh skipped(
-                AoTDSupplyDemandData owner, long generation) {
+        private static PreparedRefresh skipped(AoTDSupplyDemandData owner, long generation) {
             return new PreparedRefresh(
-                    owner, null, generation, owner.supply, owner.demand, 0,
-                    null, null, true);
+                    owner, null, generation, owner.supply, owner.demand, 0, null, null, true);
         }
 
         public boolean isSkipped() {
@@ -419,10 +443,13 @@ public class AoTDSupplyDemandData {
         public final String marketId;
         public final String commodityId;
 
-        SupplyDemandRefreshException(
-                String marketId, String commodityId, Throwable cause) {
-            super("Unable to prepare supply/demand for market=" + marketId
-                    + ", commodity=" + commodityId, cause);
+        SupplyDemandRefreshException(String marketId, String commodityId, Throwable cause) {
+            super(
+                    "Unable to prepare supply/demand for market="
+                            + marketId
+                            + ", commodity="
+                            + commodityId,
+                    cause);
             this.marketId = marketId;
             this.commodityId = commodityId;
         }

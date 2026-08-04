@@ -19,14 +19,12 @@ import data.kaysaar.aotd.tot.ui.customprod.common.*;
 import data.kaysaar.aotd.vok.misc.AoTDMisc;
 import data.kaysaar.aotd.vok.scripts.specialprojects.BlackSiteProjectManager;
 import data.kaysaar.aotd.vok.scripts.specialprojects.models.ProjectReward;
-import data.kaysaar.aotd.vok.ui.customprod.ProductionMainPanel;
 import data.kaysaar.aotd.vok.ui.customprod.buttons.FighterProductionCustomButton;
 import data.kaysaar.aotd.vok.ui.customprod.buttons.ItemProductionCustomButton;
 import data.kaysaar.aotd.vok.ui.customprod.buttons.ShipProductionCustomButton;
 import data.kaysaar.aotd.vok.ui.customprod.buttons.WeaponProductionCustomButton;
-import org.lwjgl.input.Keyboard;
-
 import java.util.*;
+import org.lwjgl.input.Keyboard;
 
 public class ProductionBrowserSection implements ExtendedUIPanelPlugin {
     protected TextFieldAPI textField;
@@ -34,9 +32,9 @@ public class ProductionBrowserSection implements ExtendedUIPanelPlugin {
     protected ChooseManufacturerPanel chooseManufacturerPanel;
     protected ChooseSizePanel chooseSizePanel;
     protected ChooseTypeInfo chooseTypeInfo;
-    protected LinkedHashMap<String,Integer>sizes = new LinkedHashMap<>();
-    protected LinkedHashMap<String,Integer>types = new LinkedHashMap<>();
-    protected LinkedHashMap<String,Integer> manus = new LinkedHashMap<>();
+    protected LinkedHashMap<String, Integer> sizes = new LinkedHashMap<>();
+    protected LinkedHashMap<String, Integer> types = new LinkedHashMap<>();
+    protected LinkedHashMap<String, Integer> manus = new LinkedHashMap<>();
     protected CustomPanelAPI mainPanel;
     protected CustomPanelAPI contentPanel;
 
@@ -60,10 +58,7 @@ public class ProductionBrowserSection implements ExtendedUIPanelPlugin {
     protected Boolean isPressingCtrl = false;
 
     public ProductionBrowserSection(
-            float width,
-            float height,
-            AoTDProductionSpec.AoTDProductionSpecType prodType
-    ) {
+            float width, float height, AoTDProductionSpec.AoTDProductionSpecType prodType) {
         this.prodType = prodType;
 
         this.mainPanel = Global.getSettings().createCustom(width, height, this);
@@ -76,151 +71,155 @@ public class ProductionBrowserSection implements ExtendedUIPanelPlugin {
 
     /**
      * Main override point.
-     * <p>
-     * Extend this class and override this method if you want different columns,
-     * different labels, different ratios, or different sorting.
+     *
+     * <p>Extend this class and override this method if you want different columns, different
+     * labels, different ratios, or different sorting.
      */
-    protected List<ColumnDefinition> createColumnDefinitions(AoTDProductionSpec.AoTDProductionSpecType prodType) {
+    protected List<ColumnDefinition> createColumnDefinitions(
+            AoTDProductionSpec.AoTDProductionSpecType prodType) {
         ArrayList<ColumnDefinition> columns = new ArrayList<>();
 
         switch (prodType) {
             case SHIP:
             case WEAPON:
-                columns.add(new ColumnDefinition(
-                        "name",
-                        "Name",
-                        0.28f,
-                        Comparator.comparing(o -> o.getSpec().getName())
-                ));
-                columns.add(new ColumnDefinition(
-                        "time",
-                        "Time",
-                        0.10f,
-                        Comparator.comparing(o -> o.getSpec().getDaysToBeCreated())
-                ));
-                columns.add(new ColumnDefinition(
-                        "size",
-                        "Size",
-                        0.10f,
-                        Comparator.comparingInt(o -> {
-                            AoTDProductionSpec spec = o.getSpec();
+                columns.add(
+                        new ColumnDefinition(
+                                "name",
+                                "Name",
+                                0.28f,
+                                Comparator.comparing(o -> o.getSpec().getName())));
+                columns.add(
+                        new ColumnDefinition(
+                                "time",
+                                "Time",
+                                0.10f,
+                                Comparator.comparing(o -> o.getSpec().getDaysToBeCreated())));
+                columns.add(
+                        new ColumnDefinition(
+                                "size",
+                                "Size",
+                                0.10f,
+                                Comparator.comparingInt(
+                                        o -> {
+                                            AoTDProductionSpec spec = o.getSpec();
 
-                            if (spec.getUnderlyingSpec() instanceof ShipHullSpecAPI ship) {
-                                return hullSizeRank(ship.getHullSize());
-                            }
-                            if (spec.getUnderlyingSpec() instanceof WeaponSpecAPI weapon) {
-                                return weaponSizeRank(weapon.getSize());
-                            }
+                                            if (spec.getUnderlyingSpec()
+                                                    instanceof ShipHullSpecAPI ship) {
+                                                return hullSizeRank(ship.getHullSize());
+                                            }
+                                            if (spec.getUnderlyingSpec()
+                                                    instanceof WeaponSpecAPI weapon) {
+                                                return weaponSizeRank(weapon.getSize());
+                                            }
 
-                            return Integer.MAX_VALUE;
-                        })
-                ));
-                columns.add(new ColumnDefinition(
-                        "type",
-                        "Type",
-                        0.10f,
-                        Comparator.comparing(o -> o.getSpec().getTypeString())
-                ));
-                columns.add(new ColumnDefinition(
-                        "design",
-                        "Design type",
-                        0.25f,
-                        Comparator.comparing(o -> o.getSpec().getManufacturer())
-                ));
-                columns.add(new ColumnDefinition(
-                        "totalCost",
-                        "Cost",
-                        0.17f,
-                        Comparator.comparing(o -> o.getSpec().getMoneyPrice())
-                ));
+                                            return Integer.MAX_VALUE;
+                                        })));
+                columns.add(
+                        new ColumnDefinition(
+                                "type",
+                                "Type",
+                                0.10f,
+                                Comparator.comparing(o -> o.getSpec().getTypeString())));
+                columns.add(
+                        new ColumnDefinition(
+                                "design",
+                                "Design type",
+                                0.25f,
+                                Comparator.comparing(o -> o.getSpec().getManufacturer())));
+                columns.add(
+                        new ColumnDefinition(
+                                "totalCost",
+                                "Cost",
+                                0.17f,
+                                Comparator.comparing(o -> o.getSpec().getMoneyPrice())));
                 break;
 
             case FIGHTER:
-                columns.add(new ColumnDefinition(
-                        "name",
-                        "Name",
-                        0.34f,
-                        Comparator.comparing(o -> o.getSpec().getName())
-                ));
-                columns.add(new ColumnDefinition(
-                        "time",
-                        "Time",
-                        0.10f,
-                        Comparator.comparing(o -> o.getSpec().getDaysToBeCreated())
-                ));
-                columns.add(new ColumnDefinition(
-                        "type",
-                        "Type",
-                        0.14f,
-                        Comparator.comparing(o -> o.getSpec().getTypeString())
-                ));
-                columns.add(new ColumnDefinition(
-                        "design",
-                        "Design type",
-                        0.24f,
-                        Comparator.comparing(o -> o.getSpec().getManufacturer())
-                ));
-                columns.add(new ColumnDefinition(
-                        "totalCost",
-                        "Cost",
-                        0.18f,
-                        Comparator.comparing(o -> o.getSpec().getMoneyPrice())
-                ));
+                columns.add(
+                        new ColumnDefinition(
+                                "name",
+                                "Name",
+                                0.34f,
+                                Comparator.comparing(o -> o.getSpec().getName())));
+                columns.add(
+                        new ColumnDefinition(
+                                "time",
+                                "Time",
+                                0.10f,
+                                Comparator.comparing(o -> o.getSpec().getDaysToBeCreated())));
+                columns.add(
+                        new ColumnDefinition(
+                                "type",
+                                "Type",
+                                0.14f,
+                                Comparator.comparing(o -> o.getSpec().getTypeString())));
+                columns.add(
+                        new ColumnDefinition(
+                                "design",
+                                "Design type",
+                                0.24f,
+                                Comparator.comparing(o -> o.getSpec().getManufacturer())));
+                columns.add(
+                        new ColumnDefinition(
+                                "totalCost",
+                                "Cost",
+                                0.18f,
+                                Comparator.comparing(o -> o.getSpec().getMoneyPrice())));
                 break;
 
             case SPECIAL_ITEM:
             case COMMODITY_ITEM:
-                columns.add(new ColumnDefinition(
-                        "name",
-                        "Name",
-                        0.42f,
-                        Comparator.comparing(o -> o.getSpec().getName())
-                ));
-                columns.add(new ColumnDefinition(
-                        "time",
-                        "Time",
-                        0.12f,
-                        Comparator.comparing(o -> o.getSpec().getDaysToBeCreated())
-                ));
-                columns.add(new ColumnDefinition(
-                        "design",
-                        "Design type",
-                        0.26f,
-                        Comparator.comparing(o -> o.getSpec().getManufacturer())
-                ));
-                columns.add(new ColumnDefinition(
-                        "totalCost",
-                        "Cost",
-                        0.20f,
-                        Comparator.comparing(o -> o.getSpec().getMoneyPrice())
-                ));
+                columns.add(
+                        new ColumnDefinition(
+                                "name",
+                                "Name",
+                                0.42f,
+                                Comparator.comparing(o -> o.getSpec().getName())));
+                columns.add(
+                        new ColumnDefinition(
+                                "time",
+                                "Time",
+                                0.12f,
+                                Comparator.comparing(o -> o.getSpec().getDaysToBeCreated())));
+                columns.add(
+                        new ColumnDefinition(
+                                "design",
+                                "Design type",
+                                0.26f,
+                                Comparator.comparing(o -> o.getSpec().getManufacturer())));
+                columns.add(
+                        new ColumnDefinition(
+                                "totalCost",
+                                "Cost",
+                                0.20f,
+                                Comparator.comparing(o -> o.getSpec().getMoneyPrice())));
                 break;
 
             default:
-                columns.add(new ColumnDefinition(
-                        "name",
-                        "Name",
-                        0.42f,
-                        Comparator.comparing(o -> o.getSpec().getName())
-                ));
-                columns.add(new ColumnDefinition(
-                        "time",
-                        "Time",
-                        0.12f,
-                        Comparator.comparing(o -> o.getSpec().getDaysToBeCreated())
-                ));
-                columns.add(new ColumnDefinition(
-                        "design",
-                        "Design type",
-                        0.26f,
-                        Comparator.comparing(o -> o.getSpec().getManufacturer())
-                ));
-                columns.add(new ColumnDefinition(
-                        "totalCost",
-                        "Cost",
-                        0.20f,
-                        Comparator.comparing(o -> o.getSpec().getMoneyPrice())
-                ));
+                columns.add(
+                        new ColumnDefinition(
+                                "name",
+                                "Name",
+                                0.42f,
+                                Comparator.comparing(o -> o.getSpec().getName())));
+                columns.add(
+                        new ColumnDefinition(
+                                "time",
+                                "Time",
+                                0.12f,
+                                Comparator.comparing(o -> o.getSpec().getDaysToBeCreated())));
+                columns.add(
+                        new ColumnDefinition(
+                                "design",
+                                "Design type",
+                                0.26f,
+                                Comparator.comparing(o -> o.getSpec().getManufacturer())));
+                columns.add(
+                        new ColumnDefinition(
+                                "totalCost",
+                                "Cost",
+                                0.20f,
+                                Comparator.comparing(o -> o.getSpec().getMoneyPrice())));
                 break;
         }
 
@@ -263,14 +262,16 @@ public class ProductionBrowserSection implements ExtendedUIPanelPlugin {
             columnDefinitions = new ArrayList<>();
         }
 
-        contentPanel = Global.getSettings().createCustom(
-                mainPanel.getPosition().getWidth(),
-                mainPanel.getPosition().getHeight(),
-                null
-        );
+        contentPanel =
+                Global.getSettings()
+                        .createCustom(
+                                mainPanel.getPosition().getWidth(),
+                                mainPanel.getPosition().getHeight(),
+                                null);
 
         TooltipMakerAPI tl = contentPanel.createUIElement(250, 20, false);
-        TooltipMakerAPI buttonTl = contentPanel.createUIElement(contentPanel.getPosition().getWidth(), 20, false);
+        TooltipMakerAPI buttonTl =
+                contentPanel.createUIElement(contentPanel.getPosition().getWidth(), 20, false);
 
         int gap = getColumnGap();
         float usablePanelWidth = getUsableHeaderWidth();
@@ -284,16 +285,16 @@ public class ProductionBrowserSection implements ExtendedUIPanelPlugin {
 
             int buttonWidth = columnLayout.getWidth(column.id);
 
-            ButtonAPI btn = buttonTl.addAreaCheckbox(
-                    column.label,
-                    UITableImpl.SortingState.NON_INITIALIZED,
-                    Misc.getBasePlayerColor(),
-                    Misc.getDarkPlayerColor(),
-                    Misc.getBrightPlayerColor(),
-                    buttonWidth,
-                    20,
-                    0f
-            );
+            ButtonAPI btn =
+                    buttonTl.addAreaCheckbox(
+                            column.label,
+                            UITableImpl.SortingState.NON_INITIALIZED,
+                            Misc.getBasePlayerColor(),
+                            Misc.getDarkPlayerColor(),
+                            Misc.getBrightPlayerColor(),
+                            buttonWidth,
+                            20,
+                            0f);
 
             if (previous == null) {
                 btn.getPosition().inTL(0, 0);
@@ -319,19 +320,22 @@ public class ProductionBrowserSection implements ExtendedUIPanelPlugin {
 
         AoTDProductionUIData.populateByType(prodType);
 
-
-
-        float remHeight = contentPanel.getPosition().getHeight() - 64 - tl.getPosition().getHeight() - 30 - 20;
+        float remHeight =
+                contentPanel.getPosition().getHeight()
+                        - 64
+                        - tl.getPosition().getHeight()
+                        - 30
+                        - 20;
         float heightOfManus = getManufacturerPanelHeight();
         float sectionsHeight = remHeight - heightOfManus;
 
         if (list == null) {
-            list = createProductionOptionList(
-                    getSpecsToShow(),
-                    contentPanel.getPosition().getWidth(),
-                    sectionsHeight,
-                    prodType
-            );
+            list =
+                    createProductionOptionList(
+                            getSpecsToShow(),
+                            contentPanel.getPosition().getWidth(),
+                            sectionsHeight,
+                            prodType);
 
             list.setFilter(createListFilter());
 
@@ -342,16 +346,18 @@ public class ProductionBrowserSection implements ExtendedUIPanelPlugin {
         }
 
         list.getButtonsStorage().forEach(x -> x.setListener(createListenerForButton(x)));
-        list.getButtonsStorage().forEach(x -> {
-            manus.merge(x.getSpec().getManufacturer(), 1, Integer::sum);
-            manus.merge("All Designs", 1, Integer::sum);
+        list.getButtonsStorage()
+                .forEach(
+                        x -> {
+                            manus.merge(x.getSpec().getManufacturer(), 1, Integer::sum);
+                            manus.merge("All Designs", 1, Integer::sum);
 
-            sizes.merge(x.getSpec().getSize(), 1, Integer::sum);
-            sizes.merge("All Sizes", 1, Integer::sum);
+                            sizes.merge(x.getSpec().getSize(), 1, Integer::sum);
+                            sizes.merge("All Sizes", 1, Integer::sum);
 
-            types.merge(x.getSpec().getTypeString(), 1, Integer::sum);
-            types.merge("All Types", 1, Integer::sum);
-        });
+                            types.merge(x.getSpec().getTypeString(), 1, Integer::sum);
+                            types.merge("All Types", 1, Integer::sum);
+                        });
         manus = AshMisc.sortByValueDescending(manus);
         sizes = AshMisc.sortByValueDescending(sizes);
         types = AshMisc.sortByValueDescending(types);
@@ -366,42 +372,35 @@ public class ProductionBrowserSection implements ExtendedUIPanelPlugin {
 
     protected void createFilterPanels() {
         if (shouldShowTypeChooser()) {
-            chooseTypeInfo = new ChooseTypeInfo(
-                    contentPanel.getPosition().getWidth(),
-                    types
-            );
-            contentPanel.addComponent(chooseTypeInfo.getMainPanel())
+            chooseTypeInfo = new ChooseTypeInfo(contentPanel.getPosition().getWidth(), types);
+            contentPanel
+                    .addComponent(chooseTypeInfo.getMainPanel())
                     .inTL(
                             0,
                             contentPanel.getPosition().getHeight()
                                     - 30
                                     - 4
-                                    - chooseTypeInfo.getMainPanel().getPosition().getHeight()
-                    );
+                                    - chooseTypeInfo.getMainPanel().getPosition().getHeight());
         }
 
         if (shouldShowSizeChooser()) {
-            chooseSizePanel = new ChooseSizePanel(
-                    contentPanel.getPosition().getWidth(),
-                    sizes
-            );
-            contentPanel.addComponent(chooseSizePanel.getMainPanel())
+            chooseSizePanel = new ChooseSizePanel(contentPanel.getPosition().getWidth(), sizes);
+            contentPanel
+                    .addComponent(chooseSizePanel.getMainPanel())
                     .inTL(
                             0,
                             contentPanel.getPosition().getHeight()
-                                    - chooseSizePanel.getMainPanel().getPosition().getHeight()
-                    );
+                                    - chooseSizePanel.getMainPanel().getPosition().getHeight());
         }
     }
 
     protected void createManufacturerPanel(float sectionsHeight, float heightOfManus) {
-        chooseManufacturerPanel = new ChooseManufacturerPanel(
-                contentPanel.getPosition().getWidth(),
-                heightOfManus,
-                manus
-        );
+        chooseManufacturerPanel =
+                new ChooseManufacturerPanel(
+                        contentPanel.getPosition().getWidth(), heightOfManus, manus);
 
-        contentPanel.addComponent(chooseManufacturerPanel.getMainPanel())
+        contentPanel
+                .addComponent(chooseManufacturerPanel.getMainPanel())
                 .inTL(0, 55 + sectionsHeight + 5);
     }
 
@@ -409,60 +408,67 @@ public class ProductionBrowserSection implements ExtendedUIPanelPlugin {
             List<AoTDProductionSpec> specs,
             float width,
             float height,
-            AoTDProductionSpec.AoTDProductionSpecType prodType
-    ) {
+            AoTDProductionSpec.AoTDProductionSpecType prodType) {
         return new ProductionOptionList(specs, width, height, prodType) {
             @Override
             public ProductionCustomButton createButtonForType(
                     AoTDProductionSpec.AoTDProductionSpecType type,
                     float width,
                     float height,
-                    AoTDProductionSpec spec
-            ) {
-                return ProductionBrowserSection.this.createProductionButtonForType(type, width, height, spec);
+                    AoTDProductionSpec spec) {
+                return ProductionBrowserSection.this.createProductionButtonForType(
+                        type, width, height, spec);
             }
         };
     }
 
     /**
      * Override this if your custom section needs custom buttons that know about the layout.
-     * <p>
-     * Example:
-     * return new MyShipButton(width, height, spec, getColumnLayout());
+     *
+     * <p>Example: return new MyShipButton(width, height, spec, getColumnLayout());
      */
     protected ProductionCustomButton createProductionButtonForType(
             AoTDProductionSpec.AoTDProductionSpecType type,
             float width,
             float height,
-            AoTDProductionSpec spec
-    ) {
+            AoTDProductionSpec spec) {
         switch (prodType) {
             case SHIP:
-                if (!BlackSiteProjectManager.getProjectMatchingRewardThroughSpec(ProjectReward.ProjectRewardType.SHIP, spec.getId()).isEmpty()) {
+                if (!BlackSiteProjectManager.getProjectMatchingRewardThroughSpec(
+                                ProjectReward.ProjectRewardType.SHIP, spec.getId())
+                        .isEmpty()) {
                     return null;
                 }
                 return new ShipProductionCustomButton(width, height, spec);
 
             case WEAPON:
-                if (!BlackSiteProjectManager.getProjectMatchingRewardThroughSpec(ProjectReward.ProjectRewardType.WEAPON, spec.getId()).isEmpty()) {
+                if (!BlackSiteProjectManager.getProjectMatchingRewardThroughSpec(
+                                ProjectReward.ProjectRewardType.WEAPON, spec.getId())
+                        .isEmpty()) {
                     return null;
                 }
                 return new WeaponProductionCustomButton(width, height, spec);
 
             case FIGHTER:
-                if (!BlackSiteProjectManager.getProjectMatchingRewardThroughSpec(ProjectReward.ProjectRewardType.FIGHTER, spec.getId()).isEmpty()) {
+                if (!BlackSiteProjectManager.getProjectMatchingRewardThroughSpec(
+                                ProjectReward.ProjectRewardType.FIGHTER, spec.getId())
+                        .isEmpty()) {
                     return null;
                 }
                 return new FighterProductionCustomButton(width, height, spec);
 
             case SPECIAL_ITEM:
-                if (!BlackSiteProjectManager.getProjectMatchingRewardThroughSpec(ProjectReward.ProjectRewardType.ITEM, spec.getId()).isEmpty()) {
+                if (!BlackSiteProjectManager.getProjectMatchingRewardThroughSpec(
+                                ProjectReward.ProjectRewardType.ITEM, spec.getId())
+                        .isEmpty()) {
                     return null;
                 }
                 return new ItemProductionCustomButton(width, height, spec);
 
             case COMMODITY_ITEM:
-                if (!BlackSiteProjectManager.getProjectMatchingRewardThroughSpec(ProjectReward.ProjectRewardType.AICORE, spec.getId()).isEmpty()) {
+                if (!BlackSiteProjectManager.getProjectMatchingRewardThroughSpec(
+                                ProjectReward.ProjectRewardType.AICORE, spec.getId())
+                        .isEmpty()) {
                     return null;
                 }
                 return new ItemProductionCustomButton(width, height, spec);
@@ -491,58 +497,64 @@ public class ProductionBrowserSection implements ExtendedUIPanelPlugin {
         final String searchString = rawSearch.toLowerCase().trim();
         final int threshold = getSearchLevenshteinThreshold();
 
-        buttons.removeIf(button -> {
-            String candidate = getSearchString(button);
-            if (candidate == null) return true;
+        buttons.removeIf(
+                button -> {
+                    String candidate = getSearchString(button);
+                    if (candidate == null) return true;
 
-            String normalized = candidate.toLowerCase();
-            int distance = AoTDMisc.levenshteinDistance(searchString, normalized);
+                    String normalized = candidate.toLowerCase();
+                    int distance = AoTDMisc.levenshteinDistance(searchString, normalized);
 
-            return distance > threshold && !normalized.contains(searchString);
-        });
+                    return distance > threshold && !normalized.contains(searchString);
+                });
 
-        buttons.sort((b1, b2) -> {
-            String s1 = getSearchString(b1);
-            String s2 = getSearchString(b2);
+        buttons.sort(
+                (b1, b2) -> {
+                    String s1 = getSearchString(b1);
+                    String s2 = getSearchString(b2);
 
-            if (s1 == null) s1 = "";
-            if (s2 == null) s2 = "";
+                    if (s1 == null) s1 = "";
+                    if (s2 == null) s2 = "";
 
-            String s1S = s1.toLowerCase();
-            String s2S = s2.toLowerCase();
+                    String s1S = s1.toLowerCase();
+                    String s2S = s2.toLowerCase();
 
-            boolean s1Contains = s1S.contains(searchString);
-            boolean s2Contains = s2S.contains(searchString);
+                    boolean s1Contains = s1S.contains(searchString);
+                    boolean s2Contains = s2S.contains(searchString);
 
-            if (s1Contains && !s2Contains) return -1;
-            if (!s1Contains && s2Contains) return 1;
+                    if (s1Contains && !s2Contains) return -1;
+                    if (!s1Contains && s2Contains) return 1;
 
-            int distance1 = AoTDMisc.levenshteinDistance(searchString, s1S);
-            int distance2 = AoTDMisc.levenshteinDistance(searchString, s2S);
+                    int distance1 = AoTDMisc.levenshteinDistance(searchString, s1S);
+                    int distance2 = AoTDMisc.levenshteinDistance(searchString, s2S);
 
-            int cmp = Integer.compare(distance1, distance2);
-            if (cmp != 0) return cmp;
+                    int cmp = Integer.compare(distance1, distance2);
+                    if (cmp != 0) return cmp;
 
-            return s1S.compareTo(s2S);
-        });
+                    return s1S.compareTo(s2S);
+                });
     }
 
     protected void pruneByFilterPanels(ArrayList<ProductionCustomButton> buttons) {
-        buttons.removeIf(button -> {
-            AoTDProductionSpec spec = button.getSpec();
+        buttons.removeIf(
+                button -> {
+                    AoTDProductionSpec spec = button.getSpec();
 
-            if (chooseManufacturerPanel != null && !chooseManufacturerPanel.isManufacturerChosen(spec.getManufacturer())) {
-                return true;
-            }
-            if (chooseTypeInfo != null && !chooseTypeInfo.isTypeChosen(spec.getTypeString())) {
-                return true;
-            }
-            if (chooseSizePanel != null && !chooseSizePanel.isSizeChosen(spec.getSize())) {
-                return true;
-            }
+                    if (chooseManufacturerPanel != null
+                            && !chooseManufacturerPanel.isManufacturerChosen(
+                                    spec.getManufacturer())) {
+                        return true;
+                    }
+                    if (chooseTypeInfo != null
+                            && !chooseTypeInfo.isTypeChosen(spec.getTypeString())) {
+                        return true;
+                    }
+                    if (chooseSizePanel != null && !chooseSizePanel.isSizeChosen(spec.getSize())) {
+                        return true;
+                    }
 
-            return false;
-        });
+                    return false;
+                });
     }
 
     protected String getSearchString(ProductionCustomButton button) {
@@ -555,9 +567,7 @@ public class ProductionBrowserSection implements ExtendedUIPanelPlugin {
 
     protected List<AoTDProductionSpec> getSpecsToShow() {
         return AoTDProductionSpecManager.getLearnedSpecsForFaction(
-                prodType,
-                Global.getSector().getPlayerFaction()
-        );
+                prodType, Global.getSector().getPlayerFaction());
     }
 
     protected boolean shouldShowTypeChooser() {
@@ -565,8 +575,8 @@ public class ProductionBrowserSection implements ExtendedUIPanelPlugin {
     }
 
     protected boolean shouldShowSizeChooser() {
-        return prodType == AoTDProductionSpec.AoTDProductionSpecType.WEAPON ||
-                prodType == AoTDProductionSpec.AoTDProductionSpecType.SHIP;
+        return prodType == AoTDProductionSpec.AoTDProductionSpecType.WEAPON
+                || prodType == AoTDProductionSpec.AoTDProductionSpecType.SHIP;
     }
 
     protected float getManufacturerPanelHeight() {
@@ -589,7 +599,8 @@ public class ProductionBrowserSection implements ExtendedUIPanelPlugin {
         return UITableImpl.SortingState.ASCENDING;
     }
 
-    public CustomButton.ButtonEventListener createListenerForButton(ProductionCustomButton customButton) {
+    public CustomButton.ButtonEventListener createListenerForButton(
+            ProductionCustomButton customButton) {
         return null;
     }
 
@@ -627,16 +638,13 @@ public class ProductionBrowserSection implements ExtendedUIPanelPlugin {
     }
 
     @Override
-    public void positionChanged(PositionAPI position) {
-    }
+    public void positionChanged(PositionAPI position) {}
 
     @Override
-    public void renderBelow(float alphaMult) {
-    }
+    public void renderBelow(float alphaMult) {}
 
     @Override
-    public void render(float alphaMult) {
-    }
+    public void render(float alphaMult) {}
 
     @Override
     public void advance(float amount) {
@@ -665,7 +673,8 @@ public class ProductionBrowserSection implements ExtendedUIPanelPlugin {
         }
     }
 
-    protected void handleSortButton(ButtonAPI button, Comparator<ProductionCustomButton> comparator) {
+    protected void handleSortButton(
+            ButtonAPI button, Comparator<ProductionCustomButton> comparator) {
         if (button == null || comparator == null) return;
         if (!button.isChecked()) return;
 
@@ -758,19 +767,23 @@ public class ProductionBrowserSection implements ExtendedUIPanelPlugin {
             if (event.isConsumed()) continue;
 
             if (event.isKeyUpEvent()) {
-                if (event.getEventValue() == Keyboard.KEY_LSHIFT || event.getEventValue() == Keyboard.KEY_RSHIFT) {
+                if (event.getEventValue() == Keyboard.KEY_LSHIFT
+                        || event.getEventValue() == Keyboard.KEY_RSHIFT) {
                     isPressingShift = false;
                 }
-                if (event.getEventValue() == Keyboard.KEY_LCONTROL || event.getEventValue() == Keyboard.KEY_RCONTROL) {
+                if (event.getEventValue() == Keyboard.KEY_LCONTROL
+                        || event.getEventValue() == Keyboard.KEY_RCONTROL) {
                     isPressingCtrl = false;
                 }
             }
 
             if (event.isKeyDownEvent()) {
-                if (event.getEventValue() == Keyboard.KEY_LSHIFT || event.getEventValue() == Keyboard.KEY_RSHIFT) {
+                if (event.getEventValue() == Keyboard.KEY_LSHIFT
+                        || event.getEventValue() == Keyboard.KEY_RSHIFT) {
                     isPressingShift = true;
                 }
-                if (event.getEventValue() == Keyboard.KEY_LCONTROL || event.getEventValue() == Keyboard.KEY_RCONTROL) {
+                if (event.getEventValue() == Keyboard.KEY_LCONTROL
+                        || event.getEventValue() == Keyboard.KEY_RCONTROL) {
                     isPressingCtrl = true;
                 }
             }
@@ -778,8 +791,7 @@ public class ProductionBrowserSection implements ExtendedUIPanelPlugin {
     }
 
     @Override
-    public void buttonPressed(Object buttonId) {
-    }
+    public void buttonPressed(Object buttonId) {}
 
     public class ColumnDefinition {
         public final String id;
@@ -791,8 +803,7 @@ public class ProductionBrowserSection implements ExtendedUIPanelPlugin {
                 String id,
                 String label,
                 float ratio,
-                Comparator<ProductionCustomButton> comparator
-        ) {
+                Comparator<ProductionCustomButton> comparator) {
             this.id = id;
             this.label = label;
             this.ratio = ratio;
@@ -887,9 +898,8 @@ public class ProductionBrowserSection implements ExtendedUIPanelPlugin {
             for (ColumnDefinition column : columns) {
                 if (column == null || column.id == null) continue;
 
-                float normalizedRatio = useEqualRatios
-                        ? equalRatio
-                        : Math.max(0f, column.ratio) / totalRatio;
+                float normalizedRatio =
+                        useEqualRatios ? equalRatio : Math.max(0f, column.ratio) / totalRatio;
 
                 float exact = normalizedRatio * effectiveWidth;
                 int base = (int) Math.floor(exact);

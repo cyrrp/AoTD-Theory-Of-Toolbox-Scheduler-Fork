@@ -6,23 +6,30 @@ import com.fs.starfarer.api.util.Misc;
 import data.kaysaar.aotd.tot.scripts.trade.contracts.AoTDTradeContract;
 import data.kaysaar.aotd.tot.scripts.trade.contracts.AoTDTradeContractManager;
 import data.kaysaar.aotd.tot.ui.economy.tradecontracts.browser.ContractBrowsingPanelPlugin;
-import data.kaysaar.aotd.tot.ui.economy.tradecontracts.TradeContractUITable;
-
 import java.awt.*;
 
 public class ContractBrowsingDialog extends BasePopUpDialog {
     ContractBrowsingPanelPlugin plugin;
     float tablePrevWidth;
-    float heightRecorded ;
+    float heightRecorded;
 
-    public ContractBrowsingDialog( ) {
+    public ContractBrowsingDialog() {
         super("Available Trade Contracts");
-
     }
 
     @Override
     public ButtonAPI generateCancelButton(TooltipMakerAPI tooltip) {
-        ButtonAPI button = tooltip.addButton("Exit", "cancel", Misc.getBasePlayerColor(), Misc.getDarkPlayerColor(), Alignment.MID, CutStyle.TL_BR, buttonConfirmWidth, 25.0F, 0.0F);
+        ButtonAPI button =
+                tooltip.addButton(
+                        "Exit",
+                        "cancel",
+                        Misc.getBasePlayerColor(),
+                        Misc.getDarkPlayerColor(),
+                        Alignment.MID,
+                        CutStyle.TL_BR,
+                        buttonConfirmWidth,
+                        25.0F,
+                        0.0F);
         button.setShortcut(1, true);
         this.cancelButton = button;
         return button;
@@ -35,28 +42,28 @@ public class ContractBrowsingDialog extends BasePopUpDialog {
 
     @Override
     public void createUI(CustomPanelAPI panelAPI) {
-        heightRecorded = panelAPI.getPosition().getHeight()-this.y-20;
+        heightRecorded = panelAPI.getPosition().getHeight() - this.y - 20;
         super.createUI(panelAPI);
-
     }
 
     @Override
     public void createContentForDialog(TooltipMakerAPI tooltip, float width) {
-        plugin = new ContractBrowsingPanelPlugin(width, heightRecorded-10);
+        plugin = new ContractBrowsingPanelPlugin(width, heightRecorded - 10);
         tooltip.setParaFont(Fonts.ORBITRON_20AABOLD);
-        tooltip.addCustom(plugin.getMainPanel(),0f);
-
+        tooltip.addCustom(plugin.getMainPanel(), 0f);
     }
 
     @Override
     public void advance(float amount) {
         super.advance(amount);
-
     }
 
     @Override
     public void applyConfirmScript() {
-        AoTDTradeContract contract = AoTDTradeContractManager.getInstance().getCurrentlyGeneratedInBrowser().remove(plugin.getCurrContract());
+        AoTDTradeContract contract =
+                AoTDTradeContractManager.getInstance()
+                        .getCurrentlyGeneratedInBrowser()
+                        .remove(plugin.getCurrContract());
         AoTDTradeContractManager.getInstance().addContract(contract);
     }
 

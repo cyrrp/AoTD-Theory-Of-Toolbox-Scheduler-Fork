@@ -13,22 +13,29 @@ import com.fs.starfarer.api.impl.campaign.ids.Commodities;
 import com.fs.starfarer.api.impl.campaign.ids.Conditions;
 import com.fs.starfarer.api.impl.campaign.ids.Industries;
 import com.fs.starfarer.api.impl.campaign.rulecmd.salvage.MarketCMD;
-
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 public class AoTDStandardGroundRaidObjectivesCreator extends StandardGroundRaidObjectivesCreator {
-    public void modifyRaidObjectives(MarketAPI market, SectorEntityToken entity, List<GroundRaidObjectivePlugin> objectives, MarketCMD.RaidType type, int marineTokens, int priority) {
+    public void modifyRaidObjectives(
+            MarketAPI market,
+            SectorEntityToken entity,
+            List<GroundRaidObjectivePlugin> objectives,
+            MarketCMD.RaidType type,
+            int marineTokens,
+            int priority) {
         if (priority != 0) return;
         if (market == null) return;
 
         if (type == MarketCMD.RaidType.VALUABLE) {
             Map<CommodityOnMarketAPI, Float> raidValuables = computeRaidValuables(market);
-            List<CommodityOnMarketAPI> commodities = new ArrayList<CommodityOnMarketAPI>(raidValuables.keySet());
+            List<CommodityOnMarketAPI> commodities =
+                    new ArrayList<CommodityOnMarketAPI>(raidValuables.keySet());
             for (CommodityOnMarketAPI com : commodities) {
-                AoTDCommodityGroundRaidObjectivePluginImpl curr = new AoTDCommodityGroundRaidObjectivePluginImpl(market, com.getId());
+                AoTDCommodityGroundRaidObjectivePluginImpl curr =
+                        new AoTDCommodityGroundRaidObjectivePluginImpl(market, com.getId());
                 if (curr.getQuantity(1) <= 0) continue;
                 objectives.add(curr);
             }
@@ -36,30 +43,34 @@ public class AoTDStandardGroundRaidObjectivesCreator extends StandardGroundRaidO
             for (Industry ind : market.getIndustries()) {
                 String coreId = ind.getAICoreId();
                 if (coreId != null) {
-                    AICoreGroundRaidObjectivePluginImpl core = new AICoreGroundRaidObjectivePluginImpl(market, coreId, ind);
+                    AICoreGroundRaidObjectivePluginImpl core =
+                            new AICoreGroundRaidObjectivePluginImpl(market, coreId, ind);
                     objectives.add(core);
                 }
                 SpecialItemData sid = ind.getSpecialItem();
                 if (sid != null) {
-                    SpecialItemRaidObjectivePluginImpl special = new SpecialItemRaidObjectivePluginImpl(market,
-                            sid.getId(), null, ind);
+                    SpecialItemRaidObjectivePluginImpl special =
+                            new SpecialItemRaidObjectivePluginImpl(market, sid.getId(), null, ind);
                     objectives.add(special);
-
                 }
             }
 
-            // a bit confusing, and also hard to balance - either the best option or the worst, not much in-between
-//			CreditsGroundRaidObjectivePluginImpl credits = new CreditsGroundRaidObjectivePluginImpl(market);
-//			if (credits.getQuantity(1) > 0) {
-//				objectives.add(credits);
-//			}
+            // a bit confusing, and also hard to balance - either the best option or the worst, not
+            // much in-between
+            //			CreditsGroundRaidObjectivePluginImpl credits = new
+            // CreditsGroundRaidObjectivePluginImpl(market);
+            //			if (credits.getQuantity(1) > 0) {
+            //				objectives.add(credits);
+            //			}
 
-            ShipWeaponsGroundRaidObjectivePluginImpl weapons = new ShipWeaponsGroundRaidObjectivePluginImpl(market);
+            ShipWeaponsGroundRaidObjectivePluginImpl weapons =
+                    new ShipWeaponsGroundRaidObjectivePluginImpl(market);
             if (weapons.getQuantity(1) > 0) {
                 objectives.add(weapons);
             }
 
-            BlueprintGroundRaidObjectivePluginImpl blueprints = new BlueprintGroundRaidObjectivePluginImpl(market);
+            BlueprintGroundRaidObjectivePluginImpl blueprints =
+                    new BlueprintGroundRaidObjectivePluginImpl(market);
             if (blueprints.getQuantity(1) > 0) {
                 objectives.add(blueprints);
             }
@@ -72,7 +83,8 @@ public class AoTDStandardGroundRaidObjectivesCreator extends StandardGroundRaidO
             for (Industry ind : market.getIndustries()) {
                 if (ind.getSpec().hasTag(Industries.TAG_UNRAIDABLE)) continue;
 
-                DisruptIndustryRaidObjectivePluginImpl curr = new DisruptIndustryRaidObjectivePluginImpl(market, ind);
+                DisruptIndustryRaidObjectivePluginImpl curr =
+                        new DisruptIndustryRaidObjectivePluginImpl(market, ind);
                 if (curr.getBaseDisruptDuration(marineTokens) <= 0) continue;
                 objectives.add(curr);
             }
@@ -95,8 +107,6 @@ public class AoTDStandardGroundRaidObjectivesCreator extends StandardGroundRaidO
         return result;
     }
 
-
-    public void reportRaidObjectivesAchieved(RaidResultData data, InteractionDialogAPI dialog, Map<String, MemoryAPI> memoryMap) {
-
-    }
+    public void reportRaidObjectivesAchieved(
+            RaidResultData data, InteractionDialogAPI dialog, Map<String, MemoryAPI> memoryMap) {}
 }

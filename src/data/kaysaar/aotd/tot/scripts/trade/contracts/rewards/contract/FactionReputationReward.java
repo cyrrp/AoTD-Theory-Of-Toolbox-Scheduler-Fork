@@ -6,7 +6,6 @@ import com.fs.starfarer.api.ui.TooltipMakerAPI;
 import com.fs.starfarer.api.util.Misc;
 import data.kaysaar.aotd.tot.misc.AoTDToolboxMisc;
 import data.kaysaar.aotd.tot.scripts.trade.contracts.rewards.TradeContractRewardDataAPI;
-
 import java.awt.*;
 
 public class FactionReputationReward implements TradeContractRewardDataAPI {
@@ -21,30 +20,42 @@ public class FactionReputationReward implements TradeContractRewardDataAPI {
     }
 
     @Override
-    public void createRewardSection(TooltipMakerAPI tooltip, float width, TradeContractRewardTooltipMode mode, float defaultOpadText) {
+    public void createRewardSection(
+            TooltipMakerAPI tooltip,
+            float width,
+            TradeContractRewardTooltipMode mode,
+            float defaultOpadText) {
         FactionAPI faction = Global.getSector().getFaction(factionId);
-        tooltip.addPara("Increase reputation with %s by %s",defaultOpadText, new Color[]{faction.getBaseUIColor(),Color.ORANGE}, AoTDToolboxMisc.capitalizeFirst(faction.getDisplayName()),changePlus+"");
+        tooltip.addPara(
+                "Increase reputation with %s by %s",
+                defaultOpadText,
+                new Color[] {faction.getBaseUIColor(), Color.ORANGE},
+                AoTDToolboxMisc.capitalizeFirst(faction.getDisplayName()),
+                changePlus + "");
     }
 
     @Override
-    public void createPenaltySectionForNotMeetingContract(TooltipMakerAPI tooltip, float width, TradeContractRewardTooltipMode mode, float defaultOpadText) {
+    public void createPenaltySectionForNotMeetingContract(
+            TooltipMakerAPI tooltip,
+            float width,
+            TradeContractRewardTooltipMode mode,
+            float defaultOpadText) {
         FactionAPI faction = Global.getSector().getFaction(factionId);
-        tooltip.addPara("Decrease reputation with %s by %s",defaultOpadText, new Color[]{faction.getBaseUIColor(), Misc.getNegativeHighlightColor()}, AoTDToolboxMisc.capitalizeFirst(faction.getDisplayName()),changeMinus+"");
-
+        tooltip.addPara(
+                "Decrease reputation with %s by %s",
+                defaultOpadText,
+                new Color[] {faction.getBaseUIColor(), Misc.getNegativeHighlightColor()},
+                AoTDToolboxMisc.capitalizeFirst(faction.getDisplayName()),
+                changeMinus + "");
     }
 
     @Override
-    public void executeRewardAtTheEndOfContract() {
-
-    }
+    public void executeRewardAtTheEndOfContract() {}
 
     @Override
-    public void executePenaltyAthTheTerminationOfContract(boolean wasTerminatedByPlayerManually) {
-
-    }
+    public void executePenaltyAthTheTerminationOfContract(boolean wasTerminatedByPlayerManually) {}
 
     @Override
-    public void executeRewardMonthly(int amountOfCommoditiesDeliveredThisMonth, int reqThisMonth, String commodityId) {
-
-    }
+    public void executeRewardMonthly(
+            int amountOfCommoditiesDeliveredThisMonth, int reqThisMonth, String commodityId) {}
 }

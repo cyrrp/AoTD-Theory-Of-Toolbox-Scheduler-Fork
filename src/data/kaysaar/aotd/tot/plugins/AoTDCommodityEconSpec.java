@@ -7,9 +7,9 @@ import org.json.JSONObject;
 
 public class AoTDCommodityEconSpec {
     public String commodityId;
-    public float supplyMult,demandMult;
+    public float supplyMult, demandMult;
     public String calculationScript;
-    public float internalCut,externalCut;
+    public float internalCut, externalCut;
     public float econUnitMult = 1f;
 
     public String getCommodityId() {
@@ -19,37 +19,46 @@ public class AoTDCommodityEconSpec {
     public AoTDBaseDemSupCalc getCalculationScript() {
         return (AoTDBaseDemSupCalc) Global.getSettings().getInstanceOfScript(calculationScript);
     }
+
     public static AoTDCommodityEconSpec generateFromJson(JSONObject obj) throws JSONException {
 
         String id = obj.getString("commodityId");
-        if(!AshMisc.isStringValid(id))return null;
+        if (!AshMisc.isStringValid(id)) return null;
         String script = obj.getString("calculationScript");
         float supplyEconMult = (float) obj.getDouble("supplyEconUnitMult");
-        float demandEconMult= (float) obj.getDouble("demandEconUnitMult");
+        float demandEconMult = (float) obj.getDouble("demandEconUnitMult");
         float internalCut = 0.05f;
         float externalCut = 0.15f;
         float econUnitMult = 1f;
-        if(!AshMisc.isStringValid(script)){
+        if (!AshMisc.isStringValid(script)) {
             script = AoTDBaseDemSupCalc.class.getName();
         }
-        if(AshMisc.isStringValid("internalCut")){
+        if (AshMisc.isStringValid("internalCut")) {
             internalCut = (float) obj.getDouble("internalCut");
         }
 
-        if(AshMisc.isStringValid("externalCut")){
+        if (AshMisc.isStringValid("externalCut")) {
             externalCut = (float) obj.getDouble("externalCut");
         }
-        if(AshMisc.isStringValid("econUnitMult")){
+        if (AshMisc.isStringValid("econUnitMult")) {
             econUnitMult = (float) obj.getDouble("econUnitMult");
-
         }
-        AoTDCommodityEconSpec spec =new AoTDCommodityEconSpec(id, supplyEconMult, demandEconMult, script,internalCut,externalCut);
-        if(econUnitMult!=1){
+        AoTDCommodityEconSpec spec =
+                new AoTDCommodityEconSpec(
+                        id, supplyEconMult, demandEconMult, script, internalCut, externalCut);
+        if (econUnitMult != 1) {
             spec.setEconUnitMult(econUnitMult);
         }
-        return spec ;
+        return spec;
     }
-    public AoTDCommodityEconSpec(String commodityId, float supplyMult, float demandMult,String classForCalc,float internalCut,float externalCut) {
+
+    public AoTDCommodityEconSpec(
+            String commodityId,
+            float supplyMult,
+            float demandMult,
+            String classForCalc,
+            float internalCut,
+            float externalCut) {
         this.commodityId = commodityId;
         this.supplyMult = supplyMult;
         this.demandMult = demandMult;
@@ -89,5 +98,4 @@ public class AoTDCommodityEconSpec {
     public float getDemandMult() {
         return demandMult;
     }
-
 }

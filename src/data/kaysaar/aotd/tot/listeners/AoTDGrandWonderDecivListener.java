@@ -12,7 +12,7 @@ public class AoTDGrandWonderDecivListener implements ColonyDecivListener {
     public void reportColonyAboutToBeDecivilized(MarketAPI market, boolean fullyDestroyed) {
         int amWonders = 0;
         for (Industry industry : market.getIndustries()) {
-            if(industry instanceof GrandWonderAPI){
+            if (industry instanceof GrandWonderAPI) {
                 amWonders++;
                 GrandWonderManager.getInstance().removeBuiltSoFar(industry.getId());
             }
@@ -26,16 +26,13 @@ public class AoTDGrandWonderDecivListener implements ColonyDecivListener {
             if (factionMarket == market) {
                 continue;
             }
-            factionMarket.getStability().addTemporaryModFlat(
-                    365f,
-                    "aotd_wonder_loss",
-                    "Loss of Grand Wonders",
-                    penalty);
+            factionMarket
+                    .getStability()
+                    .addTemporaryModFlat(
+                            365f, "aotd_wonder_loss", "Loss of Grand Wonders", penalty);
         }
     }
 
     @Override
-    public void reportColonyDecivilized(MarketAPI market, boolean fullyDestroyed) {
-
-    }
+    public void reportColonyDecivilized(MarketAPI market, boolean fullyDestroyed) {}
 }

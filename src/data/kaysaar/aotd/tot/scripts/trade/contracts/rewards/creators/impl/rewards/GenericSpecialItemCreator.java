@@ -7,7 +7,6 @@ import data.kaysaar.aotd.tot.scripts.trade.contracts.AoTDTradeContract;
 import data.kaysaar.aotd.tot.scripts.trade.contracts.AoTDTradeContractManager;
 import data.kaysaar.aotd.tot.scripts.trade.contracts.rewards.contract.SpecialItemReward;
 import data.kaysaar.aotd.tot.scripts.trade.contracts.rewards.creators.BaseContractRewardCreator;
-
 import java.util.LinkedHashSet;
 
 public class GenericSpecialItemCreator extends BaseContractRewardCreator {
@@ -15,6 +14,7 @@ public class GenericSpecialItemCreator extends BaseContractRewardCreator {
     // editable pools
     public static final LinkedHashSet<String> RARE_ITEMS = new LinkedHashSet<>();
     public static final LinkedHashSet<String> VERY_RARE_ITEMS = new LinkedHashSet<>();
+
     @Override
     public float getPickGateChance(AoTDTradeContract contract) {
         int lvl = AoTDTradeContractManager.getInstance().getCurrLevelData().getCurrentLevel();
@@ -23,6 +23,7 @@ public class GenericSpecialItemCreator extends BaseContractRewardCreator {
         float chance = 0.005f + 0.001f * Math.max(0, lvl - 5);
         return Math.min(chance, 0.015f);
     }
+
     static {
         // Rare
         RARE_ITEMS.add("corrupted_nanoforge");

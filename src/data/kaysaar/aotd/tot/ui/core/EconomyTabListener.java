@@ -1,5 +1,7 @@
 package data.kaysaar.aotd.tot.ui.core;
 
+import static ashlib.data.plugins.coreui.CommandTabTracker.tryToGetButtonProd;
+
 import ashlib.data.plugins.coreui.CommandTabListener;
 import ashlib.data.plugins.coreui.CommandUIPlugin;
 import com.fs.starfarer.api.Global;
@@ -10,10 +12,9 @@ import com.fs.starfarer.api.ui.UIComponentAPI;
 import data.kaysaar.aotd.tot.ui.economy.EconomyUIPanel;
 import org.lwjgl.input.Keyboard;
 
-import static ashlib.data.plugins.coreui.CommandTabTracker.tryToGetButtonProd;
-
 public class EconomyTabListener implements CommandTabListener {
-    public static float WIDTH ,HEIGHT;
+    public static float WIDTH, HEIGHT;
+
     @Override
     public String getNameForTab() {
         return "Economy";
@@ -26,10 +27,12 @@ public class EconomyTabListener implements CommandTabListener {
 
     @Override
     public String getButtonToBePlacedNear() {
-        if(Global.getSettings().getModManager().isModEnabled("Terraforming & Station Construction")){
+        if (Global.getSettings()
+                .getModManager()
+                .isModEnabled("Terraforming & Station Construction")) {
             return "Terraforming";
         }
-        if(Global.getSettings().getModManager().isModEnabled("aotd_vok")){
+        if (Global.getSettings().getModManager().isModEnabled("aotd_vok")) {
             return "research & production";
         }
 
@@ -50,16 +53,20 @@ public class EconomyTabListener implements CommandTabListener {
             }
 
             @Override
-            public void createTooltip(TooltipMakerAPI tooltip, boolean expanded, Object tooltipParam) {
-                tooltip.addSectionHeading("Ashes of the Domain : Theory of Toolbox", Alignment.MID,0f);
-                tooltip.addPara("In this tab, you can analyze economy data and manage markets production and exports",5f);
+            public void createTooltip(
+                    TooltipMakerAPI tooltip, boolean expanded, Object tooltipParam) {
+                tooltip.addSectionHeading(
+                        "Ashes of the Domain : Theory of Toolbox", Alignment.MID, 0f);
+                tooltip.addPara(
+                        "In this tab, you can analyze economy data and manage markets production and exports",
+                        5f);
             }
         };
     }
 
     @Override
     public CommandUIPlugin createPlugin() {
-        return new EconomyUIPanel(WIDTH,HEIGHT);
+        return new EconomyUIPanel(WIDTH, HEIGHT);
     }
 
     @Override
@@ -69,10 +76,12 @@ public class EconomyTabListener implements CommandTabListener {
 
     @Override
     public int getKeyBind() {
-        if(Global.getSettings().getModManager().isModEnabled("Terraforming & Station Construction")){
+        if (Global.getSettings()
+                .getModManager()
+                .isModEnabled("Terraforming & Station Construction")) {
             return Keyboard.KEY_7;
         }
-        return  Keyboard.KEY_6;
+        return Keyboard.KEY_6;
     }
 
     @Override
@@ -109,7 +118,5 @@ public class EconomyTabListener implements CommandTabListener {
     }
 
     @Override
-    public void performRefresh(ButtonAPI buttonAPI) {
-
-    }
+    public void performRefresh(ButtonAPI buttonAPI) {}
 }

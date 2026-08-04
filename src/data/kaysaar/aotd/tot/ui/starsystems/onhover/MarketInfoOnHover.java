@@ -14,7 +14,5 @@ public class MarketInfoOnHover implements TooltipMakerAPI.TooltipCreator {
     }
 
     @Override
-    public void createTooltip(TooltipMakerAPI tooltip, boolean expanded, Object tooltipParam) {
-
-    }
+    public void createTooltip(TooltipMakerAPI tooltip, boolean expanded, Object tooltipParam) {}
 }

@@ -24,12 +24,14 @@ public class GenericAICoreCreator extends BaseContractRewardCreator {
         base += Math.max(0, lvl - getReqMinLevelForRewardToGenerate()) * 2.5f;
         return base;
     }
+
     @Override
     public float getPickGateChance(AoTDTradeContract contract) {
         int lvl = AoTDTradeContractManager.getInstance().getCurrLevelData().getCurrentLevel();
         float chance = 0.06f + 0.01f * Math.max(0, lvl - 5); // 6% -> 16%
         return Math.min(chance, 0.16f);
     }
+
     @Override
     public boolean canRewardTypeRepeat() {
         return false;

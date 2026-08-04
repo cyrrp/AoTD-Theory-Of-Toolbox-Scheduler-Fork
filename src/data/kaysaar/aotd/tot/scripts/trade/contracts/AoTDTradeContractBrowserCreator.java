@@ -1,4 +1,3 @@
-
 package data.kaysaar.aotd.tot.scripts.trade.contracts;
 
 import com.fs.starfarer.api.Global;
@@ -15,13 +14,12 @@ import data.kaysaar.aotd.tot.scripts.trade.contracts.rewards.contract.FactionRep
 import data.kaysaar.aotd.tot.scripts.trade.contracts.rewards.contract.MerchantReputationReward;
 import data.kaysaar.aotd.tot.scripts.trade.contracts.rewards.creators.AoTDContractRewardCreatorManager;
 import data.kaysaar.aotd.tot.scripts.trade.manager.AoTDTradeManager;
-import org.lazywizard.lazylib.MathUtils;
-
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Random;
+import org.lazywizard.lazylib.MathUtils;
 
 public class AoTDTradeContractBrowserCreator {
 
@@ -108,9 +106,7 @@ public class AoTDTradeContractBrowserCreator {
         return null;
     }
 
-    /**
-     * Normal private issuer: mostly independents, sometimes others (excluding player).
-     */
+    /** Normal private issuer: mostly independents, sometimes others (excluding player). */
     private static FactionAPI pickNormalIssuerPreferIndep(Random r) {
         FactionAPI indep = Global.getSector().getFaction(Factions.INDEPENDENT);
         if (indep != null && indep.isShowInIntelTab() && !indep.isPlayerFaction()) return indep;
@@ -134,17 +130,14 @@ public class AoTDTradeContractBrowserCreator {
     }
 
     /**
-     * Commodity picker: leans slightly toward commodities the player produces (production > 0),
-     * but does not force them.
+     * Commodity picker: leans slightly toward commodities the player produces (production > 0), but
+     * does not force them.
      *
-     * Two-state weighting only:
-     *  - player produces => weight boosted
-     *  - player doesn't  => normal weight
+     * <p>Two-state weighting only: - player produces => weight boosted - player doesn't => normal
+     * weight
      */
-    private static String pickPrivateCommodityWeighted(Random r,
-                                                       LinkedHashSet<String> all,
-                                                       boolean allowIllegal,
-                                                       boolean allowExotic) {
+    private static String pickPrivateCommodityWeighted(
+            Random r, LinkedHashSet<String> all, boolean allowIllegal, boolean allowExotic) {
         WeightedRandomPicker<String> picker = new WeightedRandomPicker<>(r);
 
         for (String cid : all) {
@@ -152,7 +145,9 @@ public class AoTDTradeContractBrowserCreator {
 
             if (!isPrivateCommodityAllowed(cid)) continue;
 
-            int prod = AoTDSectorProductionDemandDataUtils.getTotalProductionFromFaction(cid, Factions.PLAYER);
+            int prod =
+                    AoTDSectorProductionDemandDataUtils.getTotalProductionFromFaction(
+                            cid, Factions.PLAYER);
             boolean exotic = commodityIsExotic(cid);
 
             // Exotics only allowed if produced
@@ -170,7 +165,7 @@ public class AoTDTradeContractBrowserCreator {
             // Exotic-specific behavior
             if (exotic) {
                 if (prod > 0) {
-                    w *=5.0f; // strong boost for produced exotics
+                    w *= 5.0f; // strong boost for produced exotics
                 }
                 // IMPORTANT: no demand scaling for exotics
             } else {
@@ -187,11 +182,10 @@ public class AoTDTradeContractBrowserCreator {
     }
 
     /**
-     * Private cut rolls:
-     * - non-exotic single-line contracts (normal)
+     * Private cut rolls: - non-exotic single-line contracts (normal)
      *
-     * You asked earlier for faction cuts min=0.25 max=0.6, but this class is private-only generator.
-     * So we keep private in a sane "buyer pays player" range, with mild level lift.
+     * <p>You asked earlier for faction cuts min=0.25 max=0.6, but this class is private-only
+     * generator. So we keep private in a sane "buyer pays player" range, with mild level lift.
      */
     private static float rollCutPrivate(Random r, int level, String commodityId) {
         float cutOriginal = 0.15f;
@@ -214,27 +208,28 @@ public class AoTDTradeContractBrowserCreator {
 
         if (u < lowChance) {
             // ~0.30–0.40 (for base 0.15)
-            mult = 2.0f + r.nextFloat() * 0.7f;   // 2.0–2.7
+            mult = 2.0f + r.nextFloat() * 0.7f; // 2.0–2.7
         } else if (u < lowChance + midChance) {
             // ~0.40–0.50
-            mult = 2.7f + r.nextFloat() * 0.7f;   // 2.7–3.4
+            mult = 2.7f + r.nextFloat() * 0.7f; // 2.7–3.4
         } else {
             // ~0.50–0.75
-            mult = 3.4f + r.nextFloat() * 1.6f;   // 3.4–5.0
+            mult = 3.4f + r.nextFloat() * 1.6f; // 3.4–5.0
         }
 
         return cutOriginal * mult;
     }
 
-    private static int computeMonthlyAmountPrivate(Random r,
-                                                   String commodityId,
-                                                   float cut,
-                                                   int targetIncome,
-                                                   int level,
-                                                   float maxSupplyShare,
-                                                   float fallbackSupplyHard,
-                                                   float minDemandShareCap,
-                                                   float maxDemandShareCap) {
+    private static int computeMonthlyAmountPrivate(
+            Random r,
+            String commodityId,
+            float cut,
+            int targetIncome,
+            int level,
+            float maxSupplyShare,
+            float fallbackSupplyHard,
+            float minDemandShareCap,
+            float maxDemandShareCap) {
         if (commodityId == null) return 1;
 
         CommoditySpecAPI specAPI = Global.getSettings().getCommoditySpec(commodityId);
@@ -245,8 +240,10 @@ public class AoTDTradeContractBrowserCreator {
         int byIncome = (int) Math.floor(targetIncome / Math.max(1f, base * cut));
         if (byIncome < 1) byIncome = 1;
 
-        int sectorSupply = AoTDSectorProductionDemandDataUtils.getTotalProductionFromSector(commodityId);
-        int sectorDemand = AoTDSectorProductionDemandDataUtils.getTotalDemandFromSector(commodityId);
+        int sectorSupply =
+                AoTDSectorProductionDemandDataUtils.getTotalProductionFromSector(commodityId);
+        int sectorDemand =
+                AoTDSectorProductionDemandDataUtils.getTotalDemandFromSector(commodityId);
 
         boolean exotic = commodityIsExotic(commodityId);
 
@@ -316,10 +313,10 @@ public class AoTDTradeContractBrowserCreator {
     }
 
     /**
-     * If a private contract ends up with only illegal commodities, it should actually be black market:
-     * - swap person to black market faction
+     * If a private contract ends up with only illegal commodities, it should actually be black
+     * market: - swap person to black market faction
      *
-     * This is your "safe call" to avoid "independent broker asking only drugs".
+     * <p>This is your "safe call" to avoid "independent broker asking only drugs".
      */
     private static void enforceIllegalImpliesBlackMarket(Random r, AoTDTradeContract c) {
         if (c == null) return;
@@ -346,12 +343,14 @@ public class AoTDTradeContractBrowserCreator {
         // replace person with a black market faction person
         PersonAPI p = bm.createRandomPerson();
         // AoTDTradeContract has no setter for person in your snippet; if you have one, use it.
-        // If you don't, you can do this transformation earlier, at creation time, instead of "fixing".
+        // If you don't, you can do this transformation earlier, at creation time, instead of
+        // "fixing".
         //
         // For now, we keep the "safe call" as a no-op unless you add a setter:
         // c.setPerson(p);
 
-        // If you cannot add a setter, the better approach is: create the person AFTER commodity pick,
+        // If you cannot add a setter, the better approach is: create the person AFTER commodity
+        // pick,
         // and choose black market faction if the commodity is illegal. (We do that below.)
     }
 
@@ -363,7 +362,8 @@ public class AoTDTradeContractBrowserCreator {
         ArrayList<AoTDTradeContract> out = new ArrayList<>();
         if (maxContracts <= 0) return out;
 
-        LinkedHashSet<String> all = AoTDTradeManager.getInstance().getPossibleCommoditiesDemandedOrSupplied();
+        LinkedHashSet<String> all =
+                AoTDTradeManager.getInstance().getPossibleCommoditiesDemandedOrSupplied();
         if (all == null || all.isEmpty()) return out;
 
         Random r = new Random(Misc.random.nextLong());
@@ -376,8 +376,8 @@ public class AoTDTradeContractBrowserCreator {
         // monthly income targets (private)
         final int PRIVATE_MIN_LVL1 = 20_000;
         final int PRIVATE_MAX_LVL1 = 40_000;
-        final int PRIVATE_MIN_MAX  = 100_000;
-        final int PRIVATE_MAX_MAX  = 600_000;
+        final int PRIVATE_MIN_MAX = 100_000;
+        final int PRIVATE_MAX_MAX = 600_000;
 
         // supply share cap (avoid modded "supply 1000 demand 14000" asking 10k)
         final float MAX_SECTOR_SUPPLY_SHARE_PRIVATE = 0.30f; // <=20% of sector supply
@@ -387,7 +387,7 @@ public class AoTDTradeContractBrowserCreator {
 
         // demand share cap bounds (tiered by demand digits in computeMonthlyAmountPrivate)
         final float DEMAND_SHARE_CAP_MIN = 0.015f; // never below 1.5%
-        final float DEMAND_SHARE_CAP_MAX = 0.08f;  // never above 8%
+        final float DEMAND_SHARE_CAP_MAX = 0.08f; // never above 8%
 
         // black market presence:
         // lvl1: cap 1..2 total black market contracts, later slightly more
@@ -428,7 +428,8 @@ public class AoTDTradeContractBrowserCreator {
         // but keep them uncommon at low levels.
         // ---------------------------------------------
         if (!blackPool.isEmpty() && out.size() < maxContracts) {
-            float bmChance = BM_CHANCE_PER_CONTRACT_LVL1 + BM_CHANCE_PER_LEVEL * Math.max(0, level - 1);
+            float bmChance =
+                    BM_CHANCE_PER_CONTRACT_LVL1 + BM_CHANCE_PER_LEVEL * Math.max(0, level - 1);
             if (bmChance > BM_CHANCE_MAX) bmChance = BM_CHANCE_MAX;
 
             // ensure at least 1 sometimes, but not always at lvl1
@@ -452,23 +453,28 @@ public class AoTDTradeContractBrowserCreator {
                 if (issuerFaction == null) continue;
 
                 PersonAPI p = issuerFaction.createRandomPerson();
-                AoTDTradeContract c = new AoTDTradeContract("aotd_contract_" + Misc.genUID(), p, null, getDurationOfPrivateContract());
+                AoTDTradeContract c =
+                        new AoTDTradeContract(
+                                "aotd_contract_" + Misc.genUID(),
+                                p,
+                                null,
+                                getDurationOfPrivateContract());
 
-                float cut = rollCutPrivate(r, level,cid);
+                float cut = rollCutPrivate(r, level, cid);
                 int target = rollRange(r, privateIncomeMin, privateIncomeMax);
 
                 // amount is still capped by supply+demand tiers
-                int amount = computeMonthlyAmountPrivate(
-                        r,
-                        cid,
-                        cut,
-                        target,
-                        level,
-                        MAX_SECTOR_SUPPLY_SHARE_PRIVATE,
-                        FALLBACK_SUPPLY_HARD,
-                        DEMAND_SHARE_CAP_MIN,
-                        DEMAND_SHARE_CAP_MAX
-                );
+                int amount =
+                        computeMonthlyAmountPrivate(
+                                r,
+                                cid,
+                                cut,
+                                target,
+                                level,
+                                MAX_SECTOR_SUPPLY_SHARE_PRIVATE,
+                                FALLBACK_SUPPLY_HARD,
+                                DEMAND_SHARE_CAP_MIN,
+                                DEMAND_SHARE_CAP_MAX);
 
                 c.addContractData(cid, amount, cut);
                 out.add(c);
@@ -494,32 +500,44 @@ public class AoTDTradeContractBrowserCreator {
 
             // build contract
             PersonAPI p = issuerFaction.createRandomPerson();
-            AoTDTradeContract c = new AoTDTradeContract("aotd_contract_" + Misc.genUID(), p, null, getDurationOfPrivateContract());
+            AoTDTradeContract c =
+                    new AoTDTradeContract(
+                            "aotd_contract_" + Misc.genUID(),
+                            p,
+                            null,
+                            getDurationOfPrivateContract());
 
-            float cut = rollCutPrivate(r, level,cid);
+            float cut = rollCutPrivate(r, level, cid);
             int target = rollRange(r, privateIncomeMin, privateIncomeMax);
 
-            int amount = computeMonthlyAmountPrivate(
-                    r,
-                    cid,
-                    cut,
-                    target,
-                    level,
-                    MAX_SECTOR_SUPPLY_SHARE_PRIVATE,
-                    FALLBACK_SUPPLY_HARD,
-                    DEMAND_SHARE_CAP_MIN,
-                    DEMAND_SHARE_CAP_MAX
-            );
+            int amount =
+                    computeMonthlyAmountPrivate(
+                            r,
+                            cid,
+                            cut,
+                            target,
+                            level,
+                            MAX_SECTOR_SUPPLY_SHARE_PRIVATE,
+                            FALLBACK_SUPPLY_HARD,
+                            DEMAND_SHARE_CAP_MIN,
+                            DEMAND_SHARE_CAP_MAX);
 
             c.addContractData(cid, amount, cut);
 
-            // safety: if somehow we ended up with only illegal (shouldn't), swap to black market issuer
-            // (If you add AoTDTradeContract#setPerson later, enforceIllegalImpliesBlackMarket can do it post-hoc.)
+            // safety: if somehow we ended up with only illegal (shouldn't), swap to black market
+            // issuer
+            // (If you add AoTDTradeContract#setPerson later, enforceIllegalImpliesBlackMarket can
+            // do it post-hoc.)
             if (isIllegalCommodity(cid)) {
                 FactionAPI bmFac = pickFromIds(r, blackMarketFactions);
                 if (bmFac != null) {
                     PersonAPI bp = bmFac.createRandomPerson();
-                    c = new AoTDTradeContract("aotd_contract_" + Misc.genUID(), bp, null, getDurationOfPrivateContract());
+                    c =
+                            new AoTDTradeContract(
+                                    "aotd_contract_" + Misc.genUID(),
+                                    bp,
+                                    null,
+                                    getDurationOfPrivateContract());
                     c.addContractData(cid, amount, cut);
                     bmMade++;
                 }
@@ -533,25 +551,22 @@ public class AoTDTradeContractBrowserCreator {
         // ---------------------------------------------
         Collections.shuffle(out, r);
         for (AoTDTradeContract contract : out) {
-            if(contract.isPrivate()){
-                if(blackMarketFactions.contains(contract.getFaction().getId())){
+            if (contract.isPrivate()) {
+                if (blackMarketFactions.contains(contract.getFaction().getId())) {
                     contract.setContractTypeId("aotd_contract_black_market");
-                }
-                else{
+                } else {
                     contract.setContractTypeId("aotd_contract_independent");
                 }
-            }
-            else{
+            } else {
                 contract.setContractTypeId("aotd_contract_foreign_trade");
             }
-
-
         }
 
         // ---------------------------------------------
         // Rewards
         // ---------------------------------------------
-        applyGeneratedContractRewards(out,AoTDTradeContractManager.getInstance().getCurrLevelData().getCurrentLevel());
+        applyGeneratedContractRewards(
+                out, AoTDTradeContractManager.getInstance().getCurrLevelData().getCurrentLevel());
 
         return out;
     }
@@ -582,7 +597,6 @@ public class AoTDTradeContractBrowserCreator {
         return cap;
     }
 
-
     private static void applyGeneratedContractRewards(List<AoTDTradeContract> out, int level) {
         if (out == null || out.isEmpty()) return;
 
@@ -597,10 +611,13 @@ public class AoTDTradeContractBrowserCreator {
 
             // faction-issued (NOT private, NOT player-issued) => add faction rep reward
             if (!contract.isPrivate() && !contract.isIssuedByPlayer()) {
-                int currLvl = AoTDTradeContractManager.getInstance().getCurrLevelData().getCurrentLevel();
+                int currLvl =
+                        AoTDTradeContractManager.getInstance().getCurrLevelData().getCurrentLevel();
                 int plus = getFactionRepPlusForLevel(currLvl);
                 int minus = getFactionRepMinusForLevel(currLvl);
-                contract.addReward("rep_faction", new FactionReputationReward(contract.getFactionId(), plus, minus));
+                contract.addReward(
+                        "rep_faction",
+                        new FactionReputationReward(contract.getFactionId(), plus, minus));
             }
 
             int extra = rollAdditionalRewardsCount(contract, level, Misc.random);
@@ -611,8 +628,8 @@ public class AoTDTradeContractBrowserCreator {
     }
 
     /**
-     * Merchant XP should care *a lot* about duration.
-     * monthlyCreditsWorth only sets the baseline; monthsRemaining multiplies it hard.
+     * Merchant XP should care *a lot* about duration. monthlyCreditsWorth only sets the baseline;
+     * monthsRemaining multiplies it hard.
      */
     private static int getMerchantXpForContract(int monthlyCreditsWorth, int monthsRemaining) {
         int moneyXp = AoTDTradeContractLevelData.getXpForMonthlyContractValue(monthlyCreditsWorth);
@@ -645,6 +662,7 @@ public class AoTDTradeContractBrowserCreator {
         // lvl1=8, lvl5=20, lvl10=35, lvl15=50
         return 8 + Math.max(0, lvl - 1) * 3;
     }
+
     // ==========================================================
     // Additional rewards logic
     // ==========================================================

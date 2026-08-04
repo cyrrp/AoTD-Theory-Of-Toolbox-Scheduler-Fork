@@ -10,9 +10,7 @@ import com.fs.starfarer.api.ui.TooltipMakerAPI;
 import com.fs.starfarer.api.util.Misc;
 import data.kaysaar.aotd.tot.ui.RowData;
 import data.kaysaar.aotd.tot.ui.UIData;
-
 import java.util.*;
-
 
 public class ChooseManufacturerPanel implements ExtendedUIPanelPlugin {
     CustomPanelAPI mainPanel;
@@ -31,18 +29,19 @@ public class ChooseManufacturerPanel implements ExtendedUIPanelPlugin {
         return needsUpdate;
     }
 
-    public ChooseManufacturerPanel(float width, float height, LinkedHashMap<String, Integer> manufactures) {
+    public ChooseManufacturerPanel(
+            float width, float height, LinkedHashMap<String, Integer> manufactures) {
         this.mainPanel = Global.getSettings().createCustom(width, height, this);
         this.manufactures = manufactures;
         allMode = true;
         createUI();
-
     }
 
     @Override
     public CustomPanelAPI getMainPanel() {
         return mainPanel;
     }
+
     public static String extractManufacturer(String input) {
         String[] parts = input.split("\\(");
         StringBuilder result = new StringBuilder(parts[0].trim());
@@ -57,7 +56,8 @@ public class ChooseManufacturerPanel implements ExtendedUIPanelPlugin {
         }
 
         // Check the last section; remove it if it's purely numeric
-        if (!extractedParts.isEmpty() && extractedParts.get(extractedParts.size() - 1).matches("\\d+")) {
+        if (!extractedParts.isEmpty()
+                && extractedParts.get(extractedParts.size() - 1).matches("\\d+")) {
             extractedParts.remove(extractedParts.size() - 1);
         }
 
@@ -68,22 +68,43 @@ public class ChooseManufacturerPanel implements ExtendedUIPanelPlugin {
 
         return result.toString();
     }
+
     @Override
     public void createUI() {
         buttons.clear();
         if (componentPanel != null) {
             mainPanel.removeComponent(componentPanel);
         }
-        componentPanel = Global.getSettings().createCustom(mainPanel.getPosition().getWidth(), mainPanel.getPosition().getHeight(), null);
-        TooltipMakerAPI tooltipButDesigners = componentPanel.createUIElement(componentPanel.getPosition().getWidth(), componentPanel.getPosition().getHeight(), true);
+        componentPanel =
+                Global.getSettings()
+                        .createCustom(
+                                mainPanel.getPosition().getWidth(),
+                                mainPanel.getPosition().getHeight(),
+                                null);
+        TooltipMakerAPI tooltipButDesigners =
+                componentPanel.createUIElement(
+                        componentPanel.getPosition().getWidth(),
+                        componentPanel.getPosition().getHeight(),
+                        true);
         float currY = 1;
-        for (RowData calculateAmountOfRow : UIData.calculateAmountOfRows(componentPanel.getPosition().getWidth(), manufactures, 5)) {
+        for (RowData calculateAmountOfRow :
+                UIData.calculateAmountOfRows(
+                        componentPanel.getPosition().getWidth(), manufactures, 5)) {
             float x = 0;
             tooltipButDesigners.setButtonFontDefault();
             for (Map.Entry<String, Integer> entry : calculateAmountOfRow.stringsInRow.entrySet()) {
                 String manu = extractManufacturer(entry.getKey());
 
-                ButtonAPI button = tooltipButDesigners.addAreaCheckbox("", manu, Misc.getBasePlayerColor(), Misc.getDarkPlayerColor(), Misc.getBrightPlayerColor(), entry.getValue(), 30, 0f);
+                ButtonAPI button =
+                        tooltipButDesigners.addAreaCheckbox(
+                                "",
+                                manu,
+                                Misc.getBasePlayerColor(),
+                                Misc.getDarkPlayerColor(),
+                                Misc.getBrightPlayerColor(),
+                                entry.getValue(),
+                                30,
+                                0f);
                 button.getPosition().inTL(x, currY);
                 if (isManufacturerChosen((String) button.getCustomData())) {
                     button.highlight();
@@ -91,7 +112,10 @@ public class ChooseManufacturerPanel implements ExtendedUIPanelPlugin {
                     button.unhighlight();
                 }
                 buttons.add(button);
-                tooltipButDesigners.addPara(entry.getKey(), Misc.getDesignTypeColor(manu), 0f).getPosition().inTL((x + 15), currY + 8);
+                tooltipButDesigners
+                        .addPara(entry.getKey(), Misc.getDesignTypeColor(manu), 0f)
+                        .getPosition()
+                        .inTL((x + 15), currY + 8);
                 x += entry.getValue() + 5f;
             }
             currY += 35;
@@ -99,28 +123,19 @@ public class ChooseManufacturerPanel implements ExtendedUIPanelPlugin {
         tooltipButDesigners.setHeightSoFar(currY);
         componentPanel.addUIElement(tooltipButDesigners).inTL(0, 0);
         mainPanel.addComponent(componentPanel).inTL(0, 0);
-
     }
 
     @Override
-    public void clearUI() {
-
-    }
+    public void clearUI() {}
 
     @Override
-    public void positionChanged(PositionAPI position) {
-
-    }
+    public void positionChanged(PositionAPI position) {}
 
     @Override
-    public void renderBelow(float alphaMult) {
-
-    }
+    public void renderBelow(float alphaMult) {}
 
     @Override
-    public void render(float alphaMult) {
-
-    }
+    public void render(float alphaMult) {}
 
     public boolean isManufacturerChosen(String manu) {
         return currentlyChosenManufacturers.contains(manu) || allMode;
@@ -132,30 +147,27 @@ public class ChooseManufacturerPanel implements ExtendedUIPanelPlugin {
             String manu = (String) button.getCustomData();
             if (button.isChecked()) {
                 button.setChecked(false);
-                if(manu.equalsIgnoreCase("all designs")){
-                    if(!allMode){
+                if (manu.equalsIgnoreCase("all designs")) {
+                    if (!allMode) {
                         needsUpdate = true;
                     }
                     allMode = true;
                     currentlyChosenManufacturers.clear();
-                }
-                else{
+                } else {
                     if (allMode) {
                         allMode = false;
                     }
-                    if(currentlyChosenManufacturers.contains(button.getCustomData())){
+                    if (currentlyChosenManufacturers.contains(button.getCustomData())) {
                         currentlyChosenManufacturers.remove((String) button.getCustomData());
-                        if(currentlyChosenManufacturers.isEmpty()){
+                        if (currentlyChosenManufacturers.isEmpty()) {
                             allMode = true;
                         }
-                        needsUpdate  = true;
-                    }
-                    else{
+                        needsUpdate = true;
+                    } else {
                         currentlyChosenManufacturers.add((String) button.getCustomData());
-                        needsUpdate  = true;
+                        needsUpdate = true;
                     }
                 }
-
             }
             if (isManufacturerChosen((String) button.getCustomData())) {
                 button.highlight();
@@ -163,16 +175,11 @@ public class ChooseManufacturerPanel implements ExtendedUIPanelPlugin {
                 button.unhighlight();
             }
         }
-
     }
 
     @Override
-    public void processInput(List<InputEventAPI> events) {
-
-    }
+    public void processInput(List<InputEventAPI> events) {}
 
     @Override
-    public void buttonPressed(Object buttonId) {
-
-    }
+    public void buttonPressed(Object buttonId) {}
 }

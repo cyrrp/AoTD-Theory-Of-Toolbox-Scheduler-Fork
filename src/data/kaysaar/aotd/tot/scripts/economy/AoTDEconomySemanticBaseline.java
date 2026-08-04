@@ -8,7 +8,6 @@ import data.kaysaar.aotd.tot.scripts.commoditydata.AoTDCommodityOnMarket;
 import data.kaysaar.aotd.tot.scripts.trade.manager.AoTDTradeManager;
 import data.kaysaar.aotd.tot.scripts.trade.models.AoTDFactionTradeData;
 import data.kaysaar.aotd.tot.scripts.trade.models.AoTDMarketData;
-
 import java.lang.management.ManagementFactory;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -30,12 +29,11 @@ import java.util.concurrent.atomic.AtomicLong;
 /**
  * Temporary, source-level semantic baseline instrumentation for the scheduler fork.
  *
- * <p>This class deliberately observes the current implementation without changing
- * its ordering or calculated values. It records phase timings, worker/main-thread
- * attribution, operation counts and before/after market fingerprints for a bounded
- * deterministic sample of markets. The collected files are intended to answer
- * which reconciliation passes change authoritative economy state before those
- * passes are refactored.</p>
+ * <p>This class deliberately observes the current implementation without changing its ordering or
+ * calculated values. It records phase timings, worker/main-thread attribution, operation counts and
+ * before/after market fingerprints for a bounded deterministic sample of markets. The collected
+ * files are intended to answer which reconciliation passes change authoritative economy state
+ * before those passes are refactored.
  */
 public final class AoTDEconomySemanticBaseline {
     private AoTDEconomySemanticBaseline() {}
@@ -49,9 +47,9 @@ public final class AoTDEconomySemanticBaseline {
 
     private static final Object LOCK = new Object();
     private static final AtomicLong SEQUENCE = new AtomicLong();
-    private static final DateTimeFormatter SESSION_TIME = DateTimeFormatter
-            .ofPattern("yyyyMMdd-HHmmss-SSS", Locale.ROOT)
-            .withZone(ZoneOffset.UTC);
+    private static final DateTimeFormatter SESSION_TIME =
+            DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss-SSS", Locale.ROOT)
+                    .withZone(ZoneOffset.UTC);
 
     private static final com.sun.management.ThreadMXBean ALLOCATION_BEAN = allocationBean();
 
@@ -92,8 +90,12 @@ public final class AoTDEconomySemanticBaseline {
                 if (!enabled) return;
 
                 String root = Global.getSettings().getModManager().getModSpec(MOD_ID).getPath();
-                sessionDirectory = Path.of(root, "logs", "semantic-baseline",
-                        "session-" + SESSION_TIME.format(Instant.now()));
+                sessionDirectory =
+                        Path.of(
+                                root,
+                                "logs",
+                                "semantic-baseline",
+                                "session-" + SESSION_TIME.format(Instant.now()));
                 Files.createDirectories(sessionDirectory);
                 logInfoBestEffort("AoTD semantic baseline enabled: " + sessionDirectory);
             }
@@ -159,10 +161,10 @@ public final class AoTDEconomySemanticBaseline {
     private static Scope begin(String phase, MarketAPI market, String detail, boolean snapshot) {
         try {
             if (!isEnabled()) return Scope.NOOP;
-            MarketSnapshot before = snapshot && shouldSample(market)
-                    ? MarketSnapshot.capture(market) : null;
-            return new Scope(phase, marketId(market), detail,
-                    System.nanoTime(), allocatedBytes(), before);
+            MarketSnapshot before =
+                    snapshot && shouldSample(market) ? MarketSnapshot.capture(market) : null;
+            return new Scope(
+                    phase, marketId(market), detail, System.nanoTime(), allocatedBytes(), before);
         } catch (Throwable ignored) {
             disableBestEffort();
             return Scope.NOOP;
@@ -197,10 +199,10 @@ public final class AoTDEconomySemanticBaseline {
         try {
             if (!isEnabled() || market == null || !shouldSample(market)) return;
             AoTDTradeManager manager = AoTDTradeManager.getInstance();
-            AoTDFactionTradeData faction = manager == null
-                    ? null : manager.getFactionTradeData(market.getFactionId());
-            AoTDMarketData data = faction == null
-                    ? null : faction.getTradeData().get(market.getId());
+            AoTDFactionTradeData faction =
+                    manager == null ? null : manager.getFactionTradeData(market.getFactionId());
+            AoTDMarketData data =
+                    faction == null ? null : faction.getTradeData().get(market.getId());
             if (data == null) return;
 
             Set<String> commodityIds = new LinkedHashSet<>();
@@ -214,10 +216,20 @@ public final class AoTDEconomySemanticBaseline {
                         droppedDiffs++;
                         return;
                     }
-                    TRADE_SNAPSHOTS.add(new TradeSnapshotRow(
-                            SEQUENCE.incrementAndGet(), economyRevision, phase,
-                            market.getId(), market.getFactionId(), "", 0, 0, 0, 0,
-                            data.weight, data.outsideWeight));
+                    TRADE_SNAPSHOTS.add(
+                            new TradeSnapshotRow(
+                                    SEQUENCE.incrementAndGet(),
+                                    economyRevision,
+                                    phase,
+                                    market.getId(),
+                                    market.getFactionId(),
+                                    "",
+                                    0,
+                                    0,
+                                    0,
+                                    0,
+                                    data.weight,
+                                    data.outsideWeight));
                 } else {
                     ArrayList<String> sorted = new ArrayList<>(commodityIds);
                     sorted.sort(Comparator.naturalOrder());
@@ -226,14 +238,20 @@ public final class AoTDEconomySemanticBaseline {
                             droppedDiffs++;
                             break;
                         }
-                        TRADE_SNAPSHOTS.add(new TradeSnapshotRow(
-                                SEQUENCE.incrementAndGet(), economyRevision, phase,
-                                market.getId(), market.getFactionId(), commodityId,
-                                data.netProductionValues.getOrDefault(commodityId, 0),
-                                data.remainingNet.getOrDefault(commodityId, 0),
-                                data.internalSent.getOrDefault(commodityId, 0),
-                                data.internalReceived.getOrDefault(commodityId, 0),
-                                data.weight, data.outsideWeight));
+                        TRADE_SNAPSHOTS.add(
+                                new TradeSnapshotRow(
+                                        SEQUENCE.incrementAndGet(),
+                                        economyRevision,
+                                        phase,
+                                        market.getId(),
+                                        market.getFactionId(),
+                                        commodityId,
+                                        data.netProductionValues.getOrDefault(commodityId, 0),
+                                        data.remainingNet.getOrDefault(commodityId, 0),
+                                        data.internalSent.getOrDefault(commodityId, 0),
+                                        data.internalReceived.getOrDefault(commodityId, 0),
+                                        data.weight,
+                                        data.outsideWeight));
                     }
                 }
             }
@@ -282,7 +300,8 @@ public final class AoTDEconomySemanticBaseline {
         if (scope == null || scope == Scope.NOOP || !enabled) return;
         long elapsed = Math.max(0L, System.nanoTime() - scope.startedNanos);
         long allocated = allocationDelta(scope.startedAllocated, allocatedBytes());
-        MarketSnapshot after = scope.before == null ? null : MarketSnapshot.captureById(scope.marketId);
+        MarketSnapshot after =
+                scope.before == null ? null : MarketSnapshot.captureById(scope.marketId);
 
         synchronized (LOCK) {
             PhaseStats stats = PHASES.computeIfAbsent(scope.phase, ignored -> new PhaseStats());
@@ -298,9 +317,17 @@ public final class AoTDEconomySemanticBaseline {
             if (scope.workerThread) stats.workerCalls++;
             else stats.nonWorkerCalls++;
 
-            appendEvent(new EventRow(SEQUENCE.incrementAndGet(), economyRevision,
-                    scope.phase, scope.marketId, scope.detail, scope.threadName,
-                    elapsed, allocated, scope.failed ? "FAIL" : "OK"));
+            appendEvent(
+                    new EventRow(
+                            SEQUENCE.incrementAndGet(),
+                            economyRevision,
+                            scope.phase,
+                            scope.marketId,
+                            scope.detail,
+                            scope.threadName,
+                            elapsed,
+                            allocated,
+                            scope.failed ? "FAIL" : "OK"));
             if (scope.before != null) {
                 appendSnapshot(scope.phase, "BEFORE", scope.before);
                 if (after != null) {
@@ -311,12 +338,26 @@ public final class AoTDEconomySemanticBaseline {
         }
     }
 
-    private static void event(String phase, MarketAPI market, String detail,
-                              long elapsed, long allocated, String outcome, long revision) {
+    private static void event(
+            String phase,
+            MarketAPI market,
+            String detail,
+            long elapsed,
+            long allocated,
+            String outcome,
+            long revision) {
         synchronized (LOCK) {
-            appendEvent(new EventRow(SEQUENCE.incrementAndGet(), revision, phase,
-                    marketId(market), detail, Thread.currentThread().getName(),
-                    elapsed, allocated, outcome));
+            appendEvent(
+                    new EventRow(
+                            SEQUENCE.incrementAndGet(),
+                            revision,
+                            phase,
+                            marketId(market),
+                            detail,
+                            Thread.currentThread().getName(),
+                            elapsed,
+                            allocated,
+                            outcome));
         }
     }
 
@@ -333,13 +374,28 @@ public final class AoTDEconomySemanticBaseline {
             droppedSnapshots++;
             return;
         }
-        SNAPSHOTS.add(new SnapshotRow(SEQUENCE.incrementAndGet(), economyRevision, phase, moment,
-                snapshot.marketId, snapshot.factionId, snapshot.econGroup,
-                snapshot.industryCount, snapshot.commodityCount, snapshot.pendingIndustries,
-                snapshot.disruptedIndustries, snapshot.buildingIndustries,
-                snapshot.upgradingIndustries, snapshot.rawSupply, snapshot.rawDemand,
-                snapshot.stockpile, snapshot.deficit, snapshot.excess,
-                snapshot.valueCount, snapshot.fingerprint));
+        SNAPSHOTS.add(
+                new SnapshotRow(
+                        SEQUENCE.incrementAndGet(),
+                        economyRevision,
+                        phase,
+                        moment,
+                        snapshot.marketId,
+                        snapshot.factionId,
+                        snapshot.econGroup,
+                        snapshot.industryCount,
+                        snapshot.commodityCount,
+                        snapshot.pendingIndustries,
+                        snapshot.disruptedIndustries,
+                        snapshot.buildingIndustries,
+                        snapshot.upgradingIndustries,
+                        snapshot.rawSupply,
+                        snapshot.rawDemand,
+                        snapshot.stockpile,
+                        snapshot.deficit,
+                        snapshot.excess,
+                        snapshot.valueCount,
+                        snapshot.fingerprint));
     }
 
     private static void appendDiffs(String phase, MarketSnapshot before, MarketSnapshot after) {
@@ -354,8 +410,15 @@ public final class AoTDEconomySemanticBaseline {
                 droppedDiffs++;
                 continue;
             }
-            DIFFS.add(new DiffRow(SEQUENCE.incrementAndGet(), economyRevision, phase,
-                    before.marketId, key, oldValue, newValue));
+            DIFFS.add(
+                    new DiffRow(
+                            SEQUENCE.incrementAndGet(),
+                            economyRevision,
+                            phase,
+                            before.marketId,
+                            key,
+                            oldValue,
+                            newValue));
         }
     }
 
@@ -371,18 +434,35 @@ public final class AoTDEconomySemanticBaseline {
     }
 
     private static String phaseSummaryCsv() {
-        StringBuilder out = new StringBuilder(
-                "phase,calls,failures,worker_calls,non_worker_calls,total_ms,mean_ms,max_ms,allocated_samples,total_allocated_bytes,max_allocated_bytes\n");
+        StringBuilder out =
+                new StringBuilder(
+                        "phase,calls,failures,worker_calls,non_worker_calls,total_ms,mean_ms,max_ms,allocated_samples,total_allocated_bytes,max_allocated_bytes\n");
         for (Map.Entry<String, PhaseStats> entry : PHASES.entrySet()) {
             PhaseStats value = entry.getValue();
             double totalMs = value.totalNanos / 1_000_000d;
             double meanMs = value.calls == 0L ? 0d : totalMs / value.calls;
-            out.append(csv(entry.getKey())).append(',').append(value.calls).append(',')
-                    .append(value.failures).append(',').append(value.workerCalls).append(',')
-                    .append(value.nonWorkerCalls).append(',').append(format(totalMs)).append(',')
-                    .append(format(meanMs)).append(',').append(format(value.maxNanos / 1_000_000d)).append(',')
-                    .append(value.allocatedSamples).append(',').append(value.totalAllocatedBytes).append(',')
-                    .append(value.maxAllocatedBytes).append('\n');
+            out.append(csv(entry.getKey()))
+                    .append(',')
+                    .append(value.calls)
+                    .append(',')
+                    .append(value.failures)
+                    .append(',')
+                    .append(value.workerCalls)
+                    .append(',')
+                    .append(value.nonWorkerCalls)
+                    .append(',')
+                    .append(format(totalMs))
+                    .append(',')
+                    .append(format(meanMs))
+                    .append(',')
+                    .append(format(value.maxNanos / 1_000_000d))
+                    .append(',')
+                    .append(value.allocatedSamples)
+                    .append(',')
+                    .append(value.totalAllocatedBytes)
+                    .append(',')
+                    .append(value.maxAllocatedBytes)
+                    .append('\n');
         }
         return out.toString();
     }
@@ -396,60 +476,139 @@ public final class AoTDEconomySemanticBaseline {
     }
 
     private static String eventsCsv() {
-        StringBuilder out = new StringBuilder(
-                "sequence,economy_revision,phase,market_id,detail,thread,duration_nanos,allocated_bytes,outcome\n");
+        StringBuilder out =
+                new StringBuilder(
+                        "sequence,economy_revision,phase,market_id,detail,thread,duration_nanos,allocated_bytes,outcome\n");
         for (EventRow row : EVENTS) {
-            out.append(row.sequence).append(',').append(row.revision).append(',')
-                    .append(csv(row.phase)).append(',').append(csv(row.marketId)).append(',')
-                    .append(csv(row.detail)).append(',').append(csv(row.thread)).append(',')
-                    .append(row.durationNanos).append(',').append(row.allocatedBytes).append(',')
-                    .append(row.outcome).append('\n');
+            out.append(row.sequence)
+                    .append(',')
+                    .append(row.revision)
+                    .append(',')
+                    .append(csv(row.phase))
+                    .append(',')
+                    .append(csv(row.marketId))
+                    .append(',')
+                    .append(csv(row.detail))
+                    .append(',')
+                    .append(csv(row.thread))
+                    .append(',')
+                    .append(row.durationNanos)
+                    .append(',')
+                    .append(row.allocatedBytes)
+                    .append(',')
+                    .append(row.outcome)
+                    .append('\n');
         }
         return out.toString();
     }
 
     private static String snapshotsCsv() {
-        StringBuilder out = new StringBuilder(
-                "sequence,economy_revision,phase,moment,market_id,faction_id,econ_group,industries,commodities,pending_industries,disrupted_industries,building_industries,upgrading_industries,raw_supply,raw_demand,stockpile,deficit,excess,value_count,fingerprint\n");
+        StringBuilder out =
+                new StringBuilder(
+                        "sequence,economy_revision,phase,moment,market_id,faction_id,econ_group,industries,commodities,pending_industries,disrupted_industries,building_industries,upgrading_industries,raw_supply,raw_demand,stockpile,deficit,excess,value_count,fingerprint\n");
         for (SnapshotRow row : SNAPSHOTS) {
-            out.append(row.sequence).append(',').append(row.revision).append(',')
-                    .append(csv(row.phase)).append(',').append(row.moment).append(',')
-                    .append(csv(row.marketId)).append(',').append(csv(row.factionId)).append(',')
-                    .append(csv(row.econGroup)).append(',').append(row.industries).append(',')
-                    .append(row.commodities).append(',').append(row.pendingIndustries).append(',')
-                    .append(row.disruptedIndustries).append(',').append(row.buildingIndustries).append(',')
-                    .append(row.upgradingIndustries).append(',').append(format(row.rawSupply)).append(',')
-                    .append(format(row.rawDemand)).append(',').append(format(row.stockpile)).append(',')
-                    .append(format(row.deficit)).append(',').append(format(row.excess)).append(',')
-                    .append(row.valueCount).append(',').append(Long.toUnsignedString(row.fingerprint)).append('\n');
+            out.append(row.sequence)
+                    .append(',')
+                    .append(row.revision)
+                    .append(',')
+                    .append(csv(row.phase))
+                    .append(',')
+                    .append(row.moment)
+                    .append(',')
+                    .append(csv(row.marketId))
+                    .append(',')
+                    .append(csv(row.factionId))
+                    .append(',')
+                    .append(csv(row.econGroup))
+                    .append(',')
+                    .append(row.industries)
+                    .append(',')
+                    .append(row.commodities)
+                    .append(',')
+                    .append(row.pendingIndustries)
+                    .append(',')
+                    .append(row.disruptedIndustries)
+                    .append(',')
+                    .append(row.buildingIndustries)
+                    .append(',')
+                    .append(row.upgradingIndustries)
+                    .append(',')
+                    .append(format(row.rawSupply))
+                    .append(',')
+                    .append(format(row.rawDemand))
+                    .append(',')
+                    .append(format(row.stockpile))
+                    .append(',')
+                    .append(format(row.deficit))
+                    .append(',')
+                    .append(format(row.excess))
+                    .append(',')
+                    .append(row.valueCount)
+                    .append(',')
+                    .append(Long.toUnsignedString(row.fingerprint))
+                    .append('\n');
         }
         return out.toString();
     }
 
     private static String diffsCsv() {
-        StringBuilder out = new StringBuilder(
-                "sequence,economy_revision,phase,market_id,value_key,before_value,after_value,delta\n");
+        StringBuilder out =
+                new StringBuilder(
+                        "sequence,economy_revision,phase,market_id,value_key,before_value,after_value,delta\n");
         for (DiffRow row : DIFFS) {
-            double delta = Double.isNaN(row.beforeValue) || Double.isNaN(row.afterValue)
-                    ? Double.NaN : row.afterValue - row.beforeValue;
-            out.append(row.sequence).append(',').append(row.revision).append(',')
-                    .append(csv(row.phase)).append(',').append(csv(row.marketId)).append(',')
-                    .append(csv(row.key)).append(',').append(format(row.beforeValue)).append(',')
-                    .append(format(row.afterValue)).append(',').append(format(delta)).append('\n');
+            double delta =
+                    Double.isNaN(row.beforeValue) || Double.isNaN(row.afterValue)
+                            ? Double.NaN
+                            : row.afterValue - row.beforeValue;
+            out.append(row.sequence)
+                    .append(',')
+                    .append(row.revision)
+                    .append(',')
+                    .append(csv(row.phase))
+                    .append(',')
+                    .append(csv(row.marketId))
+                    .append(',')
+                    .append(csv(row.key))
+                    .append(',')
+                    .append(format(row.beforeValue))
+                    .append(',')
+                    .append(format(row.afterValue))
+                    .append(',')
+                    .append(format(delta))
+                    .append('\n');
         }
         return out.toString();
     }
 
     private static String tradeSnapshotsCsv() {
-        StringBuilder out = new StringBuilder(
-                "sequence,economy_revision,phase,market_id,faction_id,commodity_id,net_production,remaining_net,internal_sent,internal_received,weight,outside_weight\n");
+        StringBuilder out =
+                new StringBuilder(
+                        "sequence,economy_revision,phase,market_id,faction_id,commodity_id,net_production,remaining_net,internal_sent,internal_received,weight,outside_weight\n");
         for (TradeSnapshotRow row : TRADE_SNAPSHOTS) {
-            out.append(row.sequence).append(',').append(row.revision).append(',')
-                    .append(csv(row.phase)).append(',').append(csv(row.marketId)).append(',')
-                    .append(csv(row.factionId)).append(',').append(csv(row.commodityId)).append(',')
-                    .append(row.netProduction).append(',').append(row.remainingNet).append(',')
-                    .append(row.internalSent).append(',').append(row.internalReceived).append(',')
-                    .append(format(row.weight)).append(',').append(format(row.outsideWeight)).append('\n');
+            out.append(row.sequence)
+                    .append(',')
+                    .append(row.revision)
+                    .append(',')
+                    .append(csv(row.phase))
+                    .append(',')
+                    .append(csv(row.marketId))
+                    .append(',')
+                    .append(csv(row.factionId))
+                    .append(',')
+                    .append(csv(row.commodityId))
+                    .append(',')
+                    .append(row.netProduction)
+                    .append(',')
+                    .append(row.remainingNet)
+                    .append(',')
+                    .append(row.internalSent)
+                    .append(',')
+                    .append(row.internalReceived)
+                    .append(',')
+                    .append(format(row.weight))
+                    .append(',')
+                    .append(format(row.outsideWeight))
+                    .append('\n');
         }
         return out.toString();
     }
@@ -457,26 +616,58 @@ public final class AoTDEconomySemanticBaseline {
     private static String metadataJson(String reason) {
         return "{\n"
                 + "  \"schemaVersion\": 1,\n"
-                + "  \"sessionStartedUtc\": \"" + json(sessionStartedUtc) + "\",\n"
-                + "  \"lastFlushUtc\": \"" + json(Instant.now().toString()) + "\",\n"
-                + "  \"flushReason\": \"" + json(reason) + "\",\n"
-                + "  \"elapsedNanos\": " + Math.max(0L, System.nanoTime() - sessionStartedNanos) + ",\n"
-                + "  \"economyRevision\": " + economyRevision + ",\n"
-                + "  \"deepSnapshots\": " + deepSnapshots + ",\n"
-                + "  \"sampledMarkets\": " + SAMPLED_MARKETS.size() + ",\n"
-                + "  \"eventRows\": " + EVENTS.size() + ",\n"
-                + "  \"droppedEvents\": " + droppedEvents + ",\n"
-                + "  \"snapshotRows\": " + SNAPSHOTS.size() + ",\n"
-                + "  \"droppedSnapshots\": " + droppedSnapshots + ",\n"
-                + "  \"diffRows\": " + DIFFS.size() + ",\n"
-                + "  \"tradeSnapshotRows\": " + TRADE_SNAPSHOTS.size() + ",\n"
-                + "  \"droppedDiffs\": " + droppedDiffs + "\n"
+                + "  \"sessionStartedUtc\": \""
+                + json(sessionStartedUtc)
+                + "\",\n"
+                + "  \"lastFlushUtc\": \""
+                + json(Instant.now().toString())
+                + "\",\n"
+                + "  \"flushReason\": \""
+                + json(reason)
+                + "\",\n"
+                + "  \"elapsedNanos\": "
+                + Math.max(0L, System.nanoTime() - sessionStartedNanos)
+                + ",\n"
+                + "  \"economyRevision\": "
+                + economyRevision
+                + ",\n"
+                + "  \"deepSnapshots\": "
+                + deepSnapshots
+                + ",\n"
+                + "  \"sampledMarkets\": "
+                + SAMPLED_MARKETS.size()
+                + ",\n"
+                + "  \"eventRows\": "
+                + EVENTS.size()
+                + ",\n"
+                + "  \"droppedEvents\": "
+                + droppedEvents
+                + ",\n"
+                + "  \"snapshotRows\": "
+                + SNAPSHOTS.size()
+                + ",\n"
+                + "  \"droppedSnapshots\": "
+                + droppedSnapshots
+                + ",\n"
+                + "  \"diffRows\": "
+                + DIFFS.size()
+                + ",\n"
+                + "  \"tradeSnapshotRows\": "
+                + TRADE_SNAPSHOTS.size()
+                + ",\n"
+                + "  \"droppedDiffs\": "
+                + droppedDiffs
+                + "\n"
                 + "}\n";
     }
 
     private static void write(Path target, String content) throws Exception {
-        Files.writeString(target, content, StandardCharsets.UTF_8,
-                StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING,
+        Files.writeString(
+                target,
+                content,
+                StandardCharsets.UTF_8,
+                StandardOpenOption.CREATE,
+                StandardOpenOption.TRUNCATE_EXISTING,
                 StandardOpenOption.WRITE);
     }
 
@@ -529,7 +720,8 @@ public final class AoTDEconomySemanticBaseline {
             java.lang.management.ThreadMXBean raw = ManagementFactory.getThreadMXBean();
             if (raw instanceof com.sun.management.ThreadMXBean bean
                     && bean.isThreadAllocatedMemorySupported()) {
-                if (!bean.isThreadAllocatedMemoryEnabled()) bean.setThreadAllocatedMemoryEnabled(true);
+                if (!bean.isThreadAllocatedMemoryEnabled())
+                    bean.setThreadAllocatedMemoryEnabled(true);
                 return bean;
             }
         } catch (Throwable ignored) {
@@ -540,7 +732,8 @@ public final class AoTDEconomySemanticBaseline {
 
     private static long allocatedBytes() {
         try {
-            return ALLOCATION_BEAN == null ? -1L
+            return ALLOCATION_BEAN == null
+                    ? -1L
                     : ALLOCATION_BEAN.getThreadAllocatedBytes(Thread.currentThread().getId());
         } catch (Throwable ignored) {
             return -1L;
@@ -573,8 +766,10 @@ public final class AoTDEconomySemanticBaseline {
 
     private static String json(String value) {
         if (value == null) return "";
-        return value.replace("\\", "\\\\").replace("\"", "\\\"")
-                .replace("\r", "\\r").replace("\n", "\\n");
+        return value.replace("\\", "\\\\")
+                .replace("\"", "\\\"")
+                .replace("\r", "\\r")
+                .replace("\n", "\\n");
     }
 
     private static String format(double value) {
@@ -615,8 +810,13 @@ public final class AoTDEconomySemanticBaseline {
             closed = true;
         }
 
-        private Scope(String phase, String marketId, String detail,
-                      long startedNanos, long startedAllocated, MarketSnapshot before) {
+        private Scope(
+                String phase,
+                String marketId,
+                String detail,
+                long startedNanos,
+                long startedAllocated,
+                MarketSnapshot before) {
             this.phase = phase == null ? "" : phase;
             this.marketId = marketId == null ? "" : marketId;
             this.detail = detail == null ? "" : detail;
@@ -662,12 +862,22 @@ public final class AoTDEconomySemanticBaseline {
         final long fingerprint;
         final LinkedHashMap<String, Double> values;
 
-        private MarketSnapshot(String marketId, String factionId, String econGroup,
-                               int industryCount, int commodityCount, int pendingIndustries,
-                               int disruptedIndustries, int buildingIndustries,
-                               int upgradingIndustries, double rawSupply, double rawDemand,
-                               double stockpile, double deficit, double excess,
-                               LinkedHashMap<String, Double> values) {
+        private MarketSnapshot(
+                String marketId,
+                String factionId,
+                String econGroup,
+                int industryCount,
+                int commodityCount,
+                int pendingIndustries,
+                int disruptedIndustries,
+                int buildingIndustries,
+                int upgradingIndustries,
+                double rawSupply,
+                double rawDemand,
+                double stockpile,
+                double deficit,
+                double excess,
+                LinkedHashMap<String, Double> values) {
             this.marketId = marketId;
             this.factionId = factionId;
             this.econGroup = econGroup;
@@ -689,7 +899,8 @@ public final class AoTDEconomySemanticBaseline {
 
         static MarketSnapshot captureById(String marketId) {
             try {
-                if (Global.getSector() == null || Global.getSector().getEconomy() == null) return null;
+                if (Global.getSector() == null || Global.getSector().getEconomy() == null)
+                    return null;
                 MarketAPI market = Global.getSector().getEconomy().getMarket(marketId);
                 return market == null ? null : capture(market);
             } catch (Throwable ignored) {
@@ -715,92 +926,172 @@ public final class AoTDEconomySemanticBaseline {
             List<CommodityOnMarketAPI> commodities = new ArrayList<>();
 
             if (market != null) {
-                try { faction = nullToEmpty(market.getFactionId()); } catch (Throwable ignored) {}
-                try { group = nullToEmpty(market.getEconGroup()); } catch (Throwable ignored) {}
-                try { industries.addAll(market.getIndustries()); } catch (Throwable ignored) {}
-                try { commodities.addAll(market.getAllCommodities()); } catch (Throwable ignored) {}
+                try {
+                    faction = nullToEmpty(market.getFactionId());
+                } catch (Throwable ignored) {
+                }
+                try {
+                    group = nullToEmpty(market.getEconGroup());
+                } catch (Throwable ignored) {
+                }
+                try {
+                    industries.addAll(market.getIndustries());
+                } catch (Throwable ignored) {
+                }
+                try {
+                    commodities.addAll(market.getAllCommodities());
+                } catch (Throwable ignored) {
+                }
             }
 
-            industries.sort(Comparator.comparing(industry -> {
-                try { return nullToEmpty(industry.getId()); }
-                catch (Throwable ignored) { return ""; }
-            }));
-            commodities.sort(Comparator.comparing(commodity -> {
-                try { return nullToEmpty(commodity.getId()); }
-                catch (Throwable ignored) { return ""; }
-            }));
+            industries.sort(
+                    Comparator.comparing(
+                            industry -> {
+                                try {
+                                    return nullToEmpty(industry.getId());
+                                } catch (Throwable ignored) {
+                                    return "";
+                                }
+                            }));
+            commodities.sort(
+                    Comparator.comparing(
+                            commodity -> {
+                                try {
+                                    return nullToEmpty(commodity.getId());
+                                } catch (Throwable ignored) {
+                                    return "";
+                                }
+                            }));
 
             AoTDIndustryData industryData = null;
-            try { industryData = AoTDIndustryData.getInstance(market); } catch (Throwable ignored) {}
+            try {
+                industryData = AoTDIndustryData.getInstance(market);
+            } catch (Throwable ignored) {
+            }
 
             for (Industry industry : industries) {
                 String industryId;
-                try { industryId = nullToEmpty(industry.getId()); }
-                catch (Throwable ignored) { industryId = "<unknown>"; }
+                try {
+                    industryId = nullToEmpty(industry.getId());
+                } catch (Throwable ignored) {
+                    industryId = "<unknown>";
+                }
                 boolean isPending = false;
-                try { isPending = industryData != null && industryData.isPending(industryId); }
-                catch (Throwable ignored) {}
+                try {
+                    isPending = industryData != null && industryData.isPending(industryId);
+                } catch (Throwable ignored) {
+                }
                 if (isPending) pending++;
-                try { if (industry.isDisrupted()) disrupted++; } catch (Throwable ignored) {}
-                try { if (industry.isBuilding()) building++; } catch (Throwable ignored) {}
-                try { if (industry.isUpgrading()) upgrading++; } catch (Throwable ignored) {}
+                try {
+                    if (industry.isDisrupted()) disrupted++;
+                } catch (Throwable ignored) {
+                }
+                try {
+                    if (industry.isBuilding()) building++;
+                } catch (Throwable ignored) {
+                }
+                try {
+                    if (industry.isUpgrading()) upgrading++;
+                } catch (Throwable ignored) {
+                }
                 values.put("industry/" + industryId + "/pending", isPending ? 1d : 0d);
 
                 for (CommodityOnMarketAPI commodity : commodities) {
                     String commodityId;
-                    try { commodityId = nullToEmpty(commodity.getId()); }
-                    catch (Throwable ignored) { continue; }
                     try {
-                        values.put("industry/" + industryId + "/" + commodityId + "/supply",
-                                (double) industry.getSupply(commodityId).getQuantity().getModifiedValue());
-                    } catch (Throwable ignored) {}
+                        commodityId = nullToEmpty(commodity.getId());
+                    } catch (Throwable ignored) {
+                        continue;
+                    }
                     try {
-                        values.put("industry/" + industryId + "/" + commodityId + "/demand",
-                                (double) industry.getDemand(commodityId).getQuantity().getModifiedValue());
-                    } catch (Throwable ignored) {}
+                        values.put(
+                                "industry/" + industryId + "/" + commodityId + "/supply",
+                                (double)
+                                        industry.getSupply(commodityId)
+                                                .getQuantity()
+                                                .getModifiedValue());
+                    } catch (Throwable ignored) {
+                    }
+                    try {
+                        values.put(
+                                "industry/" + industryId + "/" + commodityId + "/demand",
+                                (double)
+                                        industry.getDemand(commodityId)
+                                                .getQuantity()
+                                                .getModifiedValue());
+                    } catch (Throwable ignored) {
+                    }
                 }
             }
 
             for (CommodityOnMarketAPI commodity : commodities) {
                 String commodityId;
-                try { commodityId = nullToEmpty(commodity.getId()); }
-                catch (Throwable ignored) { continue; }
                 try {
-                    values.put("commodity/" + commodityId + "/stockpile",
+                    commodityId = nullToEmpty(commodity.getId());
+                } catch (Throwable ignored) {
+                    continue;
+                }
+                try {
+                    values.put(
+                            "commodity/" + commodityId + "/stockpile",
                             (double) commodity.getStockpile());
                     stockpile += commodity.getStockpile();
-                } catch (Throwable ignored) {}
+                } catch (Throwable ignored) {
+                }
                 if (commodity instanceof AoTDCommodityOnMarket aotd) {
                     try {
                         int value = aotd.getSupplyDemandData().getTotalRawUnitsFromSupply();
                         values.put("commodity/" + commodityId + "/rawSupply", (double) value);
                         rawSupply += value;
-                    } catch (Throwable ignored) {}
+                    } catch (Throwable ignored) {
+                    }
                     try {
                         int value = aotd.getSupplyDemandData().getTotalRawUnitsFromDemand();
                         values.put("commodity/" + commodityId + "/rawDemand", (double) value);
                         rawDemand += value;
-                    } catch (Throwable ignored) {}
+                    } catch (Throwable ignored) {
+                    }
                     try {
                         float value = aotd.getDeficitQuantity();
                         values.put("commodity/" + commodityId + "/deficit", (double) value);
                         deficit += value;
-                    } catch (Throwable ignored) {}
+                    } catch (Throwable ignored) {
+                    }
                     try {
                         float value = aotd.getExcessQuantity();
                         values.put("commodity/" + commodityId + "/excess", (double) value);
                         excess += value;
-                    } catch (Throwable ignored) {}
-                    try { values.put("commodity/" + commodityId + "/monthlyDef", (double) aotd.getDef()); }
-                    catch (Throwable ignored) {}
-                    try { values.put("commodity/" + commodityId + "/monthlyExc", (double) aotd.getExc()); }
-                    catch (Throwable ignored) {}
+                    } catch (Throwable ignored) {
+                    }
+                    try {
+                        values.put(
+                                "commodity/" + commodityId + "/monthlyDef", (double) aotd.getDef());
+                    } catch (Throwable ignored) {
+                    }
+                    try {
+                        values.put(
+                                "commodity/" + commodityId + "/monthlyExc", (double) aotd.getExc());
+                    } catch (Throwable ignored) {
+                    }
                 }
             }
 
-            return new MarketSnapshot(id, faction, group, industries.size(), commodities.size(),
-                    pending, disrupted, building, upgrading, rawSupply, rawDemand,
-                    stockpile, deficit, excess, values);
+            return new MarketSnapshot(
+                    id,
+                    faction,
+                    group,
+                    industries.size(),
+                    commodities.size(),
+                    pending,
+                    disrupted,
+                    building,
+                    upgrading,
+                    rawSupply,
+                    rawDemand,
+                    stockpile,
+                    deficit,
+                    excess,
+                    values);
         }
 
         private static long fingerprint(LinkedHashMap<String, Double> values) {
@@ -843,24 +1134,59 @@ public final class AoTDEconomySemanticBaseline {
         long maxAllocatedBytes;
     }
 
-    private record EventRow(long sequence, long revision, String phase, String marketId,
-                            String detail, String thread, long durationNanos,
-                            long allocatedBytes, String outcome) {}
+    private record EventRow(
+            long sequence,
+            long revision,
+            String phase,
+            String marketId,
+            String detail,
+            String thread,
+            long durationNanos,
+            long allocatedBytes,
+            String outcome) {}
 
-    private record SnapshotRow(long sequence, long revision, String phase, String moment,
-                               String marketId, String factionId, String econGroup,
-                               int industries, int commodities, int pendingIndustries,
-                               int disruptedIndustries, int buildingIndustries,
-                               int upgradingIndustries, double rawSupply, double rawDemand,
-                               double stockpile, double deficit, double excess,
-                               int valueCount, long fingerprint) {}
+    private record SnapshotRow(
+            long sequence,
+            long revision,
+            String phase,
+            String moment,
+            String marketId,
+            String factionId,
+            String econGroup,
+            int industries,
+            int commodities,
+            int pendingIndustries,
+            int disruptedIndustries,
+            int buildingIndustries,
+            int upgradingIndustries,
+            double rawSupply,
+            double rawDemand,
+            double stockpile,
+            double deficit,
+            double excess,
+            int valueCount,
+            long fingerprint) {}
 
-    private record DiffRow(long sequence, long revision, String phase, String marketId,
-                           String key, double beforeValue, double afterValue) {}
+    private record DiffRow(
+            long sequence,
+            long revision,
+            String phase,
+            String marketId,
+            String key,
+            double beforeValue,
+            double afterValue) {}
 
-    private record TradeSnapshotRow(long sequence, long revision, String phase,
-                                    String marketId, String factionId, String commodityId,
-                                    int netProduction, int remainingNet,
-                                    int internalSent, int internalReceived,
-                                    float weight, float outsideWeight) {}
+    private record TradeSnapshotRow(
+            long sequence,
+            long revision,
+            String phase,
+            String marketId,
+            String factionId,
+            String commodityId,
+            int netProduction,
+            int remainingNet,
+            int internalSent,
+            int internalReceived,
+            float weight,
+            float outsideWeight) {}
 }

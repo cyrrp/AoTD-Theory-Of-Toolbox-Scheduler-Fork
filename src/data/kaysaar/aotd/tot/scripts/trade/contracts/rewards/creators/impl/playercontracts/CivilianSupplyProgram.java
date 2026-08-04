@@ -8,7 +8,6 @@ import com.fs.starfarer.api.util.Misc;
 import data.kaysaar.aotd.tot.scripts.economy.AoTDSectorProductionDemandDataUtils;
 import data.kaysaar.aotd.tot.scripts.trade.contracts.AoTDTradeContract;
 import data.kaysaar.aotd.tot.scripts.trade.contracts.rewards.monthly.MonthlyGrowthAndStabilityBoost;
-
 import java.awt.*;
 import java.util.LinkedHashSet;
 
@@ -30,7 +29,8 @@ public class CivilianSupplyProgram extends DirectedTradeInitiativeBaseContract {
     @Override
     public void onContractCreated(AoTDTradeContract generatedContract) {
         super.onContractCreated(generatedContract);
-        generatedContract.addReward("aotd_civ_supply",new MonthlyGrowthAndStabilityBoost(generatedContract));
+        generatedContract.addReward(
+                "aotd_civ_supply", new MonthlyGrowthAndStabilityBoost(generatedContract));
     }
 
     @Override
@@ -47,51 +47,39 @@ public class CivilianSupplyProgram extends DirectedTradeInitiativeBaseContract {
 
         tooltip.addPara(
                 "This contract establishes a directed internal supply program for civilian goods. Your faction creates additional subsidized demand for essential commodities.",
-                5f
-        );
+                5f);
 
         tooltip.addPara(
                 "While these sales generate only a very small amount of tax revenue, they improve living conditions and support internal stability across your colonies.",
-                3f
-        );
+                3f);
 
         tooltip.addPara(
                 "For %s, every time your faction's total demand is fully satisfied through this contract, stability is increased by %s across your colonies.",
-                3f,
-                Color.ORANGE,
-                "Food",
-                "+1"
-        );
+                3f, Color.ORANGE, "Food", "+1");
 
         tooltip.addPara(
                 "For %s, every time your faction's total demand is fully satisfied through this contract, colony growth is increased by %s across your colonies.",
                 3f,
                 Color.ORANGE,
                 "Domestic Goods",
-                growthPerMetDemandDomesticGoods+"+ growth points"
-        );
+                growthPerMetDemandDomesticGoods + "+ growth points");
     }
 
-
-
     @Override
-    public void createProcTooltipSection(TooltipMakerAPI tooltip, float width, float price, int amount, String commodity) {
-        int demand = AoTDSectorProductionDemandDataUtils.getTotalDemandFromFactionIgnoreContracts(commodity, Factions.PLAYER);
+    public void createProcTooltipSection(
+            TooltipMakerAPI tooltip, float width, float price, int amount, String commodity) {
+        int demand =
+                AoTDSectorProductionDemandDataUtils.getTotalDemandFromFactionIgnoreContracts(
+                        commodity, Factions.PLAYER);
 
         tooltip.addPara(
                 "This will generate %s in tax revenue.",
-                3f,
-                Color.ORANGE,
-                Misc.getDGSCredits(price)
-        );
+                3f, Color.ORANGE, Misc.getDGSCredits(price));
 
         if (demand <= 0) {
             tooltip.addPara(
                     "No external sector demand for %s is currently present, so this contract will not provide any additional empire-wide benefits at this time.",
-                    3f,
-                    Color.ORANGE,
-                    commodity
-            );
+                    3f, Color.ORANGE, commodity);
             return;
         }
 
@@ -104,13 +92,7 @@ public class CivilianSupplyProgram extends DirectedTradeInitiativeBaseContract {
 
             tooltip.addPara(
                     "Current total external demand for %s is %s units. This shipment fulfills %s demand cycles and will increase stability by %s across all colonies.",
-                    3f,
-                    Color.ORANGE,
-                    "food",
-                    Misc.getWithDGS(demand),
-                    fulfilledCycles,
-                    stability
-            );
+                    3f, Color.ORANGE, "food", Misc.getWithDGS(demand), fulfilledCycles, stability);
         }
 
         if (Commodities.DOMESTIC_GOODS.equals(commodity)) {
@@ -124,8 +106,7 @@ public class CivilianSupplyProgram extends DirectedTradeInitiativeBaseContract {
                     "domestic goods",
                     Misc.getWithDGS(demand),
                     fulfilledCycles,
-                    growth
-            );
+                    growth);
         }
     }
 

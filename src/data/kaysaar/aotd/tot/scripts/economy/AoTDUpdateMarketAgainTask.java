@@ -8,7 +8,6 @@ import com.fs.starfarer.campaign.econ.Economy;
 import com.fs.starfarer.campaign.econ.reach.UpdateMarketsAgainTask;
 import data.kaysaar.aotd.tot.compat.MarketRegistry;
 import data.kaysaar.aotd.tot.scripts.commoditydata.AoTDCommodityOnMarket;
-
 import java.util.ArrayList;
 import java.util.List;
 
@@ -16,9 +15,8 @@ import java.util.List;
  * Finalizes one market's authoritative AoTD state after the price phase.
  *
  * <p>The optimized path removes the unconditional second reconciliation pass. Industry
- * apply/unapply is now executed only for pending/active transitions; a full
- * local supply/demand refresh is performed only when such a transition changed
- * the materialized industry state.</p>
+ * apply/unapply is now executed only for pending/active transitions; a full local supply/demand
+ * refresh is performed only when such a transition changed the materialized industry state.
  */
 public class AoTDUpdateMarketAgainTask extends UpdateMarketsAgainTask {
 
@@ -80,9 +78,10 @@ public class AoTDUpdateMarketAgainTask extends UpdateMarketsAgainTask {
         boolean desiredStateChanged = false;
         if (materializedRefresh) {
             try (AoTDEconomySemanticBaseline.Scope ignored =
-                         AoTDEconomySemanticBaseline.beginMarketMutation(
-                                 "update-market-again.detect-industry-state", market,
-                                 "authoritative-state-refresh")) {
+                    AoTDEconomySemanticBaseline.beginMarketMutation(
+                            "update-market-again.detect-industry-state",
+                            market,
+                            "authoritative-state-refresh")) {
                 AoTDEconomySemanticBaseline.operation("industry-data.check-new-industries", market);
                 desiredStateChanged = data.checkForNewIndustriesAndReport(market);
             }
@@ -93,9 +92,10 @@ public class AoTDUpdateMarketAgainTask extends UpdateMarketsAgainTask {
         for (Industry industry : industries) {
             if (data.needsReconciliation(industry.getId())) {
                 try (AoTDEconomySemanticBaseline.Scope ignored =
-                             AoTDEconomySemanticBaseline.beginMarketMutation(
-                                     "update-market-again.reapply-conditions", market,
-                                     "transition-only")) {
+                        AoTDEconomySemanticBaseline.beginMarketMutation(
+                                "update-market-again.reapply-conditions",
+                                market,
+                                "transition-only")) {
                     AoTDEconomySemanticBaseline.operation(
                             "market.reapplyConditions.transition-only", market);
                     market.reapplyConditions();
@@ -118,9 +118,8 @@ public class AoTDUpdateMarketAgainTask extends UpdateMarketsAgainTask {
             if (!data.needsReconciliation(industryId)) continue;
 
             try (AoTDEconomySemanticBaseline.Scope ignored =
-                         AoTDEconomySemanticBaseline.beginMarketMutation(
-                                  "update-market-again.reconcile-industry", market,
-                                  industryId)) {
+                    AoTDEconomySemanticBaseline.beginMarketMutation(
+                            "update-market-again.reconcile-industry", market, industryId)) {
                 if (data.isPending(industryId)) {
                     AoTDEconomySemanticBaseline.operation("industry.pending-suppression", market);
                     applyPendingIndustrySuppression(industry);
@@ -153,9 +152,10 @@ public class AoTDUpdateMarketAgainTask extends UpdateMarketsAgainTask {
 
     private static void refreshAuthoritativeSupplyDemand(MarketAPI market) {
         try (AoTDEconomySemanticBaseline.Scope ignored =
-                     AoTDEconomySemanticBaseline.begin(
-                             "update-market-again.authoritative-supply-demand", market,
-                             "transition-refresh")) {
+                AoTDEconomySemanticBaseline.begin(
+                        "update-market-again.authoritative-supply-demand",
+                        market,
+                        "transition-refresh")) {
             for (CommodityOnMarketAPI commodity : new ArrayList<>(market.getAllCommodities())) {
                 if (commodity instanceof AoTDCommodityOnMarket aotdCommodity) {
                     aotdCommodity.getSupplyDemandData().updateSupplyDemandData(market, true);
@@ -165,10 +165,10 @@ public class AoTDUpdateMarketAgainTask extends UpdateMarketsAgainTask {
     }
 
     public static void applyPendingIndustrySuppression(Industry industry) {
-        industry.getSupplyBonusFromOther().modifyFlat(
-                AoTDIndustryData.source, -getReduction(), INITIAL_STAGE_DESC);
-        industry.getDemandReductionFromOther().modifyFlat(
-                AoTDIndustryData.source, getReduction(), INITIAL_STAGE_DESC);
+        industry.getSupplyBonusFromOther()
+                .modifyFlat(AoTDIndustryData.source, -getReduction(), INITIAL_STAGE_DESC);
+        industry.getDemandReductionFromOther()
+                .modifyFlat(AoTDIndustryData.source, getReduction(), INITIAL_STAGE_DESC);
 
         AoTDEconomySemanticBaseline.operation("industry.apply.pending", 1L);
         industry.apply();

@@ -6,14 +6,11 @@ import com.fs.starfarer.api.Global;
 import com.fs.starfarer.api.input.InputEventAPI;
 import com.fs.starfarer.api.ui.CustomPanelAPI;
 import com.fs.starfarer.api.ui.PositionAPI;
-import com.fs.starfarer.api.util.Misc;
 import data.kaysaar.aotd.tot.scripts.trade.contracts.AoTDTradeContractManager;
 import data.kaysaar.aotd.tot.scripts.trade.contracts.rewards.creators.AoTDPlayerContractCreatorManager;
 import data.kaysaar.aotd.tot.scripts.trade.contracts.rewards.creators.PlayerContractCreatorAPI;
-import data.kaysaar.aotd.tot.ui.economy.tradecontracts.TradeContractCustomButton;
 import data.kaysaar.aotd.tot.ui.economy.tradecontracts.TradeContractFactionData;
 import data.kaysaar.aotd.tot.ui.economy.tradecontracts.TradeContractUITable;
-
 import java.util.List;
 
 public class EconomyTradeDealsData implements ExtendedUIPanelPlugin {
@@ -37,82 +34,87 @@ public class EconomyTradeDealsData implements ExtendedUIPanelPlugin {
         if (contentPanel != null) {
             mainPanel.removeComponent(contentPanel);
         }
-        AoTDTradeContractManager.getInstance().getActiveContracts().values().forEach(x->{
-            if(x.isIssuedByPlayer()&& AoTDPlayerContractCreatorManager.getCreator(x.getContractTypeId())!=null){
-                PlayerContractCreatorAPI creatorAPI = AoTDPlayerContractCreatorManager.getCreator(x.getContractTypeId());
-                creatorAPI.applyChangesToContractIfNecessary(x);
-            }
-        });
+        AoTDTradeContractManager.getInstance()
+                .getActiveContracts()
+                .values()
+                .forEach(
+                        x -> {
+                            if (x.isIssuedByPlayer()
+                                    && AoTDPlayerContractCreatorManager.getCreator(
+                                                    x.getContractTypeId())
+                                            != null) {
+                                PlayerContractCreatorAPI creatorAPI =
+                                        AoTDPlayerContractCreatorManager.getCreator(
+                                                x.getContractTypeId());
+                                creatorAPI.applyChangesToContractIfNecessary(x);
+                            }
+                        });
         AoTDTradeContractManager.getInstance().pruneEmptyContracts();
-        contentPanel = Global.getSettings().createCustom(mainPanel.getPosition().getWidth(), mainPanel.getPosition().getHeight(), null);
+        contentPanel =
+                Global.getSettings()
+                        .createCustom(
+                                mainPanel.getPosition().getWidth(),
+                                mainPanel.getPosition().getHeight(),
+                                null);
         TradeContractUITable.resizeToNewWidth(contentPanel.getPosition().getWidth() - 410);
         if (table == null) {
-            table = new TradeContractUITable(TradeContractUITable.getWidth(), contentPanel.getPosition().getHeight() - 50, true, 0, 0);
+            table =
+                    new TradeContractUITable(
+                            TradeContractUITable.getWidth(),
+                            contentPanel.getPosition().getHeight() - 50,
+                            true,
+                            0,
+                            0);
             table.createSections();
             table.createTable();
-        }
-        else{
+        } else {
             table.recreateTable();
         }
-        if(data==null){
-            data = new TradeContractFactionData(410,contentPanel.getPosition().getHeight()-49);
-        }
-        else{
+        if (data == null) {
+            data = new TradeContractFactionData(410, contentPanel.getPosition().getHeight() - 49);
+        } else {
             data.getTradeContractUI().createUI();
         }
         contentPanel.addComponent(table.mainPanel).inTL(415, 0);
         contentPanel.addComponent(data.getMainPanel()).inTL(0, 1);
         mainPanel.addComponent(contentPanel).inTL(0, 0);
-
     }
 
     @Override
-    public void clearUI() {
-
-    }
+    public void clearUI() {}
 
     @Override
-    public void positionChanged(PositionAPI position) {
+    public void positionChanged(PositionAPI position) {}
 
-    }
     public static boolean forceTableUpdate = false;
 
     @Override
     public void renderBelow(float alphaMult) {
-        if(data!=null&&table!=null){
+        if (data != null && table != null) {
             String curr = table.getCurrentlyChosenContract();
-            if(AshMisc.isStringValid(curr)){
+            if (AshMisc.isStringValid(curr)) {
                 data.setCurrentlyChosenContract(curr);
             }
-            if(data.getTradeContractUI().isUpdateUI()){
+            if (data.getTradeContractUI().isUpdateUI()) {
                 data.getTradeContractUI().setUpdateUI(false);
                 table.recreateTable();
             }
-            if(forceTableUpdate){
+            if (forceTableUpdate) {
                 forceTableUpdate = false;
                 table.recreateTable();
             }
-
         }
     }
 
     @Override
-    public void render(float alphaMult) {
-
-    }
+    public void render(float alphaMult) {}
 
     @Override
-    public void advance(float amount) {
-
-    }
+    public void advance(float amount) {}
 
     @Override
-    public void processInput(List<InputEventAPI> events) {
-
-    }
+    public void processInput(List<InputEventAPI> events) {}
 
     @Override
-    public void buttonPressed(Object buttonId) {
-
-    }
+    public void buttonPressed(Object buttonId) {}
 }

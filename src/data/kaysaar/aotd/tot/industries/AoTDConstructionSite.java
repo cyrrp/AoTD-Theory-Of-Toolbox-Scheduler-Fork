@@ -1,10 +1,8 @@
 package data.kaysaar.aotd.tot.industries;
 
-import data.kaysaar.aotd.tot.compat.SchedulerBridge;
 import ashlib.data.plugins.ui.models.ProgressBarComponentV2;
 import com.fs.starfarer.api.Global;
 import com.fs.starfarer.api.campaign.comm.CommMessageAPI;
-import com.fs.starfarer.api.campaign.econ.Industry;
 import com.fs.starfarer.api.campaign.econ.MarketAPI;
 import com.fs.starfarer.api.impl.campaign.econ.impl.BaseIndustry;
 import com.fs.starfarer.api.impl.campaign.intel.BaseIntelPlugin;
@@ -13,6 +11,7 @@ import com.fs.starfarer.api.loading.IndustrySpecAPI;
 import com.fs.starfarer.api.ui.Alignment;
 import com.fs.starfarer.api.ui.TooltipMakerAPI;
 import com.fs.starfarer.api.util.Misc;
+import data.kaysaar.aotd.tot.compat.SchedulerBridge;
 import data.kaysaar.aotd.tot.grandwonders.GrandWonderAPI;
 import data.kaysaar.aotd.tot.grandwonders.GrandWonderManager;
 import data.kaysaar.aotd.tot.grandwonders.GrandWonderTypeManager;
@@ -22,7 +21,6 @@ import data.kaysaar.aotd.tot.scripts.trade.contracts.AoTDTradeContract;
 import data.kaysaar.aotd.tot.scripts.trade.contracts.AoTDTradeContractManager;
 import data.kaysaar.aotd.tot.ui.commoditypanel.AoTDCommodityShortPanelCombined;
 import data.kaysaar.aotd.tot.ui.grandwonders.GrandWonderContract;
-
 import java.awt.*;
 import java.util.GregorianCalendar;
 import java.util.HashMap;
@@ -55,22 +53,32 @@ public class AoTDConstructionSite extends BaseIndustry {
 
     @Override
     protected void buildingFinished() {
-        long token = SchedulerBridge.beforeMarketMutation(
-                market, SchedulerBridge.MUTATION_INDUSTRY_STRUCTURE);
+        long token =
+                SchedulerBridge.beforeMarketMutation(
+                        market, SchedulerBridge.MUTATION_INDUSTRY_STRUCTURE);
         try {
-        super.buildingFinished();
+            super.buildingFinished();
         } finally {
-            SchedulerBridge.afterMarketMutation(token, market,
+            SchedulerBridge.afterMarketMutation(
+                    token,
+                    market,
                     SchedulerBridge.DIRTY_STRUCTURE
                             | SchedulerBridge.DIRTY_INDUSTRIES
-                            | SchedulerBridge.DIRTY_DERIVED_ECONOMY, 0L);
+                            | SchedulerBridge.DIRTY_DERIVED_ECONOMY,
+                    0L);
         }
     }
 
     public float getAllowedProgressOnRestoration() {
         LinkedHashMap<String, Integer> required = new LinkedHashMap<>();
-        for (Map.Entry<String, Integer> entry : wonderAPI.getDemandCostForRestoration().entrySet()) {
-            required.put(entry.getKey(), (int) (AoTDCommodityEconSpecManager.getCargoAmountFromSupplyOrDemand(entry.getValue(), true, entry.getKey())*Math.ceil(wonderAPI.getSpec().getBuildTime()/30f)));
+        for (Map.Entry<String, Integer> entry :
+                wonderAPI.getDemandCostForRestoration().entrySet()) {
+            required.put(
+                    entry.getKey(),
+                    (int)
+                            (AoTDCommodityEconSpecManager.getCargoAmountFromSupplyOrDemand(
+                                            entry.getValue(), true, entry.getKey())
+                                    * Math.ceil(wonderAPI.getSpec().getBuildTime() / 30f)));
         }
 
         if (required == null || required.isEmpty()) {
@@ -99,28 +107,41 @@ public class AoTDConstructionSite extends BaseIndustry {
     public HashMap<String, Integer> getMonthlyResNeeded() {
         HashMap<String, Integer> commodities = new HashMap<>();
 
-        int months = Math.max(1, (int) Math.ceil((wonderAPI.getSpec().getBuildTime()-daysPassedOnConstruction) / 30f));// prevent division by 0
+        int months =
+                Math.max(
+                        1,
+                        (int)
+                                Math.ceil(
+                                        (wonderAPI.getSpec().getBuildTime()
+                                                        - daysPassedOnConstruction)
+                                                / 30f)); // prevent division by 0
         LinkedHashMap<String, Integer> required = new LinkedHashMap<>();
-        for (Map.Entry<String, Integer> entry : wonderAPI.getDemandCostForRestoration().entrySet()) {
-            required.put(entry.getKey(), (int) (AoTDCommodityEconSpecManager.getCargoAmountFromSupplyOrDemand(entry.getValue(), true, entry.getKey())*Math.ceil(wonderAPI.getSpec().getBuildTime()/30f)));
+        for (Map.Entry<String, Integer> entry :
+                wonderAPI.getDemandCostForRestoration().entrySet()) {
+            required.put(
+                    entry.getKey(),
+                    (int)
+                            (AoTDCommodityEconSpecManager.getCargoAmountFromSupplyOrDemand(
+                                            entry.getValue(), true, entry.getKey())
+                                    * Math.ceil(wonderAPI.getSpec().getBuildTime() / 30f)));
         }
 
-        required.forEach((key, totalRequired) -> {
-            int alreadySpent = delivered.getOrDefault(key, 0);
+        required.forEach(
+                (key, totalRequired) -> {
+                    int alreadySpent = delivered.getOrDefault(key, 0);
 
-            int remaining = Math.max(0, totalRequired - alreadySpent);
+                    int remaining = Math.max(0, totalRequired - alreadySpent);
 
-            if (remaining <= 0) return;
+                    if (remaining <= 0) return;
 
-            // ceil division so we don't "lose" resources over time
-            int perMonth = (int) Math.ceil((float) remaining / (float) months);
+                    // ceil division so we don't "lose" resources over time
+                    int perMonth = (int) Math.ceil((float) remaining / (float) months);
 
-            putCommoditiesIntoMap(commodities, key, perMonth);
-        });
+                    putCommoditiesIntoMap(commodities, key, perMonth);
+                });
 
         return commodities;
     }
-
 
     public String getUniqueIdForContract() {
         if (uniqueIdForContract == null) uniqueIdForContract = Misc.genUID();
@@ -128,7 +149,9 @@ public class AoTDConstructionSite extends BaseIndustry {
     }
 
     public AoTDTradeContract getContract() {
-        return AoTDTradeContractManager.getInstance().getActiveContracts().get(getUniqueIdForContract());
+        return AoTDTradeContractManager.getInstance()
+                .getActiveContracts()
+                .get(getUniqueIdForContract());
     }
 
     @Override
@@ -137,7 +160,6 @@ public class AoTDConstructionSite extends BaseIndustry {
         spec = getSpec();
         return resolved;
     }
-
 
     public void setAssignedWonder(String assignedWonder) {
 
@@ -165,18 +187,33 @@ public class AoTDConstructionSite extends BaseIndustry {
     }
 
     @Override
-    protected void addPostDemandSection(TooltipMakerAPI tooltip, boolean hasDemand, IndustryTooltipMode mode) {
+    protected void addPostDemandSection(
+            TooltipMakerAPI tooltip, boolean hasDemand, IndustryTooltipMode mode) {
         super.addPostDemandSection(tooltip, hasDemand, mode);
         if (assignedWonder != null) {
             tooltip.addSectionHeading("Current Wonder In Construction", Alignment.MID, 5f);
-            tooltip.addPara("Currently constructed wonder : %s", 5f, Color.ORANGE, wonderAPI.getCurrentName());
-            tooltip.addPara("This wonder to progress requires monthly flow of resources, which are provided via Trade Contract", 3f);
+            tooltip.addPara(
+                    "Currently constructed wonder : %s",
+                    5f, Color.ORANGE, wonderAPI.getCurrentName());
+            tooltip.addPara(
+                    "This wonder to progress requires monthly flow of resources, which are provided via Trade Contract",
+                    3f);
             LinkedHashMap<String, Integer> am = new LinkedHashMap<>(getMonthlyResNeeded());
             float progress = Math.round(getAllowedProgressOnRestoration() * 100);
-            AoTDCommodityShortPanelCombined combined = new AoTDCommodityShortPanelCombined(tooltip.getWidthSoFar(), 3, am);
-            ProgressBarComponentV2 bar = new ProgressBarComponentV2(tooltip.getWidthSoFar(), 15, null, null, market.getFaction().getBaseUIColor(), market.getFaction().getDarkUIColor(), progress / 100);
+            AoTDCommodityShortPanelCombined combined =
+                    new AoTDCommodityShortPanelCombined(tooltip.getWidthSoFar(), 3, am);
+            ProgressBarComponentV2 bar =
+                    new ProgressBarComponentV2(
+                            tooltip.getWidthSoFar(),
+                            15,
+                            null,
+                            null,
+                            market.getFaction().getBaseUIColor(),
+                            market.getFaction().getDarkUIColor(),
+                            progress / 100);
             tooltip.addCustom(combined.getMainPanel(), 5f);
-            tooltip.addPara("Currently allowed progress : %s", 3f, Color.ORANGE, progress + "%").setAlignment(Alignment.MID);
+            tooltip.addPara("Currently allowed progress : %s", 3f, Color.ORANGE, progress + "%")
+                    .setAlignment(Alignment.MID);
             tooltip.addCustom(bar.getMainPanel(), 3f);
         }
     }
@@ -188,13 +225,15 @@ public class AoTDConstructionSite extends BaseIndustry {
 
     @Override
     public boolean isUpgrading() {
-        return assignedWonder != null && daysPassedOnConstruction <= wonderAPI.getSpec().getBuildTime();
+        return assignedWonder != null
+                && daysPassedOnConstruction <= wonderAPI.getSpec().getBuildTime();
     }
 
     @Override
     public float getBuildOrUpgradeProgress() {
         if (assignedWonder != null) {
-            return daysPassedOnConstruction / Global.getSettings().getIndustrySpec(assignedWonder).getBuildTime();
+            return daysPassedOnConstruction
+                    / Global.getSettings().getIndustrySpec(assignedWonder).getBuildTime();
         }
         return super.getBuildOrUpgradeProgress();
     }
@@ -216,7 +255,9 @@ public class AoTDConstructionSite extends BaseIndustry {
 
     @Override
     public boolean isAvailableToBuild() {
-        return !GrandWonderTypeManager.getWondersVisibleForMarket(market).isEmpty() && market.getFaction().isPlayerFaction() && GrandWonderManager.canBuiltAdditionalWonderDueToSlots(market);
+        return !GrandWonderTypeManager.getWondersVisibleForMarket(market).isEmpty()
+                && market.getFaction().isPlayerFaction()
+                && GrandWonderManager.canBuiltAdditionalWonderDueToSlots(market);
     }
 
     @Override
@@ -242,14 +283,9 @@ public class AoTDConstructionSite extends BaseIndustry {
         unapplyImpl();
     }
 
-    public void applyImpl() {
+    public void applyImpl() {}
 
-    }
-
-    public void unapplyImpl() {
-
-    }
-
+    public void unapplyImpl() {}
 
     @Override
     public void advance(float amount) {
@@ -265,37 +301,56 @@ public class AoTDConstructionSite extends BaseIndustry {
                 float allowedDays = allowedProgress * totalDaysNeeded;
 
                 if (daysPassedOnConstruction < allowedDays) {
-                    daysPassedOnConstruction = Math.min(daysPassedOnConstruction + days, allowedDays);
+                    daysPassedOnConstruction =
+                            Math.min(daysPassedOnConstruction + days, allowedDays);
                 }
                 float progress = getBuildOrUpgradeProgress();
                 if (daysPassedOnConstruction >= totalDaysNeeded || progress >= 1f) {
-                    long token = SchedulerBridge.beforeMarketMutation(
-                            market, SchedulerBridge.MUTATION_INDUSTRY_STRUCTURE);
+                    long token =
+                            SchedulerBridge.beforeMarketMutation(
+                                    market, SchedulerBridge.MUTATION_INDUSTRY_STRUCTURE);
                     try {
                         daysPassedOnConstruction = totalDaysNeeded;
                         building = false;
-                        GrandWonderAPI wonderAPI1 = (GrandWonderAPI) market.instantiateIndustry(wonderAPI.getId());
+                        GrandWonderAPI wonderAPI1 =
+                                (GrandWonderAPI) market.instantiateIndustry(wonderAPI.getId());
                         wonderAPI.doPreSaveCleanup();
                         wonderAPI = null;
                         wonderAPI1.finishedConstruction(market);
                         market.getIndustries().add(wonderAPI1);
-                        MessageIntel intel = new MessageIntel(wonderAPI1.getCurrentName() + " at " + market.getName(), Misc.getBasePlayerColor());
+                        MessageIntel intel =
+                                new MessageIntel(
+                                        wonderAPI1.getCurrentName() + " at " + market.getName(),
+                                        Misc.getBasePlayerColor());
                         intel.addLine(BaseIntelPlugin.BULLET + "Construction completed");
                         intel.setIcon(Global.getSector().getPlayerFaction().getCrest());
                         intel.setSound(BaseIntelPlugin.getSoundStandardUpdate());
-                        Global.getSector().getCampaignUI().addMessage(intel, CommMessageAPI.MessageClickAction.COLONY_INFO, market);
-                        AoTDIndustryData.getInstance(market).statesOnMarket.put(wonderAPI1.getId(), AoTDIndustryData.AoTDIndustryState.ALREADY_WORKING);
-                        AoTDTradeContractManager.getInstance().removeContract(getUniqueIdForContract());
+                        Global.getSector()
+                                .getCampaignUI()
+                                .addMessage(
+                                        intel,
+                                        CommMessageAPI.MessageClickAction.COLONY_INFO,
+                                        market);
+                        AoTDIndustryData.getInstance(market)
+                                .statesOnMarket
+                                .put(
+                                        wonderAPI1.getId(),
+                                        AoTDIndustryData.AoTDIndustryState.ALREADY_WORKING);
+                        AoTDTradeContractManager.getInstance()
+                                .removeContract(getUniqueIdForContract());
                         GrandWonderManager.getInstance().addBuiltSoFar(wonderAPI1.getId(), 1);
-                        market.removeIndustry(this.getId(), MarketAPI.MarketInteractionMode.REMOTE, false);
+                        market.removeIndustry(
+                                this.getId(), MarketAPI.MarketInteractionMode.REMOTE, false);
                     } finally {
-                        SchedulerBridge.afterMarketMutation(token, market,
+                        SchedulerBridge.afterMarketMutation(
+                                token,
+                                market,
                                 SchedulerBridge.DIRTY_STRUCTURE
                                         | SchedulerBridge.DIRTY_INDUSTRIES
-                                        | SchedulerBridge.DIRTY_DERIVED_ECONOMY, 0L);
+                                        | SchedulerBridge.DIRTY_DERIVED_ECONOMY,
+                                0L);
                     }
                 }
-
             }
         } else {
             super.advance(amount);
@@ -314,7 +369,8 @@ public class AoTDConstructionSite extends BaseIndustry {
         return super.getCurrentImage();
     }
 
-    public static void putCommoditiesIntoMap(HashMap<String, Integer> map, String commodity, int val) {
+    public static void putCommoditiesIntoMap(
+            HashMap<String, Integer> map, String commodity, int val) {
         if (map.get(commodity) == null) {
             map.put(commodity, val);
         } else {

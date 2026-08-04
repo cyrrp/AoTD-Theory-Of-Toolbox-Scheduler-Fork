@@ -12,7 +12,6 @@ import com.fs.starfarer.api.util.Misc;
 import com.fs.starfarer.api.util.Pair;
 import data.kaysaar.aotd.tot.plugins.AoTDCommodityEconSpecManager;
 import data.kaysaar.aotd.tot.scripts.trade.contracts.AoTDTradeContract;
-
 import java.awt.*;
 import java.util.*;
 import java.util.List;
@@ -21,12 +20,14 @@ public class AoTDCommodityShortPanelCombined implements ExtendedUIPanelPlugin {
 
     private final CustomPanelAPI mainPanel;
     boolean contractMet = true;
+
     @Override
     public CustomPanelAPI getMainPanel() {
         return mainPanel;
     }
 
-    public AoTDCommodityShortPanelCombined(float width, int columns, Industry ind, boolean demand,boolean ignoreDemand) {
+    public AoTDCommodityShortPanelCombined(
+            float width, int columns, Industry ind, boolean demand, boolean ignoreDemand) {
         float ySeparator = 3f;
         float xGap = 2f;
 
@@ -60,23 +61,38 @@ public class AoTDCommodityShortPanelCombined implements ExtendedUIPanelPlugin {
                 CustomPanelAPI commodityPanel;
 
                 if (demand) {
-                    commodityPanel = new AoTDCommodityShortPanel(
-                            entry.getCommodityId(),
-                            AoTDCommodityEconSpecManager.getEconSpec(entry.getCommodityId())
-                                    .getCalculationScript()
-                                    .getRawUnitsFromDemand(entry.getQuantity(), ind.getMarket(), entry.getCommodityId(),ind),
-                            Color.ORANGE,
-                            cellWidth, ind, true,ignoreDemand
-                    ).getMainPanel();
+                    commodityPanel =
+                            new AoTDCommodityShortPanel(
+                                            entry.getCommodityId(),
+                                            AoTDCommodityEconSpecManager.getEconSpec(
+                                                            entry.getCommodityId())
+                                                    .getCalculationScript()
+                                                    .getRawUnitsFromDemand(
+                                                            entry.getQuantity(),
+                                                            ind.getMarket(),
+                                                            entry.getCommodityId(),
+                                                            ind),
+                                            Color.ORANGE,
+                                            cellWidth,
+                                            ind,
+                                            true,
+                                            ignoreDemand)
+                                    .getMainPanel();
                 } else {
-                    commodityPanel = new AoTDCommodityShortPanel(
-                            entry.getCommodityId(),
-                            AoTDCommodityEconSpecManager.getEconSpec(entry.getCommodityId())
-                                    .getCalculationScript()
-                                    .getRawUnitsFromSupply(entry.getQuantity(), ind.getMarket(), entry.getCommodityId(),ind),
-                            Misc.getPositiveHighlightColor(),
-                            cellWidth
-                    ).getMainPanel();
+                    commodityPanel =
+                            new AoTDCommodityShortPanel(
+                                            entry.getCommodityId(),
+                                            AoTDCommodityEconSpecManager.getEconSpec(
+                                                            entry.getCommodityId())
+                                                    .getCalculationScript()
+                                                    .getRawUnitsFromSupply(
+                                                            entry.getQuantity(),
+                                                            ind.getMarket(),
+                                                            entry.getCommodityId(),
+                                                            ind),
+                                            Misc.getPositiveHighlightColor(),
+                                            cellWidth)
+                                    .getMainPanel();
                 }
 
                 mainPanel.addComponent(commodityPanel).inTL(currX, currY);
@@ -89,7 +105,8 @@ public class AoTDCommodityShortPanelCombined implements ExtendedUIPanelPlugin {
         }
     }
 
-    public AoTDCommodityShortPanelCombined(float width, int columns, ArrayList<Pair<String, Integer>> commodities) {
+    public AoTDCommodityShortPanelCombined(
+            float width, int columns, ArrayList<Pair<String, Integer>> commodities) {
         float ySeparator = 3f;
         float xGap = 2f;
 
@@ -121,14 +138,10 @@ public class AoTDCommodityShortPanelCombined implements ExtendedUIPanelPlugin {
                 Pair<String, Integer> entry = list.get(index);
 
                 CustomPanelAPI commodityPanel;
-                commodityPanel = new AoTDCommodityShortPanel(
-                        entry.one,
-                        entry.two,
-                        Color.ORANGE,
-                        cellWidth,
-                        true
-                ).getMainPanel();
-
+                commodityPanel =
+                        new AoTDCommodityShortPanel(
+                                        entry.one, entry.two, Color.ORANGE, cellWidth, true)
+                                .getMainPanel();
 
                 mainPanel.addComponent(commodityPanel).inTL(currX, currY);
 
@@ -139,7 +152,9 @@ public class AoTDCommodityShortPanelCombined implements ExtendedUIPanelPlugin {
             currY += AoTDCommodityShortPanel.height + ySeparator;
         }
     }
-    public AoTDCommodityShortPanelCombined(float width, int columns, LinkedHashMap<String,Integer>commodities) {
+
+    public AoTDCommodityShortPanelCombined(
+            float width, int columns, LinkedHashMap<String, Integer> commodities) {
         float ySeparator = 3f;
         float xGap = 2f;
 
@@ -174,14 +189,10 @@ public class AoTDCommodityShortPanelCombined implements ExtendedUIPanelPlugin {
                 Pair<String, Integer> entry = list.get(index);
 
                 CustomPanelAPI commodityPanel;
-                commodityPanel = new AoTDCommodityShortPanel(
-                        entry.one,
-                        entry.two,
-                        Color.ORANGE,
-                        cellWidth,
-                        true
-                ).getMainPanel();
-
+                commodityPanel =
+                        new AoTDCommodityShortPanel(
+                                        entry.one, entry.two, Color.ORANGE, cellWidth, true)
+                                .getMainPanel();
 
                 mainPanel.addComponent(commodityPanel).inTL(currX, currY);
 
@@ -193,7 +204,12 @@ public class AoTDCommodityShortPanelCombined implements ExtendedUIPanelPlugin {
         }
     }
 
-    public AoTDCommodityShortPanelCombined(float width, int columns, AoTDTradeContract tradeContract,boolean shortMode,boolean ignoreDemand) {
+    public AoTDCommodityShortPanelCombined(
+            float width,
+            int columns,
+            AoTDTradeContract tradeContract,
+            boolean shortMode,
+            boolean ignoreDemand) {
         float ySeparator = 3f;
         float xGap = 5f;
         float cellWidth = 100; // fixed width
@@ -206,9 +222,8 @@ public class AoTDCommodityShortPanelCombined implements ExtendedUIPanelPlugin {
 
         int rows = Math.max(0, (int) Math.ceil((double) count / columns));
         float height = (rows * AoTDCommodityShortPanel.height) + ((rows - 1) * ySeparator);
-        if(!shortMode){
+        if (!shortMode) {
             cellWidth = (width - (columns - 1) * xGap) / columns;
-
         }
         mainPanel = Global.getSettings().createCustom(width, height, this);
         if (height == 0) return;
@@ -218,10 +233,9 @@ public class AoTDCommodityShortPanelCombined implements ExtendedUIPanelPlugin {
 
         while (index < count) {
             int itemsThisRow = Math.min(columns, count - index);
-            if(shortMode){
-                itemsThisRow = Math.min(columns,max);
+            if (shortMode) {
+                itemsThisRow = Math.min(columns, max);
             }
-
 
             // calculate total row width based only on spacing + fixed cell width
             float totalRowWidth = (itemsThisRow * cellWidth) + ((itemsThisRow - 1) * xGap);
@@ -233,75 +247,68 @@ public class AoTDCommodityShortPanelCombined implements ExtendedUIPanelPlugin {
             for (int i = 0; i < itemsThisRow; i++) {
 
                 AoTDTradeContract.TradeContractData data = dataList.get(index);
-                if(Global.getSettings().getCommoditySpec(data.getCommodityId())==null)continue;
-                if(shortMode){
-                    CustomPanelAPI commodityPanel = new AoTDCommodityShortPanel(
-                            data.getCommodityId(),
-                            data.getReqMonthly(),
-                            Color.ORANGE,
-                            cellWidth,
-                            true,
-                            shortMode,ignoreDemand
-                    ).getMainPanel();
+                if (Global.getSettings().getCommoditySpec(data.getCommodityId()) == null) continue;
+                if (shortMode) {
+                    CustomPanelAPI commodityPanel =
+                            new AoTDCommodityShortPanel(
+                                            data.getCommodityId(),
+                                            data.getReqMonthly(),
+                                            Color.ORANGE,
+                                            cellWidth,
+                                            true,
+                                            shortMode,
+                                            ignoreDemand)
+                                    .getMainPanel();
+                    mainPanel.addComponent(commodityPanel).inTL(currX, currY);
+                } else {
+                    CustomPanelAPI commodityPanel =
+                            new AoTDCommodityShortPanel(
+                                            data.getCommodityId(),
+                                            Color.ORANGE,
+                                            cellWidth,
+                                            data,
+                                            tradeContract.getId(),
+                                            ignoreDemand)
+                                    .getMainPanel();
                     mainPanel.addComponent(commodityPanel).inTL(currX, currY);
                 }
-                else{
-                    CustomPanelAPI commodityPanel = new AoTDCommodityShortPanel(
-                            data.getCommodityId(),
-                            Color.ORANGE,
-                            cellWidth,
-                            data,
-                            tradeContract.getId(),ignoreDemand
-                    ).getMainPanel();
-                    mainPanel.addComponent(commodityPanel).inTL(currX, currY);
-                }
-
-
-
 
                 currX += cellWidth + xGap;
                 index++;
-
             }
-            if(shortMode&&index>=max&&index<count){
-                TooltipMakerAPI tlDots = mainPanel.createUIElement(30,mainPanel.getPosition().getHeight(),false);
-                tlDots.addPara("...",13f);
-                mainPanel.addUIElement(tlDots).inTL(currX-5, currY);
+            if (shortMode && index >= max && index < count) {
+                TooltipMakerAPI tlDots =
+                        mainPanel.createUIElement(30, mainPanel.getPosition().getHeight(), false);
+                tlDots.addPara("...", 13f);
+                mainPanel.addUIElement(tlDots).inTL(currX - 5, currY);
                 break;
             }
 
             currY += AoTDCommodityShortPanel.height + ySeparator;
         }
     }
-    @Override
-    public void createUI() {
-    }
 
     @Override
-    public void clearUI() {
-    }
+    public void createUI() {}
 
     @Override
-    public void positionChanged(PositionAPI position) {
-    }
+    public void clearUI() {}
 
     @Override
-    public void renderBelow(float alphaMult) {
-    }
+    public void positionChanged(PositionAPI position) {}
 
     @Override
-    public void render(float alphaMult) {
-    }
+    public void renderBelow(float alphaMult) {}
 
     @Override
-    public void advance(float amount) {
-    }
+    public void render(float alphaMult) {}
 
     @Override
-    public void processInput(List<InputEventAPI> events) {
-    }
+    public void advance(float amount) {}
 
     @Override
-    public void buttonPressed(Object buttonId) {
-    }
+    public void processInput(List<InputEventAPI> events) {}
+
+    @Override
+    public void buttonPressed(Object buttonId) {}
 }

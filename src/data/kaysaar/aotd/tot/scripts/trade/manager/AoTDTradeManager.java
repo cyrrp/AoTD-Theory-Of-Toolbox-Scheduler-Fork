@@ -11,7 +11,6 @@ import data.kaysaar.aotd.tot.scripts.economy.AoTDRuntimeEpoch;
 import data.kaysaar.aotd.tot.scripts.trade.models.AoTDFactionTradeData;
 import data.kaysaar.aotd.tot.scripts.trade.models.AoTDInternalTradeBatch;
 import data.kaysaar.aotd.tot.scripts.trade.models.AoTDMarketData;
-
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -24,8 +23,10 @@ public class AoTDTradeManager {
     public static boolean endOfMonth = false;
     LinkedHashMap<String, AoTDFactionTradeData> factionsTradeData = new LinkedHashMap<>();
     LinkedHashSet<String> possibleCommoditiesDemanded = new LinkedHashSet<>();
+
     /** Authoritative owner of each published market snapshot. */
     LinkedHashMap<String, String> marketFactionById = new LinkedHashMap<>();
+
     public static float multFromSellingExcess = 0.01f;
 
     private long localPublicationRevision;
@@ -37,7 +38,8 @@ public class AoTDTradeManager {
 
     private Object readResolve() {
         if (factionsTradeData == null) factionsTradeData = new LinkedHashMap<>();
-        if (possibleCommoditiesDemanded == null) possibleCommoditiesDemanded = new LinkedHashSet<>();
+        if (possibleCommoditiesDemanded == null)
+            possibleCommoditiesDemanded = new LinkedHashSet<>();
         if (marketFactionById == null) marketFactionById = new LinkedHashMap<>();
         ensureTransientState();
         if (marketFactionById.isEmpty()) {
@@ -63,7 +65,8 @@ public class AoTDTradeManager {
         return new LinkedHashSet<>(possibleCommoditiesDemanded);
     }
 
-    public synchronized List<String> getPossibleCommoditiesDemandedOrSuppliedSorted(Comparator<String> comparator) {
+    public synchronized List<String> getPossibleCommoditiesDemandedOrSuppliedSorted(
+            Comparator<String> comparator) {
         return possibleCommoditiesDemanded.stream().sorted(comparator).toList();
     }
 
@@ -80,7 +83,8 @@ public class AoTDTradeManager {
         if (!Global.getSector().getPersistentData().containsKey(memkey)) {
             Global.getSector().getPersistentData().put(memkey, new AoTDTradeManager());
         }
-        AoTDTradeManager manager = (AoTDTradeManager) Global.getSector().getPersistentData().get(memkey);
+        AoTDTradeManager manager =
+                (AoTDTradeManager) Global.getSector().getPersistentData().get(memkey);
         manager.ensureTransientState();
         return manager;
     }
@@ -110,17 +114,16 @@ public class AoTDTradeManager {
     }
 
     /**
-     * Captures the exact post-immigration trade inputs without publishing them.
-     * A whole economy iteration can therefore validate every market before any
-     * new trade snapshot becomes visible to the global cut.
+     * Captures the exact post-immigration trade inputs without publishing them. A whole economy
+     * iteration can therefore validate every market before any new trade snapshot becomes visible
+     * to the global cut.
      */
     public PreparedSnapshot preparePostImmigrationSnapshot(MarketAPI market) {
         if (market == null) return PreparedSnapshot.failed(null, "null-market");
         AoTDMarketData candidate;
         try (AoTDEconomySemanticBaseline.Scope ignored =
-                     AoTDEconomySemanticBaseline.begin(
-                              "trade-manager.capture-post-immigration", market,
-                              "post-immigration")) {
+                AoTDEconomySemanticBaseline.begin(
+                        "trade-manager.capture-post-immigration", market, "post-immigration")) {
             candidate = AoTDMarketData.capturePostImmigration(market);
         } catch (RuntimeException failure) {
             return PreparedSnapshot.failed(market.getId(), failure.toString());
@@ -155,21 +158,27 @@ public class AoTDTradeManager {
                 reasonMask |= SnapshotRefreshResult.REASON_FACTION;
             }
 
-            boolean sameFaction = previousFaction == null
-                    ? previous == null
-                    : previousFaction.equals(nextFaction);
-            boolean changed = previous == null || !sameFaction
-                    || !candidate.hasSameTradeInputs(previous);
+            boolean sameFaction =
+                    previousFaction == null
+                            ? previous == null
+                            : previousFaction.equals(nextFaction);
+            boolean changed =
+                    previous == null || !sameFaction || !candidate.hasSameTradeInputs(previous);
             long expectedRevision = previous == null ? 0L : previous.publicationRevision;
             return PreparedSnapshot.ready(
-                    marketId, nextFaction, previousFaction, expectedRevision,
-                    candidate, changed, reasonMask);
+                    marketId,
+                    nextFaction,
+                    previousFaction,
+                    expectedRevision,
+                    candidate,
+                    changed,
+                    reasonMask);
         }
     }
 
     /**
-     * Atomically validates and publishes a complete post-immigration snapshot
-     * batch. No market is published if any prepared baseline became stale.
+     * Atomically validates and publishes a complete post-immigration snapshot batch. No market is
+     * published if any prepared baseline became stale.
      */
     public synchronized boolean commitPreparedSnapshots(List<PreparedSnapshot> prepared) {
         ensureTransientState();
@@ -205,11 +214,14 @@ public class AoTDTradeManager {
         }
         if (!prepared.changed) {
             return SnapshotRefreshResult.unchanged(
-                    prepared.marketId, prepared.candidate.tradeFingerprint,
+                    prepared.marketId,
+                    prepared.candidate.tradeFingerprint,
                     prepared.expectedPreviousRevision);
         }
         return SnapshotRefreshResult.published(
-                prepared.marketId, prepared.reasonMask, false,
+                prepared.marketId,
+                prepared.reasonMask,
+                false,
                 prepared.candidate.tradeFingerprint,
                 prepared.committedPublicationRevision);
     }
@@ -228,16 +240,15 @@ public class AoTDTradeManager {
     public void addMarket(MarketAPI market) {
         if (market == null) return;
         try (AoTDEconomySemanticBaseline.Scope ignored =
-                     AoTDEconomySemanticBaseline.begin(
-                              "trade-manager.build-market-snapshot", market,
-                              "build")) {
+                AoTDEconomySemanticBaseline.begin(
+                        "trade-manager.build-market-snapshot", market, "build")) {
             AoTDMarketData snapshot = new AoTDMarketData(market);
             synchronized (this) {
                 ensureTransientState();
                 if (settlementOpen) {
                     pendingRemovals.remove(market.getId());
-                    pendingSnapshots.put(market.getId(),
-                            new PendingSnapshot(market.getFactionId(), snapshot));
+                    pendingSnapshots.put(
+                            market.getId(), new PendingSnapshot(market.getFactionId(), snapshot));
                     AoTDEconomySemanticBaseline.operation(
                             "trade-manager.snapshot-deferred-to-next-cut", market);
                 } else {
@@ -256,8 +267,8 @@ public class AoTDTradeManager {
             AoTDFactionTradeData previous = factionsTradeData.get(previousFaction);
             if (previous != null) previous.removeMarketSnapshot(snapshot.marketId);
         }
-        AoTDFactionTradeData factionData = factionsTradeData.computeIfAbsent(
-                factionId, AoTDFactionTradeData::new);
+        AoTDFactionTradeData factionData =
+                factionsTradeData.computeIfAbsent(factionId, AoTDFactionTradeData::new);
         localPublicationRevision = nextPositive(localPublicationRevision);
         snapshot.publicationRevision = localPublicationRevision;
         factionData.putMarketSnapshot(snapshot);
@@ -295,8 +306,7 @@ public class AoTDTradeManager {
 
     /** Opens an immutable cut. New local publications are deferred to the next cut. */
     public synchronized CommittedCut beginCommittedCut(int reasonMask) {
-        return beginCommittedCut(reasonMask,
-                AoTDRuntimeEpoch.captureBatch("committed-cut"));
+        return beginCommittedCut(reasonMask, AoTDRuntimeEpoch.captureBatch("committed-cut"));
     }
 
     public synchronized CommittedCut beginCommittedCut(
@@ -306,8 +316,8 @@ public class AoTDTradeManager {
             throw new IllegalStateException("Cannot open stale AoTD committed cut: " + epochStamp);
         }
         if (settlementOpen) {
-            throw new IllegalStateException("AoTD committed cut already open: token="
-                    + activeSettlementToken);
+            throw new IllegalStateException(
+                    "AoTD committed cut already open: token=" + activeSettlementToken);
         }
         settlementOpen = true;
         activeSettlementToken = nextPositive(settlementSequence);
@@ -318,19 +328,21 @@ public class AoTDTradeManager {
             for (AoTDMarketData market : entry.getValue().getTradeData().values()) {
                 markets.add(market.toInternalTradeInput());
             }
-            batch.addFaction(new AoTDInternalTradeBatch.FactionInput(
-                    entry.getKey(), markets.toArray(new AoTDInternalTradeBatch.MarketInput[0])));
+            batch.addFaction(
+                    new AoTDInternalTradeBatch.FactionInput(
+                            entry.getKey(),
+                            markets.toArray(new AoTDInternalTradeBatch.MarketInput[0])));
         }
         batch.freeze();
-        return new CommittedCut(activeSettlementToken, localPublicationRevision,
-                reasonMask, batch, epochStamp);
+        return new CommittedCut(
+                activeSettlementToken, localPublicationRevision, reasonMask, batch, epochStamp);
     }
 
     /** Applies pure results to the exact snapshots protected by the open cut. */
     public synchronized boolean commitInternalTrade(
             CommittedCut cut, AoTDInternalTradeBatch batch) {
-        if (!isActiveCutLocked(cut) || batch == null
-                || !cut.epochStamp.equals(batch.epochStamp)) return false;
+        if (!isActiveCutLocked(cut) || batch == null || !cut.epochStamp.equals(batch.epochStamp))
+            return false;
         for (int factionIndex = 0; factionIndex < batch.size(); factionIndex++) {
             AoTDInternalTradeBatch.FactionResult result = batch.resultAt(factionIndex);
             if (result == null || result.failure != null) return false;
@@ -369,7 +381,9 @@ public class AoTDTradeManager {
         return localPublicationRevision;
     }
 
-    public synchronized boolean isSettlementOpen() { return settlementOpen; }
+    public synchronized boolean isSettlementOpen() {
+        return settlementOpen;
+    }
 
     public synchronized AoTDFactionTradeData getPlayerManager() {
         return factionsTradeData.get(Global.getSector().getPlayerFaction().getId());
@@ -409,9 +423,15 @@ public class AoTDTradeManager {
         private long committedPublicationRevision;
 
         private PreparedSnapshot(
-                String marketId, String nextFaction, String expectedPreviousFaction,
-                long expectedPreviousRevision, AoTDMarketData candidate,
-                boolean changed, boolean failed, int reasonMask, String failure) {
+                String marketId,
+                String nextFaction,
+                String expectedPreviousFaction,
+                long expectedPreviousRevision,
+                AoTDMarketData candidate,
+                boolean changed,
+                boolean failed,
+                int reasonMask,
+                String failure) {
             this.marketId = marketId;
             this.nextFaction = nextFaction;
             this.expectedPreviousFaction = expectedPreviousFaction;
@@ -425,18 +445,27 @@ public class AoTDTradeManager {
         }
 
         private static PreparedSnapshot ready(
-                String marketId, String nextFaction, String expectedPreviousFaction,
-                long expectedPreviousRevision, AoTDMarketData candidate,
-                boolean changed, int reasonMask) {
+                String marketId,
+                String nextFaction,
+                String expectedPreviousFaction,
+                long expectedPreviousRevision,
+                AoTDMarketData candidate,
+                boolean changed,
+                int reasonMask) {
             return new PreparedSnapshot(
-                    marketId, nextFaction, expectedPreviousFaction,
-                    expectedPreviousRevision, candidate, changed, false,
-                    reasonMask, null);
+                    marketId,
+                    nextFaction,
+                    expectedPreviousFaction,
+                    expectedPreviousRevision,
+                    candidate,
+                    changed,
+                    false,
+                    reasonMask,
+                    null);
         }
 
         private static PreparedSnapshot failed(String marketId, String failure) {
-            return new PreparedSnapshot(
-                    marketId, null, null, 0L, null, false, true, 0, failure);
+            return new PreparedSnapshot(marketId, null, null, 0L, null, false, true, 0, failure);
         }
 
         public long getPublicationRevisionAfterCommit() {
@@ -461,8 +490,13 @@ public class AoTDTradeManager {
         public final String failure;
 
         private SnapshotRefreshResult(
-                String marketId, boolean published, boolean deferred, boolean failed,
-                int reasonMask, long fingerprint, long publicationRevision,
+                String marketId,
+                boolean published,
+                boolean deferred,
+                boolean failed,
+                int reasonMask,
+                long fingerprint,
+                long publicationRevision,
                 String failure) {
             this.marketId = marketId;
             this.published = published;
@@ -475,29 +509,37 @@ public class AoTDTradeManager {
         }
 
         private static SnapshotRefreshResult published(
-                String marketId, int reasonMask, boolean deferred,
-                long fingerprint, long publicationRevision) {
+                String marketId,
+                int reasonMask,
+                boolean deferred,
+                long fingerprint,
+                long publicationRevision) {
             return new SnapshotRefreshResult(
-                    marketId, true, deferred, false, reasonMask, fingerprint,
-                    publicationRevision, null);
+                    marketId,
+                    true,
+                    deferred,
+                    false,
+                    reasonMask,
+                    fingerprint,
+                    publicationRevision,
+                    null);
         }
 
         private static SnapshotRefreshResult unchanged(
                 String marketId, long fingerprint, long publicationRevision) {
             return new SnapshotRefreshResult(
-                    marketId, false, false, false, 0, fingerprint,
-                    publicationRevision, null);
+                    marketId, false, false, false, 0, fingerprint, publicationRevision, null);
         }
 
         private static SnapshotRefreshResult failed(String marketId, String failure) {
-            return new SnapshotRefreshResult(
-                    marketId, false, false, true, 0, 0L, 0L, failure);
+            return new SnapshotRefreshResult(marketId, false, false, true, 0, 0L, 0L, failure);
         }
     }
 
     private static final class PendingSnapshot {
         final String factionId;
         final AoTDMarketData snapshot;
+
         PendingSnapshot(String factionId, AoTDMarketData snapshot) {
             this.factionId = factionId;
             this.snapshot = snapshot;
@@ -514,9 +556,12 @@ public class AoTDTradeManager {
         public final long economyEpoch;
         public final long batchRevision;
 
-        private CommittedCut(long token, long localPublicationRevision,
-                             int reasonMask, AoTDInternalTradeBatch internalTradeBatch,
-                             AoTDRuntimeEpoch.Stamp epochStamp) {
+        private CommittedCut(
+                long token,
+                long localPublicationRevision,
+                int reasonMask,
+                AoTDInternalTradeBatch internalTradeBatch,
+                AoTDRuntimeEpoch.Stamp epochStamp) {
             this.token = token;
             this.localPublicationRevision = localPublicationRevision;
             this.reasonMask = reasonMask;

@@ -1,5 +1,7 @@
 package data.kaysaar.aotd.tot.ui.economy.commoditydata.table;
 
+import static ashlib.data.plugins.misc.AshMisc.sortByState;
+
 import ashlib.data.plugins.misc.AshMisc;
 import ashlib.data.plugins.ui.models.CustomButton;
 import ashlib.data.plugins.ui.models.DropDownButton;
@@ -10,31 +12,29 @@ import com.fs.starfarer.api.ui.ButtonAPI;
 import com.fs.starfarer.api.util.Misc;
 import data.kaysaar.aotd.tot.scripts.economy.AoTDSectorProductionDemandDataUtils;
 import data.kaysaar.aotd.tot.scripts.trade.manager.AoTDTradeManager;
-import data.kaysaar.aotd.tot.ui.commoditypanel.AoTDCommodityTableDropDownButton;
 import data.kaysaar.aotd.tot.ui.economy.commoditydata.buttons.GraphPeriodChosenButton;
-
 import java.awt.*;
 import java.util.*;
 import java.util.List;
 
-import static ashlib.data.plugins.misc.AshMisc.sortByState;
-
 public class AoTDCommodityProductionDataTable extends UITableImpl {
     public static LinkedHashMap<String, Integer> widthMap = new LinkedHashMap<>();
     public String factionId;
-    public static float seperation =1f;
+    public static float seperation = 1f;
     float currYPos = 0;
     ButtonAPI lastCheckedState;
     int months = 1;
-    public String currCommodityChecked =  null;
-    public ButtonAPI buttonCommodity, buttonGraph, buttonSupply, buttonDemand,buttonNet;
+    public String currCommodityChecked = null;
+    public ButtonAPI buttonCommodity, buttonGraph, buttonSupply, buttonDemand, buttonNet;
+
     static {
         widthMap.put("commodity", 210);
-            widthMap.put("graph", 190);
+        widthMap.put("graph", 190);
         widthMap.put("supply", 110);
         widthMap.put("demand", 110);
         widthMap.put("net", 110);
     }
+
     public static void resizeToNewWidth(float width) {
         // Minimum width = current total width.
         float minWidthF = getWidth();
@@ -107,6 +107,7 @@ public class AoTDCommodityProductionDataTable extends UITableImpl {
         widthMap.put("graph", widthMap.get("graph") + addGraph);
         widthMap.put("net", widthMap.get("net") + addNet);
     }
+
     public static int getStartingX(String id) {
         int x = 0;
         for (Map.Entry<String, Integer> value : widthMap.entrySet()) {
@@ -118,55 +119,77 @@ public class AoTDCommodityProductionDataTable extends UITableImpl {
         }
         return x;
     }
-    public static float getWidth(){
+
+    public static float getWidth() {
         float x = 0;
         for (Map.Entry<String, Integer> value : widthMap.entrySet()) {
             x += value.getValue() + 1;
-
         }
         return x;
     }
-    public AoTDCommodityProductionDataTable(float width, float height, boolean doesHaveScroller, float xCord, float yCord,String factionId,int months) {
+
+    public AoTDCommodityProductionDataTable(
+            float width,
+            float height,
+            boolean doesHaveScroller,
+            float xCord,
+            float yCord,
+            String factionId,
+            int months) {
         super(width, height, doesHaveScroller, xCord, yCord);
         this.factionId = factionId;
         this.months = months;
-        List<String>commodities = AoTDTradeManager.getInstance().getPossibleCommoditiesDemandedOrSuppliedSorted(new Comparator<String>() {
-            @Override
-            public int compare(String o1, String o2) {
-                CommoditySpecAPI o1sp = Global.getSettings().getCommoditySpec(o1);
-                CommoditySpecAPI o2sp = Global.getSettings().getCommoditySpec(o2);
-                return Float.compare(o1sp.getEconomyTier(),o2sp.getEconomyTier());
-            }
-        });
-        if(dropDownButtons.isEmpty()){
+        List<String> commodities =
+                AoTDTradeManager.getInstance()
+                        .getPossibleCommoditiesDemandedOrSuppliedSorted(
+                                new Comparator<String>() {
+                                    @Override
+                                    public int compare(String o1, String o2) {
+                                        CommoditySpecAPI o1sp =
+                                                Global.getSettings().getCommoditySpec(o1);
+                                        CommoditySpecAPI o2sp =
+                                                Global.getSettings().getCommoditySpec(o2);
+                                        return Float.compare(
+                                                o1sp.getEconomyTier(), o2sp.getEconomyTier());
+                                    }
+                                });
+        if (dropDownButtons.isEmpty()) {
             for (String s : commodities) {
-                AoTDCommodityProductionDropDownButton bt = new AoTDCommodityProductionDropDownButton(this,width-1,50,0,0,s,factionId,months);
+                AoTDCommodityProductionDropDownButton bt =
+                        new AoTDCommodityProductionDropDownButton(
+                                this, width - 1, 50, 0, 0, s, factionId, months);
                 dropDownButtons.add(bt);
             }
         }
     }
+
     @Override
     public void createTable() {
         super.createTable();
-        tooltipOfImpl.addSpacer(0f).getPosition().inTL(-4,0);
+        tooltipOfImpl.addSpacer(0f).getPosition().inTL(-4, 0);
         for (DropDownButton dropDownButton : dropDownButtons) {
             dropDownButton.resetUI();
             dropDownButton.createUI();
-            tooltipOfImpl.addCustom(dropDownButton.getPanelOfImpl(),2f);
+            tooltipOfImpl.addCustom(dropDownButton.getPanelOfImpl(), 2f);
         }
         for (DropDownButton dropDownButton : dropDownButtons) {
-            if(dropDownButton instanceof AoTDCommodityProductionDropDownButton bt){
-                if(AshMisc.isStringValid(currCommodityChecked)&&bt.commodityId.equals(currCommodityChecked)){
+            if (dropDownButton instanceof AoTDCommodityProductionDropDownButton bt) {
+                if (AshMisc.isStringValid(currCommodityChecked)
+                        && bt.commodityId.equals(currCommodityChecked)) {
                     dropDownButton.mainButton.mainButton.highlight();
-                }else{
+                } else {
                     dropDownButton.mainButton.mainButton.unhighlight();
                 }
             }
         }
         panelToWorkWith.addUIElement(tooltipOfImpl).inTL(0, 0);
         if (tooltipOfImpl.getExternalScroller() != null) {
-            if (currYPos + panelToWorkWith.getPosition().getHeight() - 2 >= tooltipOfImpl.getHeightSoFar()) {
-                currYPos = tooltipOfImpl.getHeightSoFar() - panelToWorkWith.getPosition().getHeight() + 2;
+            if (currYPos + panelToWorkWith.getPosition().getHeight() - 2
+                    >= tooltipOfImpl.getHeightSoFar()) {
+                currYPos =
+                        tooltipOfImpl.getHeightSoFar()
+                                - panelToWorkWith.getPosition().getHeight()
+                                + 2;
             }
             if (currYPos <= 0) {
                 currYPos = 0;
@@ -176,27 +199,96 @@ public class AoTDCommodityProductionDataTable extends UITableImpl {
 
         mainPanel.addComponent(panelToWorkWith).inTL(0, 22);
     }
+
     @Override
     public void createSections() {
         Color base = Misc.getBasePlayerColor();
         Color bg = Misc.getDarkPlayerColor();
         Color bright = Misc.getBrightPlayerColor();
-        buttonCommodity = tooltipOfButtons.addAreaCheckbox("Commodity", SortingState.NON_INITIALIZED, base, bg, bright, widthMap.get("commodity"), 20, 0f);
-        if(months==1){
-            buttonGraph = tooltipOfButtons.addAreaCheckbox("Graph Data (Last "+GraphPeriodChosenButton.getLabelStringForMonth(months)+")", SortingState.NON_INITIALIZED, base, bg, bright, widthMap.get("graph"), 20, 0f);
+        buttonCommodity =
+                tooltipOfButtons.addAreaCheckbox(
+                        "Commodity",
+                        SortingState.NON_INITIALIZED,
+                        base,
+                        bg,
+                        bright,
+                        widthMap.get("commodity"),
+                        20,
+                        0f);
+        if (months == 1) {
+            buttonGraph =
+                    tooltipOfButtons.addAreaCheckbox(
+                            "Graph Data (Last "
+                                    + GraphPeriodChosenButton.getLabelStringForMonth(months)
+                                    + ")",
+                            SortingState.NON_INITIALIZED,
+                            base,
+                            bg,
+                            bright,
+                            widthMap.get("graph"),
+                            20,
+                            0f);
 
-        }
-        else if (months==Integer.MAX_VALUE){
-            buttonGraph = tooltipOfButtons.addAreaCheckbox("Graph Data ("+GraphPeriodChosenButton.getLabelStringForMonth(months)+")", SortingState.NON_INITIALIZED, base, bg, bright, widthMap.get("graph"), 20, 0f);
+        } else if (months == Integer.MAX_VALUE) {
+            buttonGraph =
+                    tooltipOfButtons.addAreaCheckbox(
+                            "Graph Data ("
+                                    + GraphPeriodChosenButton.getLabelStringForMonth(months)
+                                    + ")",
+                            SortingState.NON_INITIALIZED,
+                            base,
+                            bg,
+                            bright,
+                            widthMap.get("graph"),
+                            20,
+                            0f);
 
+        } else {
+            buttonGraph =
+                    tooltipOfButtons.addAreaCheckbox(
+                            "Graph Data (Last "
+                                    + GraphPeriodChosenButton.getNumber(months)
+                                    + " "
+                                    + GraphPeriodChosenButton.getLabelStringForMonth(months)
+                                    + ")",
+                            SortingState.NON_INITIALIZED,
+                            base,
+                            bg,
+                            bright,
+                            widthMap.get("graph"),
+                            20,
+                            0f);
         }
-        else{
-            buttonGraph = tooltipOfButtons.addAreaCheckbox("Graph Data (Last "+ GraphPeriodChosenButton.getNumber(months) +" "+GraphPeriodChosenButton.getLabelStringForMonth(months)+")", SortingState.NON_INITIALIZED, base, bg, bright, widthMap.get("graph"), 20, 0f);
-
-        }
-        buttonSupply = tooltipOfButtons.addAreaCheckbox("Production", SortingState.NON_INITIALIZED, base, bg, bright, widthMap.get("supply"), 20, 0f);
-        buttonDemand = tooltipOfButtons.addAreaCheckbox("Demand", SortingState.NON_INITIALIZED, base, bg, bright, widthMap.get("demand"), 20, 0f);
-        buttonNet = tooltipOfButtons.addAreaCheckbox("Net", SortingState.NON_INITIALIZED, base, bg, bright, widthMap.get("net"), 20, 0f);
+        buttonSupply =
+                tooltipOfButtons.addAreaCheckbox(
+                        "Production",
+                        SortingState.NON_INITIALIZED,
+                        base,
+                        bg,
+                        bright,
+                        widthMap.get("supply"),
+                        20,
+                        0f);
+        buttonDemand =
+                tooltipOfButtons.addAreaCheckbox(
+                        "Demand",
+                        SortingState.NON_INITIALIZED,
+                        base,
+                        bg,
+                        bright,
+                        widthMap.get("demand"),
+                        20,
+                        0f);
+        buttonNet =
+                tooltipOfButtons.addAreaCheckbox(
+                        "Net",
+                        SortingState.NON_INITIALIZED,
+                        base,
+                        bg,
+                        bright,
+                        widthMap.get("net"),
+                        20,
+                        0f);
         buttonCommodity.getPosition().inTL(seperation, 0);
         buttonGraph.getPosition().rightOfMid(buttonCommodity, seperation);
         buttonSupply.getPosition().rightOfMid(buttonGraph, seperation);
@@ -211,25 +303,41 @@ public class AoTDCommodityProductionDataTable extends UITableImpl {
     public void advance(float amount) {
         super.advance(amount);
         for (DropDownButton dropDownButton : dropDownButtons) {
-            if(dropDownButton instanceof AoTDCommodityProductionDropDownButton bt){
-                if(AshMisc.isStringValid(currCommodityChecked)&&bt.commodityId.equals(currCommodityChecked)){
+            if (dropDownButton instanceof AoTDCommodityProductionDropDownButton bt) {
+                if (AshMisc.isStringValid(currCommodityChecked)
+                        && bt.commodityId.equals(currCommodityChecked)) {
                     dropDownButton.mainButton.mainButton.highlight();
-                }else{
+                } else {
                     dropDownButton.mainButton.mainButton.unhighlight();
                 }
             }
         }
-        handleSortButton(buttonCommodity,
-                Comparator.comparing(o -> o.getSpec().getName()));
-        handleSortButton(buttonSupply,
-                Comparator.comparingInt(o -> AoTDSectorProductionDemandDataUtils.getTotalProductionFromFaction(o.commodityId,o.factionId)));
-        handleSortButton(buttonDemand,
-                Comparator.comparingInt(o -> AoTDSectorProductionDemandDataUtils.getTotalDemandFromFaction(o.commodityId,o.factionId)));
-        handleSortButton(buttonNet,
-                Comparator.comparingInt(o -> AoTDSectorProductionDemandDataUtils.getTotalProductionFromFaction(o.commodityId,o.factionId)-AoTDSectorProductionDemandDataUtils.getTotalDemandFromFaction(o.commodityId,o.factionId)));
-
+        handleSortButton(buttonCommodity, Comparator.comparing(o -> o.getSpec().getName()));
+        handleSortButton(
+                buttonSupply,
+                Comparator.comparingInt(
+                        o ->
+                                AoTDSectorProductionDemandDataUtils.getTotalProductionFromFaction(
+                                        o.commodityId, o.factionId)));
+        handleSortButton(
+                buttonDemand,
+                Comparator.comparingInt(
+                        o ->
+                                AoTDSectorProductionDemandDataUtils.getTotalDemandFromFaction(
+                                        o.commodityId, o.factionId)));
+        handleSortButton(
+                buttonNet,
+                Comparator.comparingInt(
+                        o ->
+                                AoTDSectorProductionDemandDataUtils.getTotalProductionFromFaction(
+                                                o.commodityId, o.factionId)
+                                        - AoTDSectorProductionDemandDataUtils
+                                                .getTotalDemandFromFaction(
+                                                        o.commodityId, o.factionId)));
     }
-    private void handleSortButton(ButtonAPI button, Comparator<AoTDCommodityProductionDropDownButton> comparator) {
+
+    private void handleSortButton(
+            ButtonAPI button, Comparator<AoTDCommodityProductionDropDownButton> comparator) {
         if (button == null || comparator == null) return;
         if (!button.isChecked()) return;
 
@@ -246,7 +354,7 @@ public class AoTDCommodityProductionDataTable extends UITableImpl {
 
     @Override
     public void reportButtonPressed(CustomButton buttonPressed) {
-        if(buttonPressed instanceof AoTDCommodityProductionButton bt){
+        if (buttonPressed instanceof AoTDCommodityProductionButton bt) {
             this.currCommodityChecked = bt.getData().commodityId;
         }
     }

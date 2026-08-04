@@ -10,28 +10,28 @@ public class AoTDTradeContractLevelData {
     public static final int LEVELS_MAX = 15;
 
     /**
-     * Total XP required to be at each level (1..15).
-     * Level 1 starts at 0.
+     * Total XP required to be at each level (1..15). Level 1 starts at 0.
      *
-     * NOTE: Kept as-is (max = 31500) per your earlier UI/max-exp requirement.
+     * <p>NOTE: Kept as-is (max = 31500) per your earlier UI/max-exp requirement.
      */
-    public static final int[] XP_TO_REACH_LEVEL = new int[] {
-            0,      // 1
-            200,    // 2
-            520,    // 3
-            950,    // 4
-            1500,   // 5
-            2200,   // 6
-            3100,   // 7
-            4300,   // 8
-            5900,   // 9
-            8000,   // 10
-            10700,  // 11
-            14200,  // 12
-            18600,  // 13
-            24200,  // 14
-            31500   // 15
-    };
+    public static final int[] XP_TO_REACH_LEVEL =
+            new int[] {
+                0, // 1
+                200, // 2
+                520, // 3
+                950, // 4
+                1500, // 5
+                2200, // 6
+                3100, // 7
+                4300, // 8
+                5900, // 9
+                8000, // 10
+                10700, // 11
+                14200, // 12
+                18600, // 13
+                24200, // 14
+                31500 // 15
+            };
 
     public static int CONTRACTS_AT_LEVEL_1 = 4;
     public static int CONTRACTS_AT_MAX_LEVEL = 20;
@@ -41,9 +41,10 @@ public class AoTDTradeContractLevelData {
     // Titles
     // ==========================================================
     public static final LinkedHashMap<Integer, String> levelTitles = new LinkedHashMap<>();
+
     static {
-        for (int i = 1; i <= 4; i++)   levelTitles.put(i, "Enterprise Trade Affiliate");
-        for (int i = 5; i <= 9; i++)   levelTitles.put(i, "Recognized Distributor");
+        for (int i = 1; i <= 4; i++) levelTitles.put(i, "Enterprise Trade Affiliate");
+        for (int i = 5; i <= 9; i++) levelTitles.put(i, "Recognized Distributor");
         for (int i = 10; i <= 14; i++) levelTitles.put(i, "Corporate Commodity Trader");
         levelTitles.put(15, "Inter-faction Trade Pillar");
     }
@@ -128,7 +129,7 @@ public class AoTDTradeContractLevelData {
         int effectiveXp = Math.max(0, currXp);
 
         int floor = XP_TO_REACH_LEVEL[level - 1];
-        int next  = XP_TO_REACH_LEVEL[level];
+        int next = XP_TO_REACH_LEVEL[level];
 
         int bandSize = next - floor;
         if (bandSize <= 0) return 1f;
@@ -180,7 +181,7 @@ public class AoTDTradeContractLevelData {
 
         int effective = Math.max(0, currXp);
         int floor = getLevelFloorXp();
-        int next  = XP_TO_REACH_LEVEL[lvl];
+        int next = XP_TO_REACH_LEVEL[lvl];
 
         int bandSize = Math.max(0, next - floor);
         int progress = Math.max(0, effective - floor);
@@ -194,12 +195,11 @@ public class AoTDTradeContractLevelData {
     /**
      * XP gain from completing a month, based on monthly credits worth.
      *
-     * Analysis vs your thresholds:
-     * - Total XP to max = 31500.
-     * - Typical monthly worth in your generator tends to land in ranges where sqrt(v) is ~150..350.
-     * - Using /1.3 with a 200 cap yields monthly XP commonly ~110..200 for “good” contracts.
-     * - With common durations (3-7 private, 6-24 faction) this tends to land “max level” around
-     *   ~20-45 completed contracts in practice without changing the 31500 cap.
+     * <p>Analysis vs your thresholds: - Total XP to max = 31500. - Typical monthly worth in your
+     * generator tends to land in ranges where sqrt(v) is ~150..350. - Using /1.3 with a 200 cap
+     * yields monthly XP commonly ~110..200 for “good” contracts. - With common durations (3-7
+     * private, 6-24 faction) this tends to land “max level” around ~20-45 completed contracts in
+     * practice without changing the 31500 cap.
      */
     public static int getXpForMonthlyContractValue(int monthlyCreditsWorth) {
         int v = Math.max(0, monthlyCreditsWorth);
@@ -218,8 +218,8 @@ public class AoTDTradeContractLevelData {
     // Penalties for missing a month
     // ==========================================================
     /**
-     * Penalty XP for a missed month. Scales with contract value.
-     * If atRiskOfTermination is true, hits harder.
+     * Penalty XP for a missed month. Scales with contract value. If atRiskOfTermination is true,
+     * hits harder.
      */
     public static int getMissPenaltyXp(int monthlyCreditsWorth, boolean atRiskOfTermination) {
         int base = getXpForMonthlyContractValue(monthlyCreditsWorth);

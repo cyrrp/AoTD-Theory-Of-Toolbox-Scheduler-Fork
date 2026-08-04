@@ -4,18 +4,16 @@ package data.kaysaar.aotd.tot.scripts.trade;
 import com.fs.starfarer.api.Global;
 import data.kaysaar.aotd.tot.scripts.economy.AoTDSectorProductionDemandDataUtils;
 import data.kaysaar.aotd.tot.strings.AoTDTradeTags;
-
 import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Scavenger Guild rule:
- * If totalDemand > totalProduction * (1 + threshold),
- * scavengers cover enough to bring effective demand down to production*(1+threshold).
+ * Scavenger Guild rule: If totalDemand > totalProduction * (1 + threshold), scavengers cover enough
+ * to bring effective demand down to production*(1+threshold).
  *
- * Covered amount = max(0, totalDemand - totalProduction*(1+threshold)).
+ * <p>Covered amount = max(0, totalDemand - totalProduction*(1+threshold)).
  *
- * Threshold default: 0.10 (10%). Override per commodity via setThreshold().
+ * <p>Threshold default: 0.10 (10%). Override per commodity via setThreshold().
  */
 public final class ScavengerGuildUtils {
 
@@ -41,13 +39,16 @@ public final class ScavengerGuildUtils {
     // ----------------------------
 
     /** True if scavengers should cover some amount, given totals. */
-    public static boolean doesCoverCommodity(String commodityId, int totalDemand, int totalProduction) {
+    public static boolean doesCoverCommodity(
+            String commodityId, int totalDemand, int totalProduction) {
         return getCoveredAmount(commodityId, totalDemand, totalProduction) > 0;
     }
 
     /** Covered amount using already-known totals. */
     public static int getCoveredAmount(String commodityId, int totalDemand, int totalProduction) {
-        if(Global.getSettings().getCommoditySpec(commodityId).hasTag(AoTDTradeTags.IGNORE_SCAVENGERS))return 0;
+        if (Global.getSettings()
+                .getCommoditySpec(commodityId)
+                .hasTag(AoTDTradeTags.IGNORE_SCAVENGERS)) return 0;
         if (totalDemand <= 0 || totalProduction <= 0) return 0;
 
         float threshold = getThreshold(commodityId);
@@ -61,7 +62,7 @@ public final class ScavengerGuildUtils {
     /** Covered amount using GLOBAL sector totals (auto fetch). */
     public static int getCoveredAmountFromSector(String commodityId) {
         int prod = AoTDSectorProductionDemandDataUtils.getTotalProductionFromSector(commodityId);
-        int dem  = AoTDSectorProductionDemandDataUtils.getTotalDemandFromSector(commodityId);
+        int dem = AoTDSectorProductionDemandDataUtils.getTotalDemandFromSector(commodityId);
         return getCoveredAmount(commodityId, dem, prod);
     }
 
@@ -94,14 +95,14 @@ public final class ScavengerGuildUtils {
     /** Convenience: sector demand/production ratio for a commodity. */
     public static float getSectorDemandToProductionRatio(String commodityId) {
         int prod = AoTDSectorProductionDemandDataUtils.getTotalProductionFromSector(commodityId);
-        int dem  = AoTDSectorProductionDemandDataUtils.getTotalDemandFromSector(commodityId);
+        int dem = AoTDSectorProductionDemandDataUtils.getTotalDemandFromSector(commodityId);
         return getDemandToProductionRatio(dem, prod);
     }
 
     /** Convenience: sector overage percent for a commodity. */
     public static float getSectorOveragePercent(String commodityId) {
         int prod = AoTDSectorProductionDemandDataUtils.getTotalProductionFromSector(commodityId);
-        int dem  = AoTDSectorProductionDemandDataUtils.getTotalDemandFromSector(commodityId);
+        int dem = AoTDSectorProductionDemandDataUtils.getTotalDemandFromSector(commodityId);
         return getOveragePercent(dem, prod);
     }
 }

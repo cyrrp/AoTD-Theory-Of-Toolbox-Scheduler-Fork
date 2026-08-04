@@ -15,7 +15,6 @@ import com.fs.starfarer.api.ui.CustomPanelAPI;
 import com.fs.starfarer.api.ui.PositionAPI;
 import com.fs.starfarer.api.ui.TooltipMakerAPI;
 import com.fs.starfarer.api.util.Misc;
-
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -105,17 +104,18 @@ public class StorageItemsWidget implements ExtendedUIPanelPlugin {
 
         result.addAll(byKey.values());
 
-        result.sort(new Comparator<IconEntry>() {
-            @Override
-            public int compare(IconEntry o1, IconEntry o2) {
-                int orderCompare = Float.compare(o1.order, o2.order);
-                if (orderCompare != 0) {
-                    return orderCompare;
-                }
+        result.sort(
+                new Comparator<IconEntry>() {
+                    @Override
+                    public int compare(IconEntry o1, IconEntry o2) {
+                        int orderCompare = Float.compare(o1.order, o2.order);
+                        if (orderCompare != 0) {
+                            return orderCompare;
+                        }
 
-                return o1.id.compareToIgnoreCase(o2.id);
-            }
-        });
+                        return o1.id.compareToIgnoreCase(o2.id);
+                    }
+                });
 
         return result;
     }
@@ -223,8 +223,8 @@ public class StorageItemsWidget implements ExtendedUIPanelPlugin {
             return;
         }
 
-        float gridHeight = layout.rows * layout.iconSize
-                + Math.max(0, layout.rows - 1) * layout.separator;
+        float gridHeight =
+                layout.rows * layout.iconSize + Math.max(0, layout.rows - 1) * layout.separator;
         float startY = Math.max(0f, (height - gridHeight) / 2f);
 
         for (int index = 0; index < visibleEntries.size(); index++) {
@@ -236,8 +236,9 @@ public class StorageItemsWidget implements ExtendedUIPanelPlugin {
             int rowStartIndex = row * layout.columns;
             int entriesInThisRow = Math.min(layout.columns, visibleEntries.size() - rowStartIndex);
 
-            float rowWidth = entriesInThisRow * layout.iconSize
-                    + Math.max(0, entriesInThisRow - 1) * layout.separator;
+            float rowWidth =
+                    entriesInThisRow * layout.iconSize
+                            + Math.max(0, entriesInThisRow - 1) * layout.separator;
             float startX = Math.max(0f, (width - rowWidth) / 2f);
 
             float x = startX + column * (layout.iconSize + layout.separator);
@@ -246,9 +247,7 @@ public class StorageItemsWidget implements ExtendedUIPanelPlugin {
             ImageViewer viewer = new ImageViewer(layout.iconSize, layout.iconSize, entry.iconName);
             CustomPanelAPI iconPanel = viewer.getComponentPanel();
 
-            tooltip.addCustom(iconPanel, 0f)
-                    .getPosition()
-                    .inTL(x, y);
+            tooltip.addCustom(iconPanel, 0f).getPosition().inTL(x, y);
 
             placeOnHoverTooltip(tooltip, iconPanel, entry);
         }
@@ -292,7 +291,8 @@ public class StorageItemsWidget implements ExtendedUIPanelPlugin {
                     continue;
                 }
 
-                GridLayoutData candidate = new GridLayoutData(columns, rows, iconSize, actualSeparator);
+                GridLayoutData candidate =
+                        new GridLayoutData(columns, rows, iconSize, actualSeparator);
 
                 if (isBetterGrid(candidate, best)) {
                     best = candidate;
@@ -339,45 +339,48 @@ public class StorageItemsWidget implements ExtendedUIPanelPlugin {
     /**
      * Override this if you want custom hover behavior.
      *
-     * Important: this is called immediately after tooltip.addCustom(iconPanel, 0f),
-     * so tooltip.addTooltipToPrevious(...) will attach to the placed icon.
+     * <p>Important: this is called immediately after tooltip.addCustom(iconPanel, 0f), so
+     * tooltip.addTooltipToPrevious(...) will attach to the placed icon.
      */
-    protected void placeOnHoverTooltip(TooltipMakerAPI tooltip, CustomPanelAPI component, IconEntry entry) {
-        tooltip.addTooltipToPrevious(new TooltipMakerAPI.TooltipCreator() {
-            @Override
-            public boolean isTooltipExpandable(Object tooltipParam) {
-                return false;
-            }
+    protected void placeOnHoverTooltip(
+            TooltipMakerAPI tooltip, CustomPanelAPI component, IconEntry entry) {
+        tooltip.addTooltipToPrevious(
+                new TooltipMakerAPI.TooltipCreator() {
+                    @Override
+                    public boolean isTooltipExpandable(Object tooltipParam) {
+                        return false;
+                    }
 
-            @Override
-            public float getTooltipWidth(Object tooltipParam) {
-                return 350f;
-            }
+                    @Override
+                    public float getTooltipWidth(Object tooltipParam) {
+                        return 350f;
+                    }
 
-            @Override
-            public void createTooltip(TooltipMakerAPI tooltip, boolean expanded, Object tooltipParam) {
-                if(entry.specialData!=null){
-                    CargoStackAPI stack = Global.getFactory().createCargoStack(CargoAPI.CargoItemType.SPECIAL,entry.specialData,null);
-                    tooltip.addTitle(stack.getDisplayName());
-                    tooltip.addPara(
-                            "Stored: %s",
-                            5f,
-                            Misc.getHighlightColor(),
-                            formatQuantity(entry.quantity));
-                }
-                else{
-                    tooltip.addTitle(entry.getDisplayName());
+                    @Override
+                    public void createTooltip(
+                            TooltipMakerAPI tooltip, boolean expanded, Object tooltipParam) {
+                        if (entry.specialData != null) {
+                            CargoStackAPI stack =
+                                    Global.getFactory()
+                                            .createCargoStack(
+                                                    CargoAPI.CargoItemType.SPECIAL,
+                                                    entry.specialData,
+                                                    null);
+                            tooltip.addTitle(stack.getDisplayName());
+                            tooltip.addPara(
+                                    "Stored: %s",
+                                    5f, Misc.getHighlightColor(), formatQuantity(entry.quantity));
+                        } else {
+                            tooltip.addTitle(entry.getDisplayName());
 
-                    tooltip.addPara(
-                            "Stored: %s",
-                            5f,
-                            Misc.getHighlightColor(),
-                            formatQuantity(entry.quantity)
-                    );
-                }
-
-            }
-        }, TooltipMakerAPI.TooltipLocation.BELOW, false);
+                            tooltip.addPara(
+                                    "Stored: %s",
+                                    5f, Misc.getHighlightColor(), formatQuantity(entry.quantity));
+                        }
+                    }
+                },
+                TooltipMakerAPI.TooltipLocation.BELOW,
+                false);
     }
 
     protected boolean isAICore(String commodityId, CommoditySpecAPI spec) {
@@ -406,34 +409,22 @@ public class StorageItemsWidget implements ExtendedUIPanelPlugin {
     }
 
     @Override
-    public void positionChanged(PositionAPI position) {
-
-    }
+    public void positionChanged(PositionAPI position) {}
 
     @Override
-    public void renderBelow(float alphaMult) {
-
-    }
+    public void renderBelow(float alphaMult) {}
 
     @Override
-    public void render(float alphaMult) {
-
-    }
+    public void render(float alphaMult) {}
 
     @Override
-    public void advance(float amount) {
-
-    }
+    public void advance(float amount) {}
 
     @Override
-    public void processInput(List<InputEventAPI> events) {
-
-    }
+    public void processInput(List<InputEventAPI> events) {}
 
     @Override
-    public void buttonPressed(Object buttonId) {
-
-    }
+    public void buttonPressed(Object buttonId) {}
 
     protected static class GridLayoutData {
         protected int columns;

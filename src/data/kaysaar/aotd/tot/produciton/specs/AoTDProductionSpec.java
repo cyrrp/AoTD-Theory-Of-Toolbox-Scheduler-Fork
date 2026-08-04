@@ -15,8 +15,6 @@ import com.fs.starfarer.api.util.Misc;
 import data.kaysaar.aotd.vok.Ids.AoTDCommodities;
 import data.kaysaar.aotd.vok.Ids.AoTDItems;
 import data.kaysaar.aotd.vok.misc.AoTDMisc;
-
-
 import java.awt.*;
 import java.util.LinkedHashMap;
 
@@ -27,15 +25,16 @@ public class AoTDProductionSpec {
         FIGHTER,
         COMMODITY_ITEM,
         SPECIAL_ITEM
-
     }
+
     String id;
     public AoTDProductionSpecType type;
-    public LinkedHashMap<String,Integer>mapOfResourcesNeeded = new LinkedHashMap<>();
+    public LinkedHashMap<String, Integer> mapOfResourcesNeeded = new LinkedHashMap<>();
 
     public LinkedHashMap<String, Integer> getMapOfResourcesNeeded() {
         return mapOfResourcesNeeded;
     }
+
     public int daysToBeCreated = 1;
 
     public int getDaysToBeCreated() {
@@ -57,165 +56,190 @@ public class AoTDProductionSpec {
 
     public void setDaysToBeCreated(int daysToBeCreated) {
         this.daysToBeCreated = daysToBeCreated;
-        if(daysToBeCreated<=0){
-           this.daysToBeCreated =1;
+        if (daysToBeCreated <= 0) {
+            this.daysToBeCreated = 1;
         }
     }
 
-    public AoTDProductionSpec(String id, Object spec){
+    public AoTDProductionSpec(String id, Object spec) {
         this.id = id;
-        if(spec instanceof CommoditySpecAPI){
+        if (spec instanceof CommoditySpecAPI) {
             type = AoTDProductionSpecType.COMMODITY_ITEM;
             int price = (int) getMoneyPrice();
-            int needed = Math.round(price*0.1f);
+            int needed = Math.round(price * 0.1f);
             int advanced_component_mult = 10000;
             int domain_grade_mult = 2000;
             int tenebriumMult = 200000;
             int daysMult = 2500;
             // Remember to do commodity cost
             int basePrice = (int) getMoneyPrice();
-            float newDays = basePrice/daysMult;
-            if(Global.getSettings().getModManager().isModEnabled("aotd_vok")){
-                mapOfResourcesNeeded.put("advanced_components",  Math.max(1, needed/5));
+            float newDays = basePrice / daysMult;
+            if (Global.getSettings().getModManager().isModEnabled("aotd_vok")) {
+                mapOfResourcesNeeded.put("advanced_components", Math.max(1, needed / 5));
             }
 
             setDaysToBeCreated((int) newDays);
         }
-        if(spec instanceof SpecialItemSpecAPI specAPI){
+        if (spec instanceof SpecialItemSpecAPI specAPI) {
             type = AoTDProductionSpecType.SPECIAL_ITEM;
             int advanced_component_mult = 10000;
             int domain_grade_mult = 2000;
             int tenebriumMult = 200000;
             int daysMult = 2500;
-            if(specAPI.getManufacturer().equals("Abyss-Tech")){
-                advanced_component_mult= 20000;
-                domain_grade_mult= 10000;
+            if (specAPI.getManufacturer().equals("Abyss-Tech")) {
+                advanced_component_mult = 20000;
+                domain_grade_mult = 10000;
                 daysMult = 10000;
             }
             // Remember to do commodity cost
             int basePrice = (int) getMoneyPrice();
-            int needed = Math.round(basePrice*0.1f);
-            float newDays = basePrice/daysMult;
+            int needed = Math.round(basePrice * 0.1f);
+            float newDays = basePrice / daysMult;
             setDaysToBeCreated((int) newDays);
-            if(Global.getSettings().getModManager().isModEnabled("aotd_vok")){
-                mapOfResourcesNeeded.put("advanced_components",  Math.max(1, needed/20));
-                mapOfResourcesNeeded.put(AoTDCommodities.DOMAIN_GRADE_MACHINERY,  Math.max(1, needed/100));
-                if(specAPI.getManufacturer().equals("Abyss-Tech")){
-                    mapOfResourcesNeeded.put(AoTDItems.TENEBRIUM_CELL,  Math.max(1, basePrice/tenebriumMult));
+            if (Global.getSettings().getModManager().isModEnabled("aotd_vok")) {
+                mapOfResourcesNeeded.put("advanced_components", Math.max(1, needed / 20));
+                mapOfResourcesNeeded.put(
+                        AoTDCommodities.DOMAIN_GRADE_MACHINERY, Math.max(1, needed / 100));
+                if (specAPI.getManufacturer().equals("Abyss-Tech")) {
+                    mapOfResourcesNeeded.put(
+                            AoTDItems.TENEBRIUM_CELL, Math.max(1, basePrice / tenebriumMult));
                 }
             }
-
         }
-        if(spec instanceof ShipHullSpecAPI specAPI){
+        if (spec instanceof ShipHullSpecAPI specAPI) {
             type = AoTDProductionSpecType.SHIP;
             int basePrice = (int) getMoneyPrice();
-            int needed = Math.round(basePrice*0.1f);
+            int needed = Math.round(basePrice * 0.1f);
             int dayScaling = 10000;
             int advancedComponentsScaling = 30000;
-            int days =1;
+            int days = 1;
             int tenebriumMult = 200000;
-            mapOfResourcesNeeded.put(Commodities.SHIPS, Math.max(1, needed/200));
-            if(specAPI.getHullSize().equals(ShipAPI.HullSize.FRIGATE)){
-                days = Math.min(basePrice/dayScaling,10);
+            mapOfResourcesNeeded.put(Commodities.SHIPS, Math.max(1, needed / 200));
+            if (specAPI.getHullSize().equals(ShipAPI.HullSize.FRIGATE)) {
+                days = Math.min(basePrice / dayScaling, 10);
             }
-            if(specAPI.getHullSize().equals(ShipAPI.HullSize.DESTROYER)){
-                days = Math.min(basePrice/dayScaling,20);
+            if (specAPI.getHullSize().equals(ShipAPI.HullSize.DESTROYER)) {
+                days = Math.min(basePrice / dayScaling, 20);
             }
-            if(specAPI.getHullSize().equals(ShipAPI.HullSize.CRUISER)){
-                days = Math.min(basePrice/dayScaling,40);
+            if (specAPI.getHullSize().equals(ShipAPI.HullSize.CRUISER)) {
+                days = Math.min(basePrice / dayScaling, 40);
             }
-            if(specAPI.getHullSize().equals(ShipAPI.HullSize.CAPITAL_SHIP)){
-                days = Math.min(basePrice/dayScaling,80);
+            if (specAPI.getHullSize().equals(ShipAPI.HullSize.CAPITAL_SHIP)) {
+                days = Math.min(basePrice / dayScaling, 80);
             }
-            if(Global.getSettings().getModManager().isModEnabled("aotd_vok")){
-                if(AoTDProductionSpecManager.getManDataIfPresent(specAPI.getManufacturer())!=null){
-                    int advanced_Components = basePrice/advancedComponentsScaling;
-                    mapOfResourcesNeeded.put("advanced_components",Math.min(advanced_Components,AoTDProductionSpecManager.getManDataIfPresent(specAPI.getManufacturer()).getMaxACCostForShip()));
+            if (Global.getSettings().getModManager().isModEnabled("aotd_vok")) {
+                if (AoTDProductionSpecManager.getManDataIfPresent(specAPI.getManufacturer())
+                        != null) {
+                    int advanced_Components = basePrice / advancedComponentsScaling;
+                    mapOfResourcesNeeded.put(
+                            "advanced_components",
+                            Math.min(
+                                    advanced_Components,
+                                    AoTDProductionSpecManager.getManDataIfPresent(
+                                                    specAPI.getManufacturer())
+                                            .getMaxACCostForShip()));
                 }
-                if(specAPI.getManufacturer().equals("Abyss-Tech")){
-                    int tenebrium = Math.max(basePrice/tenebriumMult,1);
-                    mapOfResourcesNeeded.put(AoTDItems.TENEBRIUM_CELL,tenebrium);
+                if (specAPI.getManufacturer().equals("Abyss-Tech")) {
+                    int tenebrium = Math.max(basePrice / tenebriumMult, 1);
+                    mapOfResourcesNeeded.put(AoTDItems.TENEBRIUM_CELL, tenebrium);
                 }
             }
 
-            if(days<=0)days=1;
+            if (days <= 0) days = 1;
 
             this.setDaysToBeCreated(days);
         }
-        if(spec instanceof WeaponSpecAPI specAPI){
+        if (spec instanceof WeaponSpecAPI specAPI) {
             type = AoTDProductionSpecType.WEAPON;
             int basePrice = (int) getMoneyPrice();
-            int needed = Math.round(basePrice*0.1f);
+            int needed = Math.round(basePrice * 0.1f);
             int dayScaling = 1000;
-            int tenebriumMult =2;
+            int tenebriumMult = 2;
 
-            mapOfResourcesNeeded.put(Commodities.HAND_WEAPONS,  Math.max(1, needed/200));
-            int days =0;
-            if(specAPI.getSize().equals(WeaponAPI.WeaponSize.SMALL)){
-                days = Math.min(basePrice/dayScaling,30);
+            mapOfResourcesNeeded.put(Commodities.HAND_WEAPONS, Math.max(1, needed / 200));
+            int days = 0;
+            if (specAPI.getSize().equals(WeaponAPI.WeaponSize.SMALL)) {
+                days = Math.min(basePrice / dayScaling, 30);
             }
-            if(specAPI.getSize().equals(WeaponAPI.WeaponSize.MEDIUM)){
-                days = Math.min(basePrice/dayScaling,40);
+            if (specAPI.getSize().equals(WeaponAPI.WeaponSize.MEDIUM)) {
+                days = Math.min(basePrice / dayScaling, 40);
             }
-            if(specAPI.getSize().equals(WeaponAPI.WeaponSize.LARGE)){
-                days = Math.min(basePrice/dayScaling,50);
+            if (specAPI.getSize().equals(WeaponAPI.WeaponSize.LARGE)) {
+                days = Math.min(basePrice / dayScaling, 50);
             }
-            if(Global.getSettings().getModManager().isModEnabled("aotd_vok")){
-                if(AoTDProductionSpecManager.getManDataIfPresent(specAPI.getManufacturer())!=null){
-                    int advanced_Components = AoTDProductionSpecManager.getManDataIfPresent(specAPI.getManufacturer()).getMaxAcCostForWeapon(specAPI);
-                    mapOfResourcesNeeded.put("advanced_components",advanced_Components);
+            if (Global.getSettings().getModManager().isModEnabled("aotd_vok")) {
+                if (AoTDProductionSpecManager.getManDataIfPresent(specAPI.getManufacturer())
+                        != null) {
+                    int advanced_Components =
+                            AoTDProductionSpecManager.getManDataIfPresent(specAPI.getManufacturer())
+                                    .getMaxAcCostForWeapon(specAPI);
+                    mapOfResourcesNeeded.put("advanced_components", advanced_Components);
                 }
-                if(specAPI.getManufacturer().toLowerCase().equals("abyss-tech")){
-                    String substrate = specAPI.getTags().stream().filter(x->x.contains("substrate")).findFirst().orElse(null);
-                    if(substrate!=null){
+                if (specAPI.getManufacturer().toLowerCase().equals("abyss-tech")) {
+                    String substrate =
+                            specAPI.getTags().stream()
+                                    .filter(x -> x.contains("substrate"))
+                                    .findFirst()
+                                    .orElse(null);
+                    if (substrate != null) {
                         int number = Integer.parseInt(substrate.split("_")[1]);
-                        mapOfResourcesNeeded.put("aotd_tenebrium",number*tenebriumMult);
+                        mapOfResourcesNeeded.put("aotd_tenebrium", number * tenebriumMult);
                     }
-
                 }
             }
 
             setDaysToBeCreated(days);
-
         }
-        if(spec instanceof FighterWingSpecAPI specAPI ){
+        if (spec instanceof FighterWingSpecAPI specAPI) {
             type = AoTDProductionSpecType.FIGHTER;
             int priceScaling = 5000;
             int price = (int) getMoneyPrice();
-            int needed = Math.round(price*0.1f);
+            int needed = Math.round(price * 0.1f);
             int dayScaling = 10000;
             int advanced_comp_scaling = 10000;
-            float newDays = price/dayScaling;
-            if(newDays<=0){
+            float newDays = price / dayScaling;
+            if (newDays <= 0) {
                 newDays = 2;
             }
-            int priceSc =(int) price/priceScaling;
-            if(priceSc<=2){
-                priceSc =2;
+            int priceSc = (int) price / priceScaling;
+            if (priceSc <= 2) {
+                priceSc = 2;
             }
 
             setDaysToBeCreated((int) newDays);
-            mapOfResourcesNeeded.put(Commodities.SHIPS,priceSc/2);
+            mapOfResourcesNeeded.put(Commodities.SHIPS, priceSc / 2);
 
-            mapOfResourcesNeeded.put(Commodities.HAND_WEAPONS,priceSc/2);
-            if(AoTDProductionSpecManager.getManDataIfPresent(specAPI.getVariant().getHullSpec().getManufacturer())!=null&&Global.getSettings().getModManager().isModEnabled("aotd_vok")){
-                int advanced_Components = price/advanced_comp_scaling;
-                if(advanced_Components==0)advanced_Components =1;
-                mapOfResourcesNeeded.put("advanced_components",Math.min(advanced_Components,AoTDProductionSpecManager.getManDataIfPresent(specAPI.getVariant().getHullSpec().getManufacturer()).getMaxACCostForFighter()));
+            mapOfResourcesNeeded.put(Commodities.HAND_WEAPONS, priceSc / 2);
+            if (AoTDProductionSpecManager.getManDataIfPresent(
+                                    specAPI.getVariant().getHullSpec().getManufacturer())
+                            != null
+                    && Global.getSettings().getModManager().isModEnabled("aotd_vok")) {
+                int advanced_Components = price / advanced_comp_scaling;
+                if (advanced_Components == 0) advanced_Components = 1;
+                mapOfResourcesNeeded.put(
+                        "advanced_components",
+                        Math.min(
+                                advanced_Components,
+                                AoTDProductionSpecManager.getManDataIfPresent(
+                                                specAPI.getVariant()
+                                                        .getHullSpec()
+                                                        .getManufacturer())
+                                        .getMaxACCostForFighter()));
             }
         }
+    }
 
+    public int getProductionCost() {
+        return Math.round(getMoneyPrice() * 0.6f);
     }
-    public int getProductionCost(){
-        return Math.round(getMoneyPrice()*0.6f);
-    }
+
     public String getId() {
         return id;
     }
-    public AoTDProductionSpecType getProductionType(){
+
+    public AoTDProductionSpecType getProductionType() {
         return type;
     }
-
 
     public float getMoneyPrice() {
         return switch (type) {
@@ -277,35 +301,42 @@ public class AoTDProductionSpec {
             default -> null;
         };
     }
-    public String getManufacturer(){
+
+    public String getManufacturer() {
         return switch (type) {
             case SHIP -> Global.getSettings().getHullSpec(id).getManufacturer();
             case WEAPON -> Global.getSettings().getWeaponSpec(id).getManufacturer();
-            case FIGHTER -> Global.getSettings().getFighterWingSpec(id).getVariant().getHullSpec().getManufacturer();
+            case FIGHTER ->
+                    Global.getSettings()
+                            .getFighterWingSpec(id)
+                            .getVariant()
+                            .getHullSpec()
+                            .getManufacturer();
             case COMMODITY_ITEM -> "AI Cores";
             case SPECIAL_ITEM -> Global.getSettings().getSpecialItemSpec(id).getManufacturer();
             default -> "Unknown";
         };
     }
-    public Color getManufacturerColor(){
+
+    public Color getManufacturerColor() {
         return Global.getSettings().getDesignTypeColor(getManufacturer());
     }
 
-    public boolean isLearnedByFaction(FactionAPI faction){
-        if(Global.getSettings().isDevMode())return true;
+    public boolean isLearnedByFaction(FactionAPI faction) {
+        if (Global.getSettings().isDevMode()) return true;
         return switch (type) {
             case SHIP -> faction.knowsShip(getId());
             case WEAPON -> faction.knowsWeapon(getId());
             case FIGHTER -> faction.knowsFighter(getId());
-            case COMMODITY_ITEM, SPECIAL_ITEM -> knowsItem(getId(),faction);
-            default ->false;
+            case COMMODITY_ITEM, SPECIAL_ITEM -> knowsItem(getId(), faction);
+            default -> false;
         };
     }
-    public static boolean knowsItem(String id, FactionAPI faction){
-        if(Global.getSettings().getModManager().isModEnabled("aotd_vok")){
-            return AoTDMisc.knowsItem(id,faction);
+
+    public static boolean knowsItem(String id, FactionAPI faction) {
+        if (Global.getSettings().getModManager().isModEnabled("aotd_vok")) {
+            return AoTDMisc.knowsItem(id, faction);
         }
         return false;
     }
-
 }

@@ -1,7 +1,6 @@
 package data.kaysaar.aotd.tot.scripts.trade.models;
 
 import data.kaysaar.aotd.tot.scripts.economy.AoTDRuntimeEpoch;
-
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -19,14 +18,18 @@ public final class AoTDInternalTradeBatch {
         if (epochStamp == null) throw new IllegalArgumentException("epochStamp");
         this.epochStamp = epochStamp;
     }
+
     public static final class MarketInput {
         public final String marketId;
         public final float weight;
         public final boolean eligible;
         public final LinkedHashMap<String, Integer> netProductionValues;
 
-        public MarketInput(String marketId, float weight, boolean eligible,
-                           Map<String, Integer> netProductionValues) {
+        public MarketInput(
+                String marketId,
+                float weight,
+                boolean eligible,
+                Map<String, Integer> netProductionValues) {
             this.marketId = marketId;
             this.weight = weight;
             this.eligible = eligible;
@@ -68,6 +71,7 @@ public final class AoTDInternalTradeBatch {
         final int marketIndex;
         int amount;
         final float weight;
+
         MarketAmount(int marketIndex, int amount, float weight) {
             this.marketIndex = marketIndex;
             this.amount = amount;
@@ -95,8 +99,14 @@ public final class AoTDInternalTradeBatch {
         if (results.length != inputs.size()) results = new FactionResult[inputs.size()];
     }
 
-    public int size() { return inputs.size(); }
-    public FactionInput inputAt(int index) { return inputs.get(index); }
+    public int size() {
+        return inputs.size();
+    }
+
+    public FactionInput inputAt(int index) {
+        return inputs.get(index);
+    }
+
     public FactionResult resultAt(int index) {
         FactionResult[] local = results;
         return index < 0 || index >= local.length ? null : local[index];
@@ -121,7 +131,8 @@ public final class AoTDInternalTradeBatch {
         FactionResult output = new FactionResult();
         output.factionId = input.factionId;
         output.markets = new MarketResult[input.markets.length];
-        for (int i = 0; i < input.markets.length; i++) output.markets[i] = new MarketResult(input.markets[i]);
+        for (int i = 0; i < input.markets.length; i++)
+            output.markets[i] = new MarketResult(input.markets[i]);
 
         LinkedHashMap<String, Bucket> buckets = new LinkedHashMap<>();
         for (int marketIndex = 0; marketIndex < input.markets.length; marketIndex++) {
@@ -149,7 +160,8 @@ public final class AoTDInternalTradeBatch {
             bucket.importers.sort((a, b) -> Float.compare(b.weight, a.weight));
             int exporterIndex = 0;
             int importerIndex = 0;
-            while (exporterIndex < bucket.exporters.size() && importerIndex < bucket.importers.size()) {
+            while (exporterIndex < bucket.exporters.size()
+                    && importerIndex < bucket.importers.size()) {
                 MarketAmount exporter = bucket.exporters.get(exporterIndex);
                 MarketAmount importer = bucket.importers.get(importerIndex);
                 int moved = Math.min(exporter.amount, importer.amount);
@@ -175,7 +187,8 @@ public final class AoTDInternalTradeBatch {
         if (moved <= 0) return;
         market.internalSent.merge(commodityId, moved, Integer::sum);
         int left = available - moved;
-        if (left == 0) market.remainingNet.remove(commodityId); else market.remainingNet.put(commodityId, left);
+        if (left == 0) market.remainingNet.remove(commodityId);
+        else market.remainingNet.put(commodityId, left);
     }
 
     private static void applyReceived(MarketResult market, String commodityId, int amount) {
@@ -184,6 +197,7 @@ public final class AoTDInternalTradeBatch {
         if (moved <= 0) return;
         market.internalReceived.merge(commodityId, moved, Integer::sum);
         int left = -signedNeed - moved;
-        if (left == 0) market.remainingNet.remove(commodityId); else market.remainingNet.put(commodityId, -left);
+        if (left == 0) market.remainingNet.remove(commodityId);
+        else market.remainingNet.put(commodityId, -left);
     }
 }

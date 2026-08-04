@@ -10,10 +10,9 @@ import com.fs.starfarer.api.impl.campaign.ids.Tags;
 import com.fs.starfarer.api.input.InputEventAPI;
 import com.fs.starfarer.api.ui.*;
 import com.fs.starfarer.api.util.Misc;
-import org.lwjgl.input.Keyboard;
-
 import java.awt.*;
 import java.util.List;
+import org.lwjgl.input.Keyboard;
 
 public class StarSystemStructuresUI implements ExtendedUIPanelPlugin {
     CustomPanelAPI mainPanel, contentPanel;
@@ -42,24 +41,22 @@ public class StarSystemStructuresUI implements ExtendedUIPanelPlugin {
         }
         FactionAPI faction = AshMisc.getClaimingFaction(system.getCenter());
 
-        contentPanel = Global.getSettings().createCustom(
-                mainPanel.getPosition().getWidth(),
-                mainPanel.getPosition().getHeight(),
-                null
-        );
+        contentPanel =
+                Global.getSettings()
+                        .createCustom(
+                                mainPanel.getPosition().getWidth(),
+                                mainPanel.getPosition().getHeight(),
+                                null);
 
-        TooltipMakerAPI tooltip = contentPanel.createUIElement(
-                contentPanel.getPosition().getWidth(),
-                contentPanel.getPosition().getHeight() - 30,
-                true
-        );
-        TooltipMakerAPI tooltipBottom = contentPanel.createUIElement(
-                contentPanel.getPosition().getWidth(),
-                25,
-                false
-        );
-        float separator = 10;              // fixed
-        float rowGap = 20;                 // vertical gap between rows (tweak)
+        TooltipMakerAPI tooltip =
+                contentPanel.createUIElement(
+                        contentPanel.getPosition().getWidth(),
+                        contentPanel.getPosition().getHeight() - 30,
+                        true);
+        TooltipMakerAPI tooltipBottom =
+                contentPanel.createUIElement(contentPanel.getPosition().getWidth(), 25, false);
+        float separator = 10; // fixed
+        float rowGap = 20; // vertical gap between rows (tweak)
         float availableWidth = contentPanel.getPosition().getWidth();
 
         float widgetW = StableStructureWidget.width;
@@ -80,13 +77,12 @@ public class StarSystemStructuresUI implements ExtendedUIPanelPlugin {
             int row = i / perRow;
             int col = i % perRow;
 
-
             int rowStartIndex = row * perRow;
             int remaining = total - rowStartIndex;
             int itemsThisRow = Math.min(perRow, remaining);
 
             float rowW = itemsThisRow * widgetW + (itemsThisRow - 1) * separator;
-            float startX = Math.round((availableWidth - rowW) * 0.5f);  // centered
+            float startX = Math.round((availableWidth - rowW) * 0.5f); // centered
 
             float x = startX + col * (widgetW + separator);
             float y = row * (widgetH + rowGap);
@@ -97,74 +93,84 @@ public class StarSystemStructuresUI implements ExtendedUIPanelPlugin {
             tooltip.addCustom(widget.getMainPanel(), 0f).getPosition().inTL(x, y);
         }
 
-
         float neededHeight = rowsPlaced * widgetH + Math.max(0, rowsPlaced - 1) * rowGap;
         tooltip.setHeightSoFar(neededHeight);
         tooltipBottom.setParaFont(Fonts.INSIGNIA_LARGE);
-        int totalAtAllPos = total2+total;
-        LabelAPI label = tooltipBottom.addPara("System Structures: %s / %s", 0f, Misc.getGrayColor(), Color.ORANGE, "" + total, totalAtAllPos+"");
-        label.getPosition().inTL(contentPanel.getPosition().getWidth() - label.computeTextWidth(label.getText()) - 5, 1);
-        float x = contentPanel.getPosition().getWidth() - label.computeTextWidth(label.getText()) - 5;
-        ButtonAPI bt = tooltipBottom.addButton("Manage Star System", null, faction.getBaseUIColor(), faction.getDarkUIColor(), Alignment.MID, CutStyle.TL_BR, Math.min(x-20, 300), 25, 0f);
+        int totalAtAllPos = total2 + total;
+        LabelAPI label =
+                tooltipBottom.addPara(
+                        "System Structures: %s / %s",
+                        0f, Misc.getGrayColor(), Color.ORANGE, "" + total, totalAtAllPos + "");
+        label.getPosition()
+                .inTL(
+                        contentPanel.getPosition().getWidth()
+                                - label.computeTextWidth(label.getText())
+                                - 5,
+                        1);
+        float x =
+                contentPanel.getPosition().getWidth() - label.computeTextWidth(label.getText()) - 5;
+        ButtonAPI bt =
+                tooltipBottom.addButton(
+                        "Manage Star System",
+                        null,
+                        faction.getBaseUIColor(),
+                        faction.getDarkUIColor(),
+                        Alignment.MID,
+                        CutStyle.TL_BR,
+                        Math.min(x - 20, 300),
+                        25,
+                        0f);
         bt.setShortcut(Keyboard.KEY_A, true);
         bt.setEnabled(false);
-        tooltipBottom.addTooltipToPrevious(new TooltipMakerAPI.TooltipCreator() {
-            @Override
-            public boolean isTooltipExpandable(Object tooltipParam) {
-                return false;
-            }
+        tooltipBottom.addTooltipToPrevious(
+                new TooltipMakerAPI.TooltipCreator() {
+                    @Override
+                    public boolean isTooltipExpandable(Object tooltipParam) {
+                        return false;
+                    }
 
-            @Override
-            public float getTooltipWidth(Object tooltipParam) {
-                return 400;
-            }
+                    @Override
+                    public float getTooltipWidth(Object tooltipParam) {
+                        return 400;
+                    }
 
-            @Override
-            public void createTooltip(TooltipMakerAPI tooltip, boolean expanded, Object tooltipParam) {
-                tooltip.addPara("In wait of Stable Structure Rework coming in Theory of Toolbox 1.1",3f);
-            }
-        }, TooltipMakerAPI.TooltipLocation.RIGHT,false);
+                    @Override
+                    public void createTooltip(
+                            TooltipMakerAPI tooltip, boolean expanded, Object tooltipParam) {
+                        tooltip.addPara(
+                                "In wait of Stable Structure Rework coming in Theory of Toolbox 1.1",
+                                3f);
+                    }
+                },
+                TooltipMakerAPI.TooltipLocation.RIGHT,
+                false);
         bt.getPosition().inTL(5, 0);
 
-
         contentPanel.addUIElement(tooltip).inTL(0, 0f);
-        contentPanel.addUIElement(tooltipBottom).inTL(0, contentPanel.getPosition().getHeight() - 20);
+        contentPanel
+                .addUIElement(tooltipBottom)
+                .inTL(0, contentPanel.getPosition().getHeight() - 20);
         mainPanel.addComponent(contentPanel).inTL(0f, 0f);
     }
 
+    @Override
+    public void clearUI() {}
 
     @Override
-    public void clearUI() {
-
-    }
+    public void positionChanged(PositionAPI position) {}
 
     @Override
-    public void positionChanged(PositionAPI position) {
-
-    }
+    public void renderBelow(float alphaMult) {}
 
     @Override
-    public void renderBelow(float alphaMult) {
-
-    }
+    public void render(float alphaMult) {}
 
     @Override
-    public void render(float alphaMult) {
-
-    }
+    public void advance(float amount) {}
 
     @Override
-    public void advance(float amount) {
-
-    }
+    public void processInput(List<InputEventAPI> events) {}
 
     @Override
-    public void processInput(List<InputEventAPI> events) {
-
-    }
-
-    @Override
-    public void buttonPressed(Object buttonId) {
-
-    }
+    public void buttonPressed(Object buttonId) {}
 }

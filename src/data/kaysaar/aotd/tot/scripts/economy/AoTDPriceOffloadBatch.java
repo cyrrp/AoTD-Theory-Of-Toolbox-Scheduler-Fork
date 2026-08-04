@@ -6,12 +6,12 @@ import java.util.List;
 /**
  * Pure-data price/stockpile work batch.
  *
- * <p>The campaign thread owns capture and commit. Worker threads only call
- * {@link #computeMarket(int)} and therefore never receive or dereference a
- * Starsector API object.</p>
+ * <p>The campaign thread owns capture and commit. Worker threads only call {@link
+ * #computeMarket(int)} and therefore never receive or dereference a Starsector API object.
  */
 public final class AoTDPriceOffloadBatch {
     public final AoTDRuntimeEpoch.Stamp epochStamp;
+
     public static final class ModelConfig {
         public final float referenceTradeQuantity;
         public final float normalBuyMin;
@@ -222,8 +222,7 @@ public final class AoTDPriceOffloadBatch {
         this(config, AoTDRuntimeEpoch.captureBatch("price-offload"));
     }
 
-    public AoTDPriceOffloadBatch(
-            ModelConfig config, AoTDRuntimeEpoch.Stamp epochStamp) {
+    public AoTDPriceOffloadBatch(ModelConfig config, AoTDRuntimeEpoch.Stamp epochStamp) {
         if (config == null) throw new IllegalArgumentException("config");
         if (epochStamp == null) throw new IllegalArgumentException("epochStamp");
         this.config = config;
@@ -273,7 +272,8 @@ public final class AoTDPriceOffloadBatch {
         MarketResult result = new MarketResult();
         result.demandClasses = new DemandClassResult[market.demandClasses.length];
         for (int classIndex = 0; classIndex < market.demandClasses.length; classIndex++) {
-            result.demandClasses[classIndex] = computeDemandClass(c, market, market.demandClasses[classIndex]);
+            result.demandClasses[classIndex] =
+                    computeDemandClass(c, market, market.demandClasses[classIndex]);
         }
         return result;
     }
@@ -315,8 +315,10 @@ public final class AoTDPriceOffloadBatch {
 
             float utility = Math.max(0.0001f, commodity.utility);
             classStockpileUtility += Math.max(0f, pricingStockpile) * utility;
-            rawDeficitUtility += Math.max(commodity.officialDeficit, commodity.currentDeficit) * utility;
-            rawExcessUtility += Math.max(commodity.officialExcess, commodity.currentExcess) * utility;
+            rawDeficitUtility +=
+                    Math.max(commodity.officialDeficit, commodity.currentDeficit) * utility;
+            rawExcessUtility +=
+                    Math.max(commodity.officialExcess, commodity.currentExcess) * utility;
             localTradeUtility += commodity.localTradeQuantity * utility;
 
             if (commodity.currentDeficit > commodity.currentExcess
@@ -341,16 +343,19 @@ public final class AoTDPriceOffloadBatch {
             rawDeficitUtility = input.storedDeficitAnchor;
         }
 
-        boolean activeDeficit = deficitUtility > excessUtility
-                && deficitUtility >= c.minStateAmount;
-        boolean activeExcess = excessUtility >= deficitUtility
-                && excessUtility >= c.minStateAmount;
-        boolean anchoredDeficit = !activeDeficit && !activeExcess
-                && rawDeficitUtility > rawExcessUtility
-                && rawDeficitUtility >= c.minStateAmount;
-        boolean anchoredExcess = !activeDeficit && !activeExcess
-                && rawExcessUtility >= rawDeficitUtility
-                && rawExcessUtility >= c.minStateAmount;
+        boolean activeDeficit =
+                deficitUtility > excessUtility && deficitUtility >= c.minStateAmount;
+        boolean activeExcess = excessUtility >= deficitUtility && excessUtility >= c.minStateAmount;
+        boolean anchoredDeficit =
+                !activeDeficit
+                        && !activeExcess
+                        && rawDeficitUtility > rawExcessUtility
+                        && rawDeficitUtility >= c.minStateAmount;
+        boolean anchoredExcess =
+                !activeDeficit
+                        && !activeExcess
+                        && rawExcessUtility >= rawDeficitUtility
+                        && rawExcessUtility >= c.minStateAmount;
 
         int mode = 0;
         boolean hasDeficit = false;
@@ -384,11 +389,10 @@ public final class AoTDPriceOffloadBatch {
             pressure = 0f;
         }
 
-        float curveTargetUtility = classStockpileUtility
-                + (classDemandUtility - classStockpileUtility) * c.curveStateStrength;
-        float demandCurve = curveTargetUtility
-                + c.minStockpileForPricing
-                - c.minDemandForPricing;
+        float curveTargetUtility =
+                classStockpileUtility
+                        + (classDemandUtility - classStockpileUtility) * c.curveStateStrength;
+        float demandCurve = curveTargetUtility + c.minStockpileForPricing - c.minDemandForPricing;
         demandCurve = Math.max(1f, demandCurve);
 
         for (int i = 0; i < input.commodities.length; i++) {
@@ -412,8 +416,8 @@ public final class AoTDPriceOffloadBatch {
             float finalBuy;
             if (hasDeficit) {
                 float deficitMax = deficitCenterMax(c, market, commodity);
-                float deficitStart = commodity.illegal
-                        ? c.illegalDeficitCenterMin : c.deficitCenterMin;
+                float deficitStart =
+                        commodity.illegal ? c.illegalDeficitCenterMin : c.deficitCenterMin;
                 float center = lerp(deficitStart, deficitMax, pressure);
                 finalSell = center;
                 finalBuy = center;
@@ -434,8 +438,10 @@ public final class AoTDPriceOffloadBatch {
                 minSell = c.excessPriceFloor;
                 maxSell = deficitMax;
                 minBuy = c.normalBuyMin;
-                maxBuy = Math.max(deficitMax / c.maxResellReturnMult,
-                        commodity.illegal ? c.illegalDeficitCenterMax : 2f);
+                maxBuy =
+                        Math.max(
+                                deficitMax / c.maxResellReturnMult,
+                                commodity.illegal ? c.illegalDeficitCenterMax : 2f);
             } else if (hasExcess) {
                 minSell = 0.25f;
                 maxSell = c.normalSellMax;
@@ -461,12 +467,12 @@ public final class AoTDPriceOffloadBatch {
             model.maxBuyMult = maxBuy / supplyWrapper;
             model.neutralStockpileUtility = classStockpileUtility;
             model.officialStateMode = mode;
-            model.officialStateUtility = mode < 0 ? excessUtility : (mode > 0 ? deficitUtility : 0f);
+            model.officialStateUtility =
+                    mode < 0 ? excessUtility : (mode > 0 ? deficitUtility : 0f);
             model.officialStatePressureDenom = pressureDenom;
 
             if (hasDeficit) {
-                float start = commodity.illegal
-                        ? c.illegalDeficitCenterMin : c.deficitCenterMin;
+                float start = commodity.illegal ? c.illegalDeficitCenterMin : c.deficitCenterMin;
                 model.stateStartSellMult = start / demandWrapper;
                 model.stateStartBuyMult = start / supplyWrapper;
                 float max = deficitCenterMax(c, market, commodity);
@@ -475,7 +481,8 @@ public final class AoTDPriceOffloadBatch {
             } else if (hasExcess) {
                 model.stateStartSellMult = blankSell / demandWrapper;
                 model.stateStartBuyMult = blankBuy / supplyWrapper;
-                model.stateExtremeSellMult = (c.excessPriceFloor + c.excessSellSpread) / demandWrapper;
+                model.stateExtremeSellMult =
+                        (c.excessPriceFloor + c.excessSellSpread) / demandWrapper;
                 model.stateExtremeBuyMult = c.excessPriceFloor / supplyWrapper;
             } else {
                 model.stateStartSellMult = blankSell / demandWrapper;
@@ -499,9 +506,14 @@ public final class AoTDPriceOffloadBatch {
     }
 
     private static float stableRoll(MarketInput market, String commodityId) {
-        String seedString = String.valueOf(market.marketId) + "|"
-                + String.valueOf(market.marketName) + "|"
-                + String.valueOf(market.factionId) + "|" + commodityId;
+        String seedString =
+                String.valueOf(market.marketId)
+                        + "|"
+                        + String.valueOf(market.marketName)
+                        + "|"
+                        + String.valueOf(market.factionId)
+                        + "|"
+                        + commodityId;
         int seed = seedString.hashCode();
         seed ^= (seed << 13);
         seed ^= (seed >>> 17);

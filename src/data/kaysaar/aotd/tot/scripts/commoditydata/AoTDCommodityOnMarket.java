@@ -17,8 +17,8 @@ import data.kaysaar.aotd.tot.plugins.ReflectionUtilis;
 import data.kaysaar.aotd.tot.scripts.economy.AoTDEconomy;
 
 public class AoTDCommodityOnMarket extends CommodityOnMarket {
-    public static AoTDCommodityOnMarket getComMarketInstanceSave(MarketAPI market,String id){
-        if(!(market.getCommodityData(id) instanceof AoTDCommodityOnMarket)){
+    public static AoTDCommodityOnMarket getComMarketInstanceSave(MarketAPI market, String id) {
+        if (!(market.getCommodityData(id) instanceof AoTDCommodityOnMarket)) {
             AoTDEconomy.pruneCommoditiesThatMightAppear((Market) market);
         }
         return (AoTDCommodityOnMarket) market.getCommodityData(id);
@@ -26,10 +26,13 @@ public class AoTDCommodityOnMarket extends CommodityOnMarket {
 
     public AoTDCommodityOnMarket(Market market, String commodityId) {
         super(market, commodityId);
-        ReflectionUtilis.setPrivateVariableFromSuperclass("available", this, new AoTDAvailableStat(0f));
+        ReflectionUtilis.setPrivateVariableFromSuperclass(
+                "available", this, new AoTDAvailableStat(0f));
 
-        ReflectionUtilis.setPrivateVariableFromSuperclass("supplyPrice", this, new EffectivePriceCalculator(this));
-        ReflectionUtilis.setPrivateVariableFromSuperclass("demandPrice", this, new EffectivePriceCalculator(this));
+        ReflectionUtilis.setPrivateVariableFromSuperclass(
+                "supplyPrice", this, new EffectivePriceCalculator(this));
+        ReflectionUtilis.setPrivateVariableFromSuperclass(
+                "demandPrice", this, new EffectivePriceCalculator(this));
 
         getSupplyDemandData();
     }
@@ -63,10 +66,13 @@ public class AoTDCommodityOnMarket extends CommodityOnMarket {
         getSupplyPrice().setDemand(getDemand().getDemandValue() + getGreed().getModifiedInt());
     }
 
-    @Override public void reapplyEventMod() {}
+    @Override
+    public void reapplyEventMod() {}
 
     public int getDef() {
-        return Math.min(getExcDefData().getEffectiveDeficit(this), getAoTDAvailableStat().getSupplyDemandData(this).getTotalRawUnitsFromDemand());
+        return Math.min(
+                getExcDefData().getEffectiveDeficit(this),
+                getAoTDAvailableStat().getSupplyDemandData(this).getTotalRawUnitsFromDemand());
     }
 
     public AoTDExcDefData getExcDefData() {
@@ -103,7 +109,6 @@ public class AoTDCommodityOnMarket extends CommodityOnMarket {
         this.supply = i;
     }
 
-
     public AoTDSupplyDemandData getSupplyDemandData() {
         return getAoTDAvailableStat().getSupplyDemandData(this);
     }
@@ -121,14 +126,14 @@ public class AoTDCommodityOnMarket extends CommodityOnMarket {
         return getDef();
     }
 
-
     @Override
     public CommodityMarketData getCommodityMarketData() {
         Object com = ReflectionUtilis.getPrivateVariableFromSuperClass("commodityMarketData", this);
         if (com == null) {
             return new AoTDCommodityMarketData(this.getId(), this.getMarket().getEconGroup());
         } else if (!(com instanceof AoTDCommodityMarketData)) {
-            this.setCommodityMarketData(new AoTDCommodityMarketData(this.getId(), this.getMarket().getEconGroup()));
+            this.setCommodityMarketData(
+                    new AoTDCommodityMarketData(this.getId(), this.getMarket().getEconGroup()));
         }
         return super.getCommodityMarketData();
     }
@@ -137,34 +142,42 @@ public class AoTDCommodityOnMarket extends CommodityOnMarket {
     Object readResolve() {
 
         if (this.getAvailableStat() == null) {
-            ReflectionUtilis.setPrivateVariableFromSuperclass("available", this, new AoTDAvailableStat(0f));
+            ReflectionUtilis.setPrivateVariableFromSuperclass(
+                    "available", this, new AoTDAvailableStat(0f));
         }
 
         if (this.getTradeMod() == null) {
-            ReflectionUtilis.setPrivateVariableFromSuperclass("tradeMod", this, new MutableStatWithTempMods(0f));
+            ReflectionUtilis.setPrivateVariableFromSuperclass(
+                    "tradeMod", this, new MutableStatWithTempMods(0f));
         }
 
         if (this.getTradeModPlus() == null) {
-            ReflectionUtilis.setPrivateVariableFromSuperclass("tradeModPlus", this, new MutableStatWithTempMods(0f));
+            ReflectionUtilis.setPrivateVariableFromSuperclass(
+                    "tradeModPlus", this, new MutableStatWithTempMods(0f));
         }
 
         if (this.getTradeModMinus() == null) {
-            ReflectionUtilis.setPrivateVariableFromSuperclass("tradeModMinus", this, new MutableStatWithTempMods(0f));
+            ReflectionUtilis.setPrivateVariableFromSuperclass(
+                    "tradeModMinus", this, new MutableStatWithTempMods(0f));
         }
 
-        ReflectionUtilis.invokeMethodWithAutoProjection("setCommodity", this, Global.getSettings().getCommoditySpec(this.getId()));
+        ReflectionUtilis.invokeMethodWithAutoProjection(
+                "setCommodity", this, Global.getSettings().getCommoditySpec(this.getId()));
         if (this.getPlayerDemandPriceMod() == null) {
-            ReflectionUtilis.invokeMethodWithAutoProjection("playerDemandMod", this, new StatBonus());
+            ReflectionUtilis.invokeMethodWithAutoProjection(
+                    "playerDemandMod", this, new StatBonus());
         }
         this.getSupplyDemandData().getEconSpec();
 
-
         if (this.getPlayerSupplyPriceMod() == null) {
-            ReflectionUtilis.invokeMethodWithAutoProjection("playerSupplyMod", this, new StatBonus());
+            ReflectionUtilis.invokeMethodWithAutoProjection(
+                    "playerSupplyMod", this, new StatBonus());
         }
 
-        ReflectionUtilis.setPrivateVariableFromSuperclass("supplyPrice", this, new EffectivePriceCalculator(this));
-        ReflectionUtilis.setPrivateVariableFromSuperclass("demandPrice", this, new EffectivePriceCalculator(this));
+        ReflectionUtilis.setPrivateVariableFromSuperclass(
+                "supplyPrice", this, new EffectivePriceCalculator(this));
+        ReflectionUtilis.setPrivateVariableFromSuperclass(
+                "demandPrice", this, new EffectivePriceCalculator(this));
         final PriceCalculator supply = (PriceCalculator) this.getSupplyPrice();
         final PriceCalculator demand = (PriceCalculator) this.getDemandPrice();
 
@@ -199,8 +212,22 @@ public class AoTDCommodityOnMarket extends CommodityOnMarket {
         }
 
         this.getSupplyDemandData().updateSupplyDemandData(getMarket());
-        supply = getSupplyDemandData().getEconSpec().getCalculationScript().convertRawUnitsToSupply(getSupplyDemandData().getTotalRawUnitsFromSupply(), getMarket(), this.getSpec().getId());
-        demand = getSupplyDemandData().getEconSpec().getCalculationScript().convertRawUnitsToDemand(getSupplyDemandData().getTotalRawUnitsFromDemand(), getMarket(), this.getSpec().getId());
+        supply =
+                getSupplyDemandData()
+                        .getEconSpec()
+                        .getCalculationScript()
+                        .convertRawUnitsToSupply(
+                                getSupplyDemandData().getTotalRawUnitsFromSupply(),
+                                getMarket(),
+                                this.getSpec().getId());
+        demand =
+                getSupplyDemandData()
+                        .getEconSpec()
+                        .getCalculationScript()
+                        .convertRawUnitsToDemand(
+                                getSupplyDemandData().getTotalRawUnitsFromDemand(),
+                                getMarket(),
+                                this.getSpec().getId());
     }
 
     @Override
@@ -219,7 +246,8 @@ public class AoTDCommodityOnMarket extends CommodityOnMarket {
     @Override
     public MutableStatWithTempMods getTradeModPlus() {
         if (super.getTradeModPlus() == null) {
-            ReflectionUtilis.setPrivateVariableFromSuperclass("tradeModPlus", this, new MutableStatWithTempMods(0f));
+            ReflectionUtilis.setPrivateVariableFromSuperclass(
+                    "tradeModPlus", this, new MutableStatWithTempMods(0f));
         }
         return super.getTradeModPlus();
     }
@@ -227,35 +255,42 @@ public class AoTDCommodityOnMarket extends CommodityOnMarket {
     @Override
     public int getDeficitQuantity() {
         if (getDef() <= 0) return 0;
-        float trade = getTradeMod().getModifiedValue()
-            + getTradeModPlus().getModifiedValue()
-            + getTradeModMinus().getModifiedValue();
+        float trade =
+                getTradeMod().getModifiedValue()
+                        + getTradeModPlus().getModifiedValue()
+                        + getTradeModMinus().getModifiedValue();
         int deficit = Math.round(getDef() - trade);
 
         return Math.max(0, deficit);
     }
 
     public int getExcessQuantityFromTrade() {
-        float trade = getTradeMod().getModifiedValue()
-            + getTradeModPlus().getModifiedValue()
-            + getTradeModMinus().getModifiedValue();
+        float trade =
+                getTradeMod().getModifiedValue()
+                        + getTradeModPlus().getModifiedValue()
+                        + getTradeModMinus().getModifiedValue();
 
-        return Math.max(0, Math.round( trade));
+        return Math.max(0, Math.round(trade));
     }
 
     @Override
     public int getExcessQuantity() {
         float excess = getExc();
         if (excess <= 0) {
-            float trade = getTradeMod().getModifiedValue()
-                    + getTradeModPlus().getModifiedValue()
-                    + getTradeModMinus().getModifiedValue();
-            float effectiveOversurplus = Math.max(getSupplyDemandData().getTotalRawUnitsFromDemand()*2,getSpec().getEconUnit()*3);
+            float trade =
+                    getTradeMod().getModifiedValue()
+                            + getTradeModPlus().getModifiedValue()
+                            + getTradeModMinus().getModifiedValue();
+            float effectiveOversurplus =
+                    Math.max(
+                            getSupplyDemandData().getTotalRawUnitsFromDemand() * 2,
+                            getSpec().getEconUnit() * 3);
             return (int) Math.max(0, trade - effectiveOversurplus);
         }
-        float trade = getTradeMod().getModifiedValue()
-                + getTradeModPlus().getModifiedValue()
-                + getTradeModMinus().getModifiedValue();
+        float trade =
+                getTradeMod().getModifiedValue()
+                        + getTradeModPlus().getModifiedValue()
+                        + getTradeModMinus().getModifiedValue();
 
         return Math.max(0, Math.round(excess + trade));
     }

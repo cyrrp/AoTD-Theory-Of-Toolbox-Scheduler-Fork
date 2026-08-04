@@ -18,42 +18,40 @@ import com.fs.starfarer.api.ui.CustomPanelAPI;
 import data.kaysaar.aotd.tot.produciton.specs.AoTDProductionSpec;
 import data.kaysaar.aotd.tot.ui.UIData;
 
-
 public class AoTDIconUtilis {
 
-    public static CustomPanelAPI getIcon(String id, AoTDProductionSpec.AoTDProductionSpecType type, float size) {
+    public static CustomPanelAPI getIcon(
+            String id, AoTDProductionSpec.AoTDProductionSpecType type, float size) {
 
         CustomPanelAPI container = Global.getSettings().createCustom(size, size, null);
 
         switch (type) {
-
             case FIGHTER -> {
                 FighterWingSpecAPI spec = Global.getSettings().getFighterWingSpec(id);
 
                 CustomPanelAPI fighterPanel =
-                        FighterInfoGenerator.createFormationPanel(spec, FormationType.BOX, (int) size, spec.getNumFighters()).one;
+                        FighterInfoGenerator.createFormationPanel(
+                                        spec, FormationType.BOX, (int) size, spec.getNumFighters())
+                                .one;
 
                 container.addComponent(fighterPanel).inTL(0, 0);
 
                 FleetMemberAPI fleetMember =
                         Global.getFactory().createFleetMember(FleetMemberType.FIGHTER_WING, id);
 
-               UIData.createFighterTooltip(fleetMember, spec, fighterPanel);
+                UIData.createFighterTooltip(fleetMember, spec, fighterPanel);
             }
 
             case SHIP -> {
                 ShipHullSpecAPI hull = Global.getSettings().getHullSpec(id);
 
-                CustomPanelAPI shipPanel =
-                        ShipInfoGenerator.getShipImage(hull, size, null).one;
+                CustomPanelAPI shipPanel = ShipInfoGenerator.getShipImage(hull, size, null).one;
 
                 container.addComponent(shipPanel).inTL(0, 0);
 
                 FleetMemberAPI fleetMember =
-                        Global.getFactory().createFleetMember(
-                                FleetMemberType.SHIP,
-                                AshMisc.getVaraint(hull)
-                        );
+                        Global.getFactory()
+                                .createFleetMember(FleetMemberType.SHIP, AshMisc.getVaraint(hull));
 
                 fleetMember.getRepairTracker().setCR(0.7f);
                 fleetMember.getCrewComposition().addCrew(fleetMember.getMinCrew());
@@ -76,8 +74,7 @@ public class AoTDIconUtilis {
             case SPECIAL_ITEM -> {
                 SpecialItemSpecAPI spec = Global.getSettings().getSpecialItemSpec(id);
 
-                ImageViewer viewer =
-                        new ImageViewer(size, size, spec.getIconName());
+                ImageViewer viewer = new ImageViewer(size, size, spec.getIconName());
 
                 container.addComponent(viewer.getComponentPanel()).inTL(0, 0);
             }
@@ -85,8 +82,7 @@ public class AoTDIconUtilis {
             case COMMODITY_ITEM -> {
                 CommoditySpecAPI spec = Global.getSettings().getCommoditySpec(id);
 
-                ImageViewer viewer =
-                        new ImageViewer(size, size, spec.getIconName());
+                ImageViewer viewer = new ImageViewer(size, size, spec.getIconName());
 
                 container.addComponent(viewer.getComponentPanel()).inTL(0, 0);
             }
@@ -94,5 +90,4 @@ public class AoTDIconUtilis {
 
         return container;
     }
-
 }

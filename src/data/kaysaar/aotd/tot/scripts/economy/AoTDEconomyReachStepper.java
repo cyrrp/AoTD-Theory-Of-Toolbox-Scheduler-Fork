@@ -20,7 +20,6 @@ import data.kaysaar.aotd.tot.scripts.trade.models.AoTDFactionTradeData;
 import data.kaysaar.aotd.tot.scripts.trade.models.AoTDMarketData;
 import data.kaysaar.aotd.tot.scripts.trade.tasks.AoTDExternalTradeSolver;
 import data.kaysaar.aotd.tot.ui.income.AoTDMonthlyTooltipCreator;
-
 import java.util.ArrayList;
 
 public class AoTDEconomyReachStepper extends ReachEconomyStepper {
@@ -52,7 +51,7 @@ public class AoTDEconomyReachStepper extends ReachEconomyStepper {
     protected void doEndOfMonthStuff() {
         final MonthlyReport report = SharedData.getData().getCurrentReport();
 
-        if(report != null){
+        if (report != null) {
             final FDNode marketsNode = report.getNode(MonthlyReport.OUTPOSTS);
 
             for (MarketAPI market : Misc.getPlayerMarkets(true)) {
@@ -89,65 +88,69 @@ public class AoTDEconomyReachStepper extends ReachEconomyStepper {
 
     public void performBeforeMonthEnds(int prevMonth) {
         try (AoTDGlobalEconomyCoordinator.Boundary boundary =
-                     AoTDGlobalEconomyCoordinator.beginCommittedCut(
-                             AoTDGlobalEconomyCoordinator.BOUNDARY_MONTH_END, false);
-             AoTDEconomySemanticBaseline.Scope ignored =
-                     AoTDEconomySemanticBaseline.begin(
-                             "economy.month-end-preparation", null,
-                             "month-end")) {
-        SectorSurplusConsumptionStats.getInstance().clear();
+                        AoTDGlobalEconomyCoordinator.beginCommittedCut(
+                                AoTDGlobalEconomyCoordinator.BOUNDARY_MONTH_END, false);
+                AoTDEconomySemanticBaseline.Scope ignored =
+                        AoTDEconomySemanticBaseline.begin(
+                                "economy.month-end-preparation", null, "month-end")) {
+            SectorSurplusConsumptionStats.getInstance().clear();
 
-        for (AoTDFactionTradeData tradeData : AoTDTradeManager.getInstance().getAllFactionTradeData().values()) {
-            tradeData.doEndOfMonthStuffForHistory(prevMonth);
-        }
-
-        if (!AoTDEconomy.runningPrePlayerEconomy) {
-
-            // NEW: contracts phase (after internal, before external)
-            AoTDTradeContractManager.getInstance().runMonthlyContracts();
-
-            // Build external index from remainingNet (post-internal, post-contract)
-            final AoTDSectorExternalIndex idx = new AoTDSectorExternalIndex();
-            for (MarketAPI market : Global.getSector().getEconomy().getMarketsCopy()) {
-                final AoTDFactionTradeData f = AoTDTradeManager.getInstance().getFactionTradeData(market.getFactionId());
-                final AoTDMarketData md = f.getTradeData().get(market.getId());
-                if (md == null) continue;
-
-                md.resetExternalResults(); // excess-exported tracking for this month
-                if(!market.hasSpaceport()||market.getAccessibilityMod().computeEffective(0f)<=0f)continue;
-                idx.addMarket(market, md);
+            for (AoTDFactionTradeData tradeData :
+                    AoTDTradeManager.getInstance().getAllFactionTradeData().values()) {
+                tradeData.doEndOfMonthStuffForHistory(prevMonth);
             }
 
-            new AoTDExternalTradeSolver().runMonthEndExternalTrade(idx);
+            if (!AoTDEconomy.runningPrePlayerEconomy) {
 
-            // 5) Apply leftover deficit/excess to AoTDExcDefData
-            final float durDays = 31;
+                // NEW: contracts phase (after internal, before external)
+                AoTDTradeContractManager.getInstance().runMonthlyContracts();
 
-            for (MarketAPI market : Global.getSector().getEconomy().getMarketsCopy()) {
-                AoTDFactionTradeData f = AoTDTradeManager.getInstance().getFactionTradeData(market.getFactionId());
+                // Build external index from remainingNet (post-internal, post-contract)
+                final AoTDSectorExternalIndex idx = new AoTDSectorExternalIndex();
+                for (MarketAPI market : Global.getSector().getEconomy().getMarketsCopy()) {
+                    final AoTDFactionTradeData f =
+                            AoTDTradeManager.getInstance()
+                                    .getFactionTradeData(market.getFactionId());
+                    final AoTDMarketData md = f.getTradeData().get(market.getId());
+                    if (md == null) continue;
 
-                AoTDMarketData md = f.getTradeData().get(market.getId());
-                if (md == null) continue;
-                AoTDIndustryData.getInstance(market).applyEndOfMonthChange(market);
-                for (CommodityOnMarketAPI c : market.getAllCommodities()) {
-                    if (!(c instanceof AoTDCommodityOnMarket com)) continue;
-                    com.getExcDefData().clearExternalTrade(com);
-                    String commodityId = com.getId();
-                    int r = md.getRemainingNet(commodityId);
-
-                    int deficit = Math.max(0, -r);
-                    int excess = Math.max(0, r);
-
-                    com.getExcDefData().recordDemandForThisMonth(com);
-                    com.getExcDefData().applyExternalTrade(deficit, excess, durDays, com);
+                    md.resetExternalResults(); // excess-exported tracking for this month
+                    if (!market.hasSpaceport()
+                            || market.getAccessibilityMod().computeEffective(0f) <= 0f) continue;
+                    idx.addMarket(market, md);
                 }
 
+                new AoTDExternalTradeSolver().runMonthEndExternalTrade(idx);
+
+                // 5) Apply leftover deficit/excess to AoTDExcDefData
+                final float durDays = 31;
+
+                for (MarketAPI market : Global.getSector().getEconomy().getMarketsCopy()) {
+                    AoTDFactionTradeData f =
+                            AoTDTradeManager.getInstance()
+                                    .getFactionTradeData(market.getFactionId());
+
+                    AoTDMarketData md = f.getTradeData().get(market.getId());
+                    if (md == null) continue;
+                    AoTDIndustryData.getInstance(market).applyEndOfMonthChange(market);
+                    for (CommodityOnMarketAPI c : market.getAllCommodities()) {
+                        if (!(c instanceof AoTDCommodityOnMarket com)) continue;
+                        com.getExcDefData().clearExternalTrade(com);
+                        String commodityId = com.getId();
+                        int r = md.getRemainingNet(commodityId);
+
+                        int deficit = Math.max(0, -r);
+                        int excess = Math.max(0, r);
+
+                        com.getExcDefData().recordDemandForThisMonth(com);
+                        com.getExcDefData().applyExternalTrade(deficit, excess, durDays, com);
+                    }
+                }
+            } else {
+                for (MarketAPI marketAPI : Global.getSector().getEconomy().getMarketsCopy()) {
+                    AoTDIndustryData.getInstance(marketAPI).applyEndOfMonthChange(marketAPI);
+                }
             }
-        } else {
-            for (MarketAPI marketAPI : Global.getSector().getEconomy().getMarketsCopy()) {
-                AoTDIndustryData.getInstance(marketAPI).applyEndOfMonthChange(marketAPI);
-            }
-        }
         }
     }
 
@@ -163,8 +166,8 @@ public class AoTDEconomyReachStepper extends ReachEconomyStepper {
                 this.prevMonth = month;
                 iterLeft = Economy.NUM_ITER_PER_MONTH;
 
-                final float daysInThisMonth = getNumDaysInCurrMonth()
-                        - Global.getSector().getClock().getDay();
+                final float daysInThisMonth =
+                        getNumDaysInCurrMonth() - Global.getSector().getClock().getDay();
                 untilNext = daysInThisMonth / ((float) Economy.NUM_ITER_PER_MONTH + 0f);
                 elapsed = 0f;
 
@@ -211,8 +214,7 @@ public class AoTDEconomyReachStepper extends ReachEconomyStepper {
 
                 if (baselineRevision > 0L) {
                     AoTDEconomySemanticBaseline.endEconomyRevision(
-                            baselineRevision,
-                            "iteration-complete");
+                            baselineRevision, "iteration-complete");
                     baselineRevision = 0L;
                 }
                 state = ReachEconomyStepper.State.WAITING;
@@ -222,8 +224,8 @@ public class AoTDEconomyReachStepper extends ReachEconomyStepper {
 
     private void createTasks() {
         tasks = new ArrayList<>();
-        baselineRevision = AoTDEconomySemanticBaseline.beginEconomyRevision(
-                "reach-stepper-iteration");
+        baselineRevision =
+                AoTDEconomySemanticBaseline.beginEconomyRevision("reach-stepper-iteration");
         final boolean iterationsDone = iterLeft <= 0 || monthEndRefreshPending;
         final MainWorkTask.EconWorkParams mainWork = new MainWorkTask.EconWorkParams();
         mainWork.withIncomeAndUpkeep = true;
@@ -233,14 +235,15 @@ public class AoTDEconomyReachStepper extends ReachEconomyStepper {
         tasks.add(new AoTdMainWorkTask2(econ.getMarkets(), econ, mainWork));
         tasks.add(new AoTDUpdateMarketAgainTask(mainEcon));
         tasks.add(new ImmigrationTask(econ.getMarkets(), econ, false));
-        tasks.add(new AoTDPostImmigrationTradeSnapshotTask(
-                econ.getMarkets(), monthEndRefreshPending ? "month-end-refresh" : "regular-iteration"));
+        tasks.add(
+                new AoTDPostImmigrationTradeSnapshotTask(
+                        econ.getMarkets(),
+                        monthEndRefreshPending ? "month-end-refresh" : "regular-iteration"));
         tasks.add(new AoTDFinishEconomyUpdateTask(mainEcon));
         AoTDEconomySemanticBaseline.operation("economy.task.main-work", 1L);
         AoTDEconomySemanticBaseline.operation("economy.task.update-market-again", 1L);
         AoTDEconomySemanticBaseline.operation("economy.task.immigration", 1L);
-        AoTDEconomySemanticBaseline.operation(
-                "economy.task.post-immigration-trade-snapshot", 1L);
+        AoTDEconomySemanticBaseline.operation("economy.task.post-immigration-trade-snapshot", 1L);
         AoTDEconomySemanticBaseline.operation("economy.task.finish-global-cut", 1L);
     }
 

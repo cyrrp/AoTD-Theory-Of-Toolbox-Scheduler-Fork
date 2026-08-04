@@ -1,17 +1,14 @@
-
 package data.kaysaar.aotd.tot.scripts.trade.models;
 
 import com.fs.starfarer.api.Global;
 import com.fs.starfarer.api.campaign.FactionAPI;
 import com.fs.starfarer.api.campaign.econ.MarketAPI;
-import data.kaysaar.aotd.tot.scripts.commoditydata.AoTDCommodityOnMarket;
 import data.kaysaar.aotd.tot.scripts.economy.AoTDEconomy;
-import data.kaysaar.aotd.tot.scripts.economy.AoTDWorkerManager;
 import data.kaysaar.aotd.tot.scripts.economy.AoTDSectorProductionDemandDataUtils;
+import data.kaysaar.aotd.tot.scripts.economy.AoTDWorkerManager;
 import data.kaysaar.aotd.tot.scripts.trade.contracts.AoTDTradeContractManager;
 import data.kaysaar.aotd.tot.scripts.trade.history.FactionCycleProductionData;
 import data.kaysaar.aotd.tot.scripts.trade.history.FactionProductionData;
-
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -66,38 +63,60 @@ public class AoTDFactionTradeData {
         } else {
             if (!cycleProductionData.containsKey(Global.getSector().getClock().getCycle())) {
                 FactionCycleProductionData productionData = new FactionCycleProductionData(faction);
-                this.cycleProductionData.put(Global.getSector().getClock().getCycle(), productionData);
+                this.cycleProductionData.put(
+                        Global.getSector().getClock().getCycle(), productionData);
             }
-            FactionCycleProductionData productionData = cycleProductionData.get(Global.getSector().getClock().getCycle());
+            FactionCycleProductionData productionData =
+                    cycleProductionData.get(Global.getSector().getClock().getCycle());
             productionData.doEndOfMonth(month);
         }
     }
 
     public ArrayList<Integer> getProductionFromMonths(String commodityId) {
-        return getProductionFromMonths(Global.getSector().getClock().getCycle(), Global.getSector().getClock().getMonth() - 1, commodityId, Integer.MAX_VALUE);
+        return getProductionFromMonths(
+                Global.getSector().getClock().getCycle(),
+                Global.getSector().getClock().getMonth() - 1,
+                commodityId,
+                Integer.MAX_VALUE);
     }
 
     public ArrayList<Integer> getDemandFromMonths(String commodityId) {
-        return getDemandFromMonths(Global.getSector().getClock().getCycle(), Global.getSector().getClock().getMonth() - 1, commodityId, Integer.MAX_VALUE);
+        return getDemandFromMonths(
+                Global.getSector().getClock().getCycle(),
+                Global.getSector().getClock().getMonth() - 1,
+                commodityId,
+                Integer.MAX_VALUE);
     }
 
-    public ArrayList<Integer>  getProductionFromMonths(int months, String commodityId) {
-        return getProductionFromMonths(Global.getSector().getClock().getCycle(), Global.getSector().getClock().getMonth() - 1, commodityId, months);
+    public ArrayList<Integer> getProductionFromMonths(int months, String commodityId) {
+        return getProductionFromMonths(
+                Global.getSector().getClock().getCycle(),
+                Global.getSector().getClock().getMonth() - 1,
+                commodityId,
+                months);
     }
 
     public ArrayList<Integer> getDemandFromMonths(int months, String commodityId) {
-        return getDemandFromMonths(Global.getSector().getClock().getCycle(), Global.getSector().getClock().getMonth() - 1, commodityId, months);
+        return getDemandFromMonths(
+                Global.getSector().getClock().getCycle(),
+                Global.getSector().getClock().getMonth() - 1,
+                commodityId,
+                months);
     }
 
-    public ArrayList<Integer> getProductionFromMonths(int startingCycle, int startingMonth, String commodityId) {
-        return getProductionFromMonths(startingCycle, startingMonth, commodityId, Integer.MAX_VALUE);
+    public ArrayList<Integer> getProductionFromMonths(
+            int startingCycle, int startingMonth, String commodityId) {
+        return getProductionFromMonths(
+                startingCycle, startingMonth, commodityId, Integer.MAX_VALUE);
     }
 
-    public ArrayList<Integer> getDemandFromMonths(int startingCycle, int startingMonth, String commodityId) {
+    public ArrayList<Integer> getDemandFromMonths(
+            int startingCycle, int startingMonth, String commodityId) {
         return getDemandFromMonths(startingCycle, startingMonth, commodityId, Integer.MAX_VALUE);
     }
 
-    public ArrayList<Integer> getProductionFromMonths(int startingCycle, int startingMonth, String commodityId, int monthsBack) {
+    public ArrayList<Integer> getProductionFromMonths(
+            int startingCycle, int startingMonth, String commodityId, int monthsBack) {
         ArrayList<Integer> result = new ArrayList<>();
         if (monthsBack <= 0) return result;
 
@@ -105,9 +124,9 @@ public class AoTDFactionTradeData {
 
         int cycle = startingCycle;
         int month = startingMonth;
-        if(startingMonth<=0){
+        if (startingMonth <= 0) {
             cycle--;
-            month=12;
+            month = 12;
         }
         for (int i = 0; i < monthsBack; i++) {
             if (isBeforeStartOfHistory(cycle, month)) break;
@@ -136,16 +155,17 @@ public class AoTDFactionTradeData {
         return result;
     }
 
-    public ArrayList<Integer> getDemandFromMonths(int startingCycle, int startingMonth, String commodityId, int monthsBack) {
+    public ArrayList<Integer> getDemandFromMonths(
+            int startingCycle, int startingMonth, String commodityId, int monthsBack) {
         ArrayList<Integer> result = new ArrayList<>();
         if (monthsBack <= 0) return result;
         if (!hasSetStartingDate) return result;
 
         int cycle = startingCycle;
         int month = startingMonth;
-        if(startingMonth<=0){
+        if (startingMonth <= 0) {
             cycle--;
-            month=12;
+            month = 12;
         }
 
         for (int i = 0; i < monthsBack; i++) {
@@ -203,12 +223,13 @@ public class AoTDFactionTradeData {
 
     public int getFactionDemand(String commodityId) {
 
-        return AoTDSectorProductionDemandDataUtils.getTotalDemandFromFaction(commodityId,faction);
+        return AoTDSectorProductionDemandDataUtils.getTotalDemandFromFaction(commodityId, faction);
     }
 
     public int getFactionSupply(String commodityId) {
 
-        return AoTDSectorProductionDemandDataUtils.getTotalProductionFromFaction(commodityId,faction);
+        return AoTDSectorProductionDemandDataUtils.getTotalProductionFromFaction(
+                commodityId, faction);
     }
 
     // ---------- internal trade solver ----------
@@ -233,12 +254,13 @@ public class AoTDFactionTradeData {
     }
 
     /**
-     * Computes internal trade and updates remainingNet.
-     * ALSO: if this is player faction, it invalidates and (optionally) precomputes contract predictions,
-     * because remainingNet is what contracts draw from.
+     * Computes internal trade and updates remainingNet. ALSO: if this is player faction, it
+     * invalidates and (optionally) precomputes contract predictions, because remainingNet is what
+     * contracts draw from.
      */
     private static final java.util.Comparator<MarketAmount> MARKET_AMOUNT_WEIGHT_DESC =
             (a, b) -> Float.compare(b.weight, a.weight);
+
     public void computeInternalTrade() {
         computeInternalTrade(true);
     }
@@ -247,7 +269,6 @@ public class AoTDFactionTradeData {
         if (tradeData.isEmpty()) return;
 
         ArrayList<AoTDMarketData> eligibleMarkets = new ArrayList<>(tradeData.size());
-
 
         for (AoTDMarketData md : tradeData.values()) {
             md.resetInternalResults();
@@ -264,8 +285,8 @@ public class AoTDFactionTradeData {
 
         if (eligibleMarkets.size() <= 1) {
             if (refreshContractPredictions) {
-                    refreshContractPredictionsIfPlayerFaction();
-                }
+                refreshContractPredictionsIfPlayerFaction();
+            }
 
             return;
         }
@@ -278,7 +299,8 @@ public class AoTDFactionTradeData {
                 int net = entry.getValue();
                 if (net == 0) continue;
 
-                CommodityBucket bucket = buckets.computeIfAbsent(entry.getKey(), id -> new CommodityBucket());
+                CommodityBucket bucket =
+                        buckets.computeIfAbsent(entry.getKey(), id -> new CommodityBucket());
 
                 if (net > 0) {
                     bucket.exporters.add(new MarketAmount(md, net, md.weight));
@@ -343,6 +365,7 @@ public class AoTDFactionTradeData {
         mgr.invalidatePredictions();
         mgr.ensurePredictionsUpToDate();
     }
+
     public LinkedHashMap<String, AoTDMarketData> getTradeData() {
         return tradeData;
     }

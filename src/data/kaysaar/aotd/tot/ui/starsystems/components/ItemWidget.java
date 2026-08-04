@@ -16,7 +16,6 @@ import com.fs.starfarer.api.loading.Description;
 import com.fs.starfarer.api.ui.CustomPanelAPI;
 import com.fs.starfarer.api.ui.PositionAPI;
 import com.fs.starfarer.api.ui.TooltipMakerAPI;
-
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -104,14 +103,8 @@ public class ItemWidget implements ExtendedUIPanelPlugin {
 
         if (icons.isEmpty()) return;
 
-        GridLayoutData layout = computeBestIconGrid(
-                icons,
-                panelW,
-                panelH,
-                maxIconSize,
-                gapDifferent,
-                gapSame
-        );
+        GridLayoutData layout =
+                computeBestIconGrid(icons, panelW, panelH, maxIconSize, gapDifferent, gapSame);
 
         if (layout == null || layout.iconSize <= 0f) {
             return;
@@ -120,7 +113,8 @@ public class ItemWidget implements ExtendedUIPanelPlugin {
         layoutIconsCenteredGrid(icons, panelW, panelH, layout);
     }
 
-    private void addExpanded(List<IconEntry> out, LinkedHashMap<String, Integer> map, boolean isCommodity) {
+    private void addExpanded(
+            List<IconEntry> out, LinkedHashMap<String, Integer> map, boolean isCommodity) {
         for (Map.Entry<String, Integer> e : map.entrySet()) {
             int count = (e.getValue() == null) ? 0 : e.getValue();
             if (count <= 0) continue;
@@ -137,8 +131,7 @@ public class ItemWidget implements ExtendedUIPanelPlugin {
             float height,
             float maxIconSize,
             float gapDifferent,
-            float gapSame
-    ) {
+            float gapSame) {
         if (icons == null || icons.isEmpty()) {
             return null;
         }
@@ -165,13 +158,8 @@ public class ItemWidget implements ExtendedUIPanelPlugin {
             float actualGapDifferent = separatorMode == 0 ? Math.max(0f, gapDifferent) : 0f;
 
             for (int columns = 1; columns <= iconCount; columns++) {
-                List<Row> rowsAtMax = buildRowsForColumns(
-                        icons,
-                        columns,
-                        maxSize,
-                        actualGapDifferent,
-                        gapSame
-                );
+                List<Row> rowsAtMax =
+                        buildRowsForColumns(icons, columns, maxSize, actualGapDifferent, gapSame);
 
                 if (rowsAtMax.isEmpty()) {
                     continue;
@@ -180,7 +168,8 @@ public class ItemWidget implements ExtendedUIPanelPlugin {
                 int rows = rowsAtMax.size();
 
                 float widestRowAtMax = getWidestRow(rowsAtMax);
-                float totalHeightAtMax = rows * maxSize + Math.max(0, rows - 1) * actualGapDifferent;
+                float totalHeightAtMax =
+                        rows * maxSize + Math.max(0, rows - 1) * actualGapDifferent;
 
                 float widthScale = widestRowAtMax <= 0f ? 1f : width / widestRowAtMax;
                 float heightScale = totalHeightAtMax <= 0f ? 1f : height / totalHeightAtMax;
@@ -191,17 +180,13 @@ public class ItemWidget implements ExtendedUIPanelPlugin {
                     continue;
                 }
 
-                List<Row> rowsAtSize = buildRowsForColumns(
-                        icons,
-                        columns,
-                        iconSize,
-                        actualGapDifferent,
-                        gapSame
-                );
+                List<Row> rowsAtSize =
+                        buildRowsForColumns(icons, columns, iconSize, actualGapDifferent, gapSame);
 
                 float widestRowAtSize = getWidestRow(rowsAtSize);
-                float totalHeightAtSize = rowsAtSize.size() * iconSize
-                        + Math.max(0, rowsAtSize.size() - 1) * actualGapDifferent;
+                float totalHeightAtSize =
+                        rowsAtSize.size() * iconSize
+                                + Math.max(0, rowsAtSize.size() - 1) * actualGapDifferent;
 
                 if (widestRowAtSize > width + 0.01f) {
                     continue;
@@ -211,13 +196,9 @@ public class ItemWidget implements ExtendedUIPanelPlugin {
                     continue;
                 }
 
-                GridLayoutData candidate = new GridLayoutData(
-                        columns,
-                        rowsAtSize.size(),
-                        iconSize,
-                        actualGapDifferent,
-                        gapSame
-                );
+                GridLayoutData candidate =
+                        new GridLayoutData(
+                                columns, rowsAtSize.size(), iconSize, actualGapDifferent, gapSame);
 
                 if (isBetterGrid(candidate, best)) {
                     best = candidate;
@@ -265,12 +246,7 @@ public class ItemWidget implements ExtendedUIPanelPlugin {
     }
 
     private List<Row> buildRowsForColumns(
-            List<IconEntry> icons,
-            int columns,
-            float iconSize,
-            float gapDifferent,
-            float gapSame
-    ) {
+            List<IconEntry> icons, int columns, float iconSize, float gapDifferent, float gapSame) {
         List<Row> rows = new ArrayList<>();
 
         if (columns <= 0 || icons == null || icons.isEmpty()) {
@@ -322,25 +298,21 @@ public class ItemWidget implements ExtendedUIPanelPlugin {
     }
 
     private void layoutIconsCenteredGrid(
-            List<IconEntry> icons,
-            float width,
-            float height,
-            GridLayoutData layout
-    ) {
-        List<Row> rows = buildRowsForColumns(
-                icons,
-                layout.columns,
-                layout.iconSize,
-                layout.gapDifferent,
-                layout.gapSame
-        );
+            List<IconEntry> icons, float width, float height, GridLayoutData layout) {
+        List<Row> rows =
+                buildRowsForColumns(
+                        icons,
+                        layout.columns,
+                        layout.iconSize,
+                        layout.gapDifferent,
+                        layout.gapSame);
 
         if (rows.isEmpty()) {
             return;
         }
 
-        float gridHeight = rows.size() * layout.iconSize
-                + Math.max(0, rows.size() - 1) * layout.gapDifferent;
+        float gridHeight =
+                rows.size() * layout.iconSize + Math.max(0, rows.size() - 1) * layout.gapDifferent;
 
         float startY = Math.max(0f, (height - gridHeight) / 2f);
 
@@ -350,57 +322,83 @@ public class ItemWidget implements ExtendedUIPanelPlugin {
             float startX = Math.max(0f, (width - row.rowWidth) / 2f);
             float rowX = 0f;
             String prevId = null;
-            TooltipMakerAPI tl = Global.getSettings().createCustom(1,1,null).createUIElement(1,1,false);
+            TooltipMakerAPI tl =
+                    Global.getSettings().createCustom(1, 1, null).createUIElement(1, 1, false);
             for (IconEntry icon : row.entries) {
                 float gap = computeGap(rowX, prevId, icon.id, layout.gapDifferent, layout.gapSame);
 
-                ImageViewer viewer = new ImageViewer(layout.iconSize, layout.iconSize, icon.getIconName());
-                if(!icon.isCommodity){
-                    CargoStackAPI stackAPI = Global.getFactory().createCargoStack(CargoAPI.CargoItemType.SPECIAL,new SpecialItemData(icon.id,null),null);
-                    tl.addTooltipTo(new TooltipMakerAPI.TooltipCreator() {
-                        @Override
-                        public boolean isTooltipExpandable(Object tooltipParam) {
-                            return false;
-                        }
+                ImageViewer viewer =
+                        new ImageViewer(layout.iconSize, layout.iconSize, icon.getIconName());
+                if (!icon.isCommodity) {
+                    CargoStackAPI stackAPI =
+                            Global.getFactory()
+                                    .createCargoStack(
+                                            CargoAPI.CargoItemType.SPECIAL,
+                                            new SpecialItemData(icon.id, null),
+                                            null);
+                    tl.addTooltipTo(
+                            new TooltipMakerAPI.TooltipCreator() {
+                                @Override
+                                public boolean isTooltipExpandable(Object tooltipParam) {
+                                    return false;
+                                }
 
-                        @Override
-                        public float getTooltipWidth(Object tooltipParam) {
-                            return 400;
-                        }
+                                @Override
+                                public float getTooltipWidth(Object tooltipParam) {
+                                    return 400;
+                                }
 
-                        @Override
-                        public void createTooltip(TooltipMakerAPI tooltip, boolean expanded, Object tooltipParam) {
-                            stackAPI.getPlugin().createTooltip(tooltip,expanded,null,null);
-                        }
-                    },viewer.getComponentPanel(), TooltipMakerAPI.TooltipLocation.BELOW,false);
+                                @Override
+                                public void createTooltip(
+                                        TooltipMakerAPI tooltip,
+                                        boolean expanded,
+                                        Object tooltipParam) {
+                                    stackAPI.getPlugin()
+                                            .createTooltip(tooltip, expanded, null, null);
+                                }
+                            },
+                            viewer.getComponentPanel(),
+                            TooltipMakerAPI.TooltipLocation.BELOW,
+                            false);
+                } else {
+                    tl.addTooltipTo(
+                            new TooltipMakerAPI.TooltipCreator() {
+                                @Override
+                                public boolean isTooltipExpandable(Object tooltipParam) {
+                                    return false;
+                                }
+
+                                @Override
+                                public float getTooltipWidth(Object tooltipParam) {
+                                    return 400;
+                                }
+
+                                @Override
+                                public void createTooltip(
+                                        TooltipMakerAPI tooltip,
+                                        boolean expanded,
+                                        Object tooltipParam) {
+                                    CommoditySpecAPI spec =
+                                            Global.getSettings().getCommoditySpec(icon.id);
+                                    tooltip.addTitle(spec.getName());
+                                    tooltip.addPara(
+                                            Global.getSettings()
+                                                    .getDescription(
+                                                            spec.getId(), Description.Type.RESOURCE)
+                                                    .getText1FirstPara(),
+                                            10f);
+                                }
+                            },
+                            viewer.getComponentPanel(),
+                            TooltipMakerAPI.TooltipLocation.BELOW,
+                            false);
                 }
-                else{
-                    tl.addTooltipTo(new TooltipMakerAPI.TooltipCreator() {
-                        @Override
-                        public boolean isTooltipExpandable(Object tooltipParam) {
-                            return false;
-                        }
 
-                        @Override
-                        public float getTooltipWidth(Object tooltipParam) {
-                            return 400;
-                        }
-
-                        @Override
-                        public void createTooltip(TooltipMakerAPI tooltip, boolean expanded, Object tooltipParam) {
-                            CommoditySpecAPI spec = Global.getSettings().getCommoditySpec(icon.id);
-                            tooltip.addTitle(spec.getName());
-                            tooltip.addPara(Global.getSettings().getDescription(spec.getId(), Description.Type.RESOURCE).getText1FirstPara(),10f);
-                        }
-                    },viewer.getComponentPanel(), TooltipMakerAPI.TooltipLocation.BELOW,false);
-                }
-
-
-                contentPanel.addComponent(viewer.getComponentPanel())
+                contentPanel
+                        .addComponent(viewer.getComponentPanel())
                         .inTL(
                                 startX + rowX + gap,
-                                startY + rowIndex * (layout.iconSize + layout.gapDifferent)
-                        );
+                                startY + rowIndex * (layout.iconSize + layout.gapDifferent));
 
                 rowX += gap + layout.iconSize;
                 prevId = icon.id;
@@ -433,19 +431,22 @@ public class ItemWidget implements ExtendedUIPanelPlugin {
         }
 
         return counts.entrySet().stream()
-                .sorted((a, b) -> {
-                    CommoditySpecAPI specA = Global.getSettings().getCommoditySpec(a.getKey());
-                    CommoditySpecAPI specB = Global.getSettings().getCommoditySpec(b.getKey());
-                    float orderA = specA != null ? specA.getOrder() : 0f;
-                    float orderB = specB != null ? specB.getOrder() : 0f;
-                    return Float.compare(orderB, orderA);
-                })
-                .collect(Collectors.toMap(
-                        Map.Entry::getKey,
-                        Map.Entry::getValue,
-                        (a, b) -> a,
-                        LinkedHashMap::new
-                ));
+                .sorted(
+                        (a, b) -> {
+                            CommoditySpecAPI specA =
+                                    Global.getSettings().getCommoditySpec(a.getKey());
+                            CommoditySpecAPI specB =
+                                    Global.getSettings().getCommoditySpec(b.getKey());
+                            float orderA = specA != null ? specA.getOrder() : 0f;
+                            float orderB = specB != null ? specB.getOrder() : 0f;
+                            return Float.compare(orderB, orderA);
+                        })
+                .collect(
+                        Collectors.toMap(
+                                Map.Entry::getKey,
+                                Map.Entry::getValue,
+                                (a, b) -> a,
+                                LinkedHashMap::new));
     }
 
     public LinkedHashMap<String, Integer> collectAndSortSpecialItems(MarketAPI market) {
@@ -462,25 +463,39 @@ public class ItemWidget implements ExtendedUIPanelPlugin {
         }
 
         return counts.entrySet().stream()
-                .sorted((a, b) -> {
-                    SpecialItemSpecAPI specA = Global.getSettings().getSpecialItemSpec(a.getKey());
-                    SpecialItemSpecAPI specB = Global.getSettings().getSpecialItemSpec(b.getKey());
-                    float orderA = specA != null ? specA.getOrder() : 0f;
-                    float orderB = specB != null ? specB.getOrder() : 0f;
-                    return Float.compare(orderB, orderA);
-                })
-                .collect(Collectors.toMap(
-                        Map.Entry::getKey,
-                        Map.Entry::getValue,
-                        (a, b) -> a,
-                        LinkedHashMap::new
-                ));
+                .sorted(
+                        (a, b) -> {
+                            SpecialItemSpecAPI specA =
+                                    Global.getSettings().getSpecialItemSpec(a.getKey());
+                            SpecialItemSpecAPI specB =
+                                    Global.getSettings().getSpecialItemSpec(b.getKey());
+                            float orderA = specA != null ? specA.getOrder() : 0f;
+                            float orderB = specB != null ? specB.getOrder() : 0f;
+                            return Float.compare(orderB, orderA);
+                        })
+                .collect(
+                        Collectors.toMap(
+                                Map.Entry::getKey,
+                                Map.Entry::getValue,
+                                (a, b) -> a,
+                                LinkedHashMap::new));
     }
 
-    @Override public void positionChanged(PositionAPI position) {}
-    @Override public void renderBelow(float alphaMult) {}
-    @Override public void render(float alphaMult) {}
-    @Override public void advance(float amount) {}
-    @Override public void processInput(List<InputEventAPI> events) {}
-    @Override public void buttonPressed(Object buttonId) {}
+    @Override
+    public void positionChanged(PositionAPI position) {}
+
+    @Override
+    public void renderBelow(float alphaMult) {}
+
+    @Override
+    public void render(float alphaMult) {}
+
+    @Override
+    public void advance(float amount) {}
+
+    @Override
+    public void processInput(List<InputEventAPI> events) {}
+
+    @Override
+    public void buttonPressed(Object buttonId) {}
 }

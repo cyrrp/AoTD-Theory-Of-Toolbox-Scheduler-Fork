@@ -7,7 +7,6 @@ import com.fs.starfarer.campaign.econ.Market;
 import data.kaysaar.aotd.tot.scripts.commoditydata.AoTDCommodityOnMarket;
 import data.kaysaar.aotd.tot.scripts.economy.AoTdMainWorkTask2;
 import data.kaysaar.aotd.tot.scripts.submarket.aotd.AoTDOpenMarketPlugin;
-
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -17,22 +16,21 @@ import java.util.Map;
 /**
  * Candidate cache for the F1 trade table replacement.
  *
- * Important: this cache intentionally does NOT cache final prices.
- * Final buy/sell prices are recalculated live by {@link AoTDPriceTableRemoval}, because prices can change due to
- * player trade impact, excess/deficit movement, tariffs, and other temporary modifiers.
+ * <p>Important: this cache intentionally does NOT cache final prices. Final buy/sell prices are
+ * recalculated live by {@link AoTDPriceTableRemoval}, because prices can change due to player trade
+ * impact, excess/deficit movement, tariffs, and other temporary modifiers.
  *
- * What is cached here is only the expensive broad-market scan: which markets are plausible buy/sell candidates for
- * each commodity, plus rough stable values useful for pre-sorting. This removes the tooltip hitch without making the
- * displayed price stale.
+ * <p>What is cached here is only the expensive broad-market scan: which markets are plausible
+ * buy/sell candidates for each commodity, plus rough stable values useful for pre-sorting. This
+ * removes the tooltip hitch without making the displayed price stale.
  */
 public final class AoTDTradePriceCache {
 
-    private AoTDTradePriceCache() {
-    }
+    private AoTDTradePriceCache() {}
 
     /**
-     * Large enough that live sorting still has good candidates, small enough that opening the tooltip does not call
-     * getSupplyPrice()/getDemandPrice() for every market in the sector.
+     * Large enough that live sorting still has good candidates, small enough that opening the
+     * tooltip does not call getSupplyPrice()/getDemandPrice() for every market in the sector.
      */
     private static final int MAX_CANDIDATES_PER_SIDE = 48;
 
@@ -72,7 +70,8 @@ public final class AoTDTradePriceCache {
         CACHE.clear();
     }
 
-    private static CachedCommodityCandidates rebuild(String commodityId, int cycle, int month, int marketCount) {
+    private static CachedCommodityCandidates rebuild(
+            String commodityId, int cycle, int month, int marketCount) {
         ArrayList<Candidate> sellCandidates = new ArrayList<>();
         ArrayList<Candidate> buyCandidates = new ArrayList<>();
 
@@ -81,7 +80,8 @@ public final class AoTDTradePriceCache {
             if (marketAPI == null || marketAPI.isHidden()) continue;
             if (!(marketAPI instanceof Market)) continue;
 
-            AoTDCommodityOnMarket com = AoTDCommodityOnMarket.getComMarketInstanceSave(marketAPI, commodityId);
+            AoTDCommodityOnMarket com =
+                    AoTDCommodityOnMarket.getComMarketInstanceSave(marketAPI, commodityId);
             if (com == null) continue;
 
             int demand = safeDemand(com);
@@ -94,68 +94,79 @@ public final class AoTDTradePriceCache {
 
             int stableAvailable = 0;
             try {
-                stableAvailable = Math.max(0, (int) AoTdMainWorkTask2.getAoTDStableSharedSubmarketLimit(
-                        (Market) marketAPI,
-                        com,
-                        supply
-                ));
+                stableAvailable =
+                        Math.max(
+                                0,
+                                (int)
+                                        AoTdMainWorkTask2.getAoTDStableSharedSubmarketLimit(
+                                                (Market) marketAPI, com, supply));
             } catch (Throwable ignored) {
                 stableAvailable = stockpileDisplay;
             }
 
-            Candidate candidate = new Candidate(
-                    marketAPI.getId(),
-                    demand,
-                    supply,
-                    currentDeficit,
-                    anchorDeficit,
-                    currentExcess,
-                    anchorExcess,
-                    stableAvailable,
-                    stockpileDisplay
-            );
+            Candidate candidate =
+                    new Candidate(
+                            marketAPI.getId(),
+                            demand,
+                            supply,
+                            currentDeficit,
+                            anchorDeficit,
+                            currentExcess,
+                            anchorExcess,
+                            stableAvailable,
+                            stockpileDisplay);
 
             if (demand > 0) {
                 sellCandidates.add(candidate);
             }
 
-            // Do not cache markets that currently display zero buyable stock. The UI still revalidates
+            // Do not cache markets that currently display zero buyable stock. The UI still
+            // revalidates
             // this live, because stock can change after the cache is built.
             if (stableAvailable > 0 && stockpileDisplay > 0) {
                 buyCandidates.add(candidate);
             }
         }
 
-        sellCandidates.sort(new Comparator<Candidate>() {
-            @Override
-            public int compare(Candidate a, Candidate b) {
-                int deficitCompare = Integer.compare(b.getSellPressureSortValue(), a.getSellPressureSortValue());
-                if (deficitCompare != 0) return deficitCompare;
+        sellCandidates.sort(
+                new Comparator<Candidate>() {
+                    @Override
+                    public int compare(Candidate a, Candidate b) {
+                        int deficitCompare =
+                                Integer.compare(
+                                        b.getSellPressureSortValue(), a.getSellPressureSortValue());
+                        if (deficitCompare != 0) return deficitCompare;
 
-                int demandCompare = Integer.compare(b.demand, a.demand);
-                if (demandCompare != 0) return demandCompare;
+                        int demandCompare = Integer.compare(b.demand, a.demand);
+                        if (demandCompare != 0) return demandCompare;
 
-                return Integer.compare(b.stableAvailable, a.stableAvailable);
-            }
-        });
+                        return Integer.compare(b.stableAvailable, a.stableAvailable);
+                    }
+                });
 
-        buyCandidates.sort(new Comparator<Candidate>() {
-            @Override
-            public int compare(Candidate a, Candidate b) {
-                int excessCompare = Integer.compare(b.getBuyPressureSortValue(), a.getBuyPressureSortValue());
-                if (excessCompare != 0) return excessCompare;
+        buyCandidates.sort(
+                new Comparator<Candidate>() {
+                    @Override
+                    public int compare(Candidate a, Candidate b) {
+                        int excessCompare =
+                                Integer.compare(
+                                        b.getBuyPressureSortValue(), a.getBuyPressureSortValue());
+                        if (excessCompare != 0) return excessCompare;
 
-                int availableCompare = Integer.compare(b.getEffectiveAvailableSortValue(), a.getEffectiveAvailableSortValue());
-                if (availableCompare != 0) return availableCompare;
+                        int availableCompare =
+                                Integer.compare(
+                                        b.getEffectiveAvailableSortValue(),
+                                        a.getEffectiveAvailableSortValue());
+                        if (availableCompare != 0) return availableCompare;
 
-                return Integer.compare(b.stockpileDisplay, a.stockpileDisplay);
-            }
-        });
+                        return Integer.compare(b.stockpileDisplay, a.stockpileDisplay);
+                    }
+                });
 
-        CandidateSet set = new CandidateSet(
-                trim(sellCandidates, MAX_CANDIDATES_PER_SIDE),
-                trim(buyCandidates, MAX_CANDIDATES_PER_SIDE)
-        );
+        CandidateSet set =
+                new CandidateSet(
+                        trim(sellCandidates, MAX_CANDIDATES_PER_SIDE),
+                        trim(buyCandidates, MAX_CANDIDATES_PER_SIDE));
 
         return new CachedCommodityCandidates(cycle, month, marketCount, set);
     }
@@ -204,7 +215,8 @@ public final class AoTDTradePriceCache {
     }
 
     public static class CandidateSet {
-        static final CandidateSet EMPTY = new CandidateSet(new ArrayList<Candidate>(), new ArrayList<Candidate>());
+        static final CandidateSet EMPTY =
+                new CandidateSet(new ArrayList<Candidate>(), new ArrayList<Candidate>());
 
         public final List<Candidate> sellCandidates;
         public final List<Candidate> buyCandidates;
@@ -235,8 +247,7 @@ public final class AoTDTradePriceCache {
                 int currentExcess,
                 int anchorExcess,
                 int stableAvailable,
-                int stockpileDisplay
-        ) {
+                int stockpileDisplay) {
             this.marketId = marketId;
             this.demand = demand;
             this.supply = supply;
@@ -249,7 +260,8 @@ public final class AoTDTradePriceCache {
         }
 
         public MarketAPI getMarket() {
-            EconomyAPI economy = Global.getSector() == null ? null : Global.getSector().getEconomy();
+            EconomyAPI economy =
+                    Global.getSector() == null ? null : Global.getSector().getEconomy();
             if (economy == null || marketId == null) return null;
             return economy.getMarket(marketId);
         }

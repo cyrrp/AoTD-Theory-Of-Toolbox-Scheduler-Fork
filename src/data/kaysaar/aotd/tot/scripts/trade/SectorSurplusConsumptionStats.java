@@ -2,7 +2,6 @@
 package data.kaysaar.aotd.tot.scripts.trade;
 
 import com.fs.starfarer.api.Global;
-
 import java.util.HashMap;
 import java.util.Map;
 

@@ -10,7 +10,6 @@ import com.fs.starfarer.api.util.Misc;
 import data.kaysaar.aotd.tot.scripts.economy.AoTDSectorProductionDemandDataUtils;
 import data.kaysaar.aotd.tot.scripts.trade.manager.AoTDTradeManager;
 import data.kaysaar.aotd.tot.scripts.trade.models.AoTDFactionTradeData;
-
 import java.awt.*;
 import java.util.ArrayList;
 import java.util.List;
@@ -27,7 +26,8 @@ public class CommodityGraphComponent implements ExtendedUIPanelPlugin {
 
     boolean showAll = false;
 
-    public CommodityGraphComponent(float width, float height, String commodityId, String factionId, int months) {
+    public CommodityGraphComponent(
+            float width, float height, String commodityId, String factionId, int months) {
         mainPanel = Global.getSettings().createCustom(width, height, this);
 
         this.commodityId = commodityId;
@@ -48,11 +48,12 @@ public class CommodityGraphComponent implements ExtendedUIPanelPlugin {
             mainPanel.removeComponent(contentPanel);
         }
 
-        contentPanel = Global.getSettings().createCustom(
-                mainPanel.getPosition().getWidth(),
-                mainPanel.getPosition().getHeight(),
-                null
-        );
+        contentPanel =
+                Global.getSettings()
+                        .createCustom(
+                                mainPanel.getPosition().getWidth(),
+                                mainPanel.getPosition().getHeight(),
+                                null);
 
         ArrayList<Integer> prodData = getProductionHistory();
         ArrayList<Integer> demData = getDemandHistory();
@@ -81,16 +82,17 @@ public class CommodityGraphComponent implements ExtendedUIPanelPlugin {
         float width = contentPanel.getPosition().getWidth();
         float height = contentPanel.getPosition().getHeight();
 
-        ArrayList<Float> supplyYs = SupplyDemandAreaGraph.createSeriesForGraph(height, prodData, highest);
-        ArrayList<Float> demandYs = SupplyDemandAreaGraph.createSeriesForGraph(height, demData, highest);
+        ArrayList<Float> supplyYs =
+                SupplyDemandAreaGraph.createSeriesForGraph(height, prodData, highest);
+        ArrayList<Float> demandYs =
+                SupplyDemandAreaGraph.createSeriesForGraph(height, demData, highest);
 
         SupplyDemandAreaGraph graph = new SupplyDemandAreaGraph(width, height, supplyYs, demandYs);
 
         graph.setColors(
                 Misc.getPositiveHighlightColor().darker(),
                 new Color(220, 155, 33),
-                Misc.getNegativeHighlightColor().darker()
-        );
+                Misc.getNegativeHighlightColor().darker());
 
         graph.setAACrossCutPx(0f);
         graph.setCrossingOverlapPx(0f);
@@ -134,9 +136,10 @@ public class CommodityGraphComponent implements ExtendedUIPanelPlugin {
             if (id == null || data == null) continue;
             if (Factions.NEUTRAL.equals(id)) continue;
 
-            ArrayList<Integer> values = production
-                    ? safeCopy(data.getProductionFromMonths(months, commodityId))
-                    : safeCopy(data.getDemandFromMonths(months, commodityId));
+            ArrayList<Integer> values =
+                    production
+                            ? safeCopy(data.getProductionFromMonths(months, commodityId))
+                            : safeCopy(data.getDemandFromMonths(months, commodityId));
 
             addAlignedFromEnd(result, values);
         }
@@ -193,7 +196,8 @@ public class CommodityGraphComponent implements ExtendedUIPanelPlugin {
 
     private int getCurrentProduction() {
         if (!Factions.NEUTRAL.equals(factionId)) {
-            return AoTDSectorProductionDemandDataUtils.getTotalProductionFromFaction(commodityId, factionId);
+            return AoTDSectorProductionDemandDataUtils.getTotalProductionFromFaction(
+                    commodityId, factionId);
         }
 
         int total = 0;
@@ -201,7 +205,9 @@ public class CommodityGraphComponent implements ExtendedUIPanelPlugin {
         for (String id : AoTDTradeManager.getInstance().getAllFactionTradeData().keySet()) {
             if (id == null || Factions.NEUTRAL.equals(id)) continue;
 
-            total += AoTDSectorProductionDemandDataUtils.getTotalProductionFromFaction(commodityId, id);
+            total +=
+                    AoTDSectorProductionDemandDataUtils.getTotalProductionFromFaction(
+                            commodityId, id);
         }
 
         return total;
@@ -209,7 +215,8 @@ public class CommodityGraphComponent implements ExtendedUIPanelPlugin {
 
     private int getCurrentDemand() {
         if (!Factions.NEUTRAL.equals(factionId)) {
-            return AoTDSectorProductionDemandDataUtils.getTotalDemandFromFaction(commodityId, factionId);
+            return AoTDSectorProductionDemandDataUtils.getTotalDemandFromFaction(
+                    commodityId, factionId);
         }
 
         int total = 0;
@@ -224,37 +231,23 @@ public class CommodityGraphComponent implements ExtendedUIPanelPlugin {
     }
 
     @Override
-    public void clearUI() {
-
-    }
+    public void clearUI() {}
 
     @Override
-    public void positionChanged(PositionAPI position) {
-
-    }
+    public void positionChanged(PositionAPI position) {}
 
     @Override
-    public void renderBelow(float alphaMult) {
-
-    }
+    public void renderBelow(float alphaMult) {}
 
     @Override
-    public void render(float alphaMult) {
-
-    }
+    public void render(float alphaMult) {}
 
     @Override
-    public void advance(float amount) {
-
-    }
+    public void advance(float amount) {}
 
     @Override
-    public void processInput(List<InputEventAPI> events) {
-
-    }
+    public void processInput(List<InputEventAPI> events) {}
 
     @Override
-    public void buttonPressed(Object buttonId) {
-
-    }
+    public void buttonPressed(Object buttonId) {}
 }

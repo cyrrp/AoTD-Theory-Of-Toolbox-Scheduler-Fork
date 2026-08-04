@@ -51,8 +51,8 @@ public class GenericFactionReputationCreator extends BaseContractRewardCreator {
         if (getAlreadyTakenIds().contains(key)) return;
 
         int lvl = AoTDTradeContractManager.getInstance().getCurrLevelData().getCurrentLevel();
-        int plus = 5 + Math.max(0, lvl - 5) * 2;      // lvl5=5, lvl15=25
-        int minus = 8 + Math.max(0, lvl - 5) * 3;     // harsher downside
+        int plus = 5 + Math.max(0, lvl - 5) * 2; // lvl5=5, lvl15=25
+        int minus = 8 + Math.max(0, lvl - 5) * 3; // harsher downside
 
         contract.addReward(key, new FactionReputationReward(fac.getId(), plus, minus));
 

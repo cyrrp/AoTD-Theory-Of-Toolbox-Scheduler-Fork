@@ -5,7 +5,6 @@ import com.fs.starfarer.api.campaign.econ.Industry;
 import com.fs.starfarer.api.campaign.econ.MarketAPI;
 import com.fs.starfarer.api.loading.IndustrySpecAPI;
 import data.kaysaar.aotd.tot.industries.AoTDConstructionSite;
-
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 
@@ -29,7 +28,6 @@ public class GrandWonderTypeManager {
                 }
             } catch (Exception ignored) {
             }
-
         }
         return indSpecs;
     }
@@ -42,27 +40,25 @@ public class GrandWonderTypeManager {
                     indSpecs.add(wonderAPI);
                 }
             }
-
         }
-        if(market!=null){
+        if (market != null) {
             for (Industry industry : market.getIndustries()) {
-                GrandWonderAPI wonderAPI =null;
-                if(industry instanceof AoTDConstructionSite site && site.isUpgrading()){
-                  wonderAPI = site.getWonderAPI();
-
+                GrandWonderAPI wonderAPI = null;
+                if (industry instanceof AoTDConstructionSite site && site.isUpgrading()) {
+                    wonderAPI = site.getWonderAPI();
                 }
-                if(industry instanceof GrandWonderAPI ){
+                if (industry instanceof GrandWonderAPI) {
                     wonderAPI = (GrandWonderAPI) industry;
                 }
                 if (wonderAPI != null) {
                     GrandWonderTypeSpecAPI specAPI = specs.get(wonderAPI.getWonderTypeId());
-                    if(specAPI.isUniqueViaCategory()){
+                    if (specAPI.isUniqueViaCategory()) {
                         GrandWonderAPI finalWonderAPI = wonderAPI;
-                        indSpecs.removeIf(x->x.getWonderTypeId().equals(finalWonderAPI.getWonderTypeId()));
-                    }
-                    else{
+                        indSpecs.removeIf(
+                                x -> x.getWonderTypeId().equals(finalWonderAPI.getWonderTypeId()));
+                    } else {
                         GrandWonderAPI finalWonderAPI = wonderAPI;
-                        indSpecs.removeIf(x->x.getId().equals(finalWonderAPI.getId()));
+                        indSpecs.removeIf(x -> x.getId().equals(finalWonderAPI.getId()));
                     }
                 }
             }
@@ -76,7 +72,6 @@ public class GrandWonderTypeManager {
             if (industrySpecAPI.getNewPluginInstance(market) instanceof GrandWonderAPI wonderAPI) {
 
                 indSpecs.add(wonderAPI);
-
             }
         }
         return indSpecs;

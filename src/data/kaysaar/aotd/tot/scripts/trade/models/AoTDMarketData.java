@@ -4,7 +4,6 @@ package data.kaysaar.aotd.tot.scripts.trade.models;
 import com.fs.starfarer.api.campaign.econ.CommodityOnMarketAPI;
 import com.fs.starfarer.api.campaign.econ.MarketAPI;
 import data.kaysaar.aotd.tot.scripts.commoditydata.AoTDCommodityOnMarket;
-
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -17,11 +16,12 @@ public class AoTDMarketData {
     public static final int FINGERPRINT_VERSION = 1;
 
     public String marketId;
-    public Object readResolve(){
-        if(soldOutside==null){
+
+    public Object readResolve() {
+        if (soldOutside == null) {
             soldOutside = new LinkedHashMap<>();
         }
-        if(extraSold==null){
+        if (extraSold == null) {
             extraSold = new LinkedHashMap<>();
         }
         if (tradeFingerprintVersion <= 0) {
@@ -32,37 +32,47 @@ public class AoTDMarketData {
     }
 
     /** Net export (positive) / net import demand (negative). Snapshot at build time. */
-    public  LinkedHashMap<String, Integer> netProductionValues = new LinkedHashMap<>();
-    public LinkedHashMap<String,Integer>extraSold = new LinkedHashMap<>();
+    public LinkedHashMap<String, Integer> netProductionValues = new LinkedHashMap<>();
+
+    public LinkedHashMap<String, Integer> extraSold = new LinkedHashMap<>();
+
     /** Internal trade results. */
-    public  LinkedHashMap<String, Integer> internalSent = new LinkedHashMap<>();
-    public  LinkedHashMap<String, Integer> internalReceived = new LinkedHashMap<>();
+    public LinkedHashMap<String, Integer> internalSent = new LinkedHashMap<>();
 
-    public  LinkedHashMap<String,Integer>soldOutside = new LinkedHashMap<>();
+    public LinkedHashMap<String, Integer> internalReceived = new LinkedHashMap<>();
+
+    public LinkedHashMap<String, Integer> soldOutside = new LinkedHashMap<>();
+
     /** Remaining net after internal trade / contracts / external trade bookkeeping. */
-    public  LinkedHashMap<String, Integer> remainingNet = new LinkedHashMap<>();
+    public LinkedHashMap<String, Integer> remainingNet = new LinkedHashMap<>();
 
-    /**
-     * Amount of export removed by the surplus-cap AFTER matching.
-     * Used for producer bonuses.
-     */
-    public  LinkedHashMap<String, Integer> externalExcessExported = new LinkedHashMap<>();
+    /** Amount of export removed by the surplus-cap AFTER matching. Used for producer bonuses. */
+    public LinkedHashMap<String, Integer> externalExcessExported = new LinkedHashMap<>();
 
     /** Actual: contractId -> (commodityId -> amount shipped for that contract THIS MONTH) */
-    public  LinkedHashMap<String, LinkedHashMap<String, Integer>> exportedByContract = new LinkedHashMap<>();
+    public LinkedHashMap<String, LinkedHashMap<String, Integer>> exportedByContract =
+            new LinkedHashMap<>();
 
     /** Predicted: contractId -> (commodityId -> amount that WOULD be shipped this month) */
-    public  LinkedHashMap<String, LinkedHashMap<String, Integer>> predictedExportedByContract = new LinkedHashMap<>();
+    public LinkedHashMap<String, LinkedHashMap<String, Integer>> predictedExportedByContract =
+            new LinkedHashMap<>();
 
     /** Base weights (per-market). */
     public float weight;
+
     public float outsideWeight;
+
     /** Eligibility captured on the campaign thread; workers never query MarketAPI. */
     public boolean internalTradeEligible;
+
     /** Local publication revision assigned by AoTDTradeManager. */
     public long publicationRevision;
-    /** Stable diagnostic fingerprint; exact equality is still verified before skipping publication. */
+
+    /**
+     * Stable diagnostic fingerprint; exact equality is still verified before skipping publication.
+     */
     public long tradeFingerprint;
+
     public int tradeFingerprintVersion;
 
     /** Normal constructor from the last committed local supply/demand revision. */
@@ -84,15 +94,14 @@ public class AoTDMarketData {
     }
 
     /**
-     * Captures trade inputs after ImmigrationTask directly from current live
-     * industry stats. The method does not publish or mutate supply/demand data.
+     * Captures trade inputs after ImmigrationTask directly from current live industry stats. The
+     * method does not publish or mutate supply/demand data.
      */
     public static AoTDMarketData capturePostImmigration(MarketAPI market) {
         LinkedHashMap<String, Integer> netProduction = new LinkedHashMap<>();
         for (CommodityOnMarketAPI commodity : market.getAllCommodities()) {
             if (!(commodity instanceof AoTDCommodityOnMarket aotdCommodity)) continue;
-            int net = aotdCommodity.getSupplyDemandData()
-                    .computeRawNetForTradeSnapshot(market);
+            int net = aotdCommodity.getSupplyDemandData().computeRawNetForTradeSnapshot(market);
             if (net != 0) netProduction.put(aotdCommodity.getId(), net);
         }
         return new AoTDMarketData(market, netProduction);
@@ -112,7 +121,8 @@ public class AoTDMarketData {
     /** Exact comparison; the hash is diagnostic only and never the sole correctness gate. */
     public boolean hasSameTradeInputs(AoTDMarketData other) {
         if (other == null) return false;
-        return marketId != null && marketId.equals(other.marketId)
+        return marketId != null
+                && marketId.equals(other.marketId)
                 && Float.floatToIntBits(weight) == Float.floatToIntBits(other.weight)
                 && Float.floatToIntBits(outsideWeight) == Float.floatToIntBits(other.outsideWeight)
                 && internalTradeEligible == other.internalTradeEligible
@@ -126,7 +136,7 @@ public class AoTDMarketData {
         int mask = 0;
         if (Float.floatToIntBits(weight) != Float.floatToIntBits(previous.weight)
                 || Float.floatToIntBits(outsideWeight)
-                != Float.floatToIntBits(previous.outsideWeight)) {
+                        != Float.floatToIntBits(previous.outsideWeight)) {
             mask |= CHANGE_ACCESSIBILITY;
         }
         if (internalTradeEligible != previous.internalTradeEligible) {
@@ -214,7 +224,6 @@ public class AoTDMarketData {
         externalExcessExported.clear();
         soldOutside.clear();
         extraSold.clear();
-
     }
 
     /** Call once per month before contracts. (Actual shipments) */
@@ -278,11 +287,19 @@ public class AoTDMarketData {
     public int getRemainingNet(String commodityId) {
         return remainingNet.getOrDefault(commodityId, 0);
     }
-    public int getExtraSoldOutside(String commodityId){return extraSold.getOrDefault(commodityId, 0);}
-    public int getSoldOutside(String commodityId){return soldOutside.getOrDefault(commodityId, 0);}
+
+    public int getExtraSoldOutside(String commodityId) {
+        return extraSold.getOrDefault(commodityId, 0);
+    }
+
+    public int getSoldOutside(String commodityId) {
+        return soldOutside.getOrDefault(commodityId, 0);
+    }
+
     public int getExternalExcessExported(String commodityId) {
         return externalExcessExported.getOrDefault(commodityId, 0);
     }
+
     public void addExtraSold(String commodityId, int amount) {
         int curr = getExtraSoldOutside(commodityId);
         extraSold.put(commodityId, curr + amount);
@@ -293,6 +310,7 @@ public class AoTDMarketData {
         int curr = getSoldOutside(commodityId);
         soldOutside.put(commodityId, curr + amount);
     }
+
     public void addInternalSent(String commodityId, int amount) {
         if (amount <= 0) return;
 

@@ -4,14 +4,9 @@ import com.fs.starfarer.api.Global;
 import com.fs.starfarer.api.campaign.FactionAPI;
 import com.fs.starfarer.api.campaign.econ.MarketAPI;
 import com.fs.starfarer.api.campaign.econ.MonthlyReport;
-import com.fs.starfarer.api.characters.PersonAPI;
-import com.fs.starfarer.api.impl.campaign.MonthlyReportNodeTooltipCreator;
 import com.fs.starfarer.api.impl.campaign.ids.Factions;
 import com.fs.starfarer.api.impl.campaign.shared.SharedData;
-import com.fs.starfarer.api.util.Misc;
-import com.fs.starfarer.api.util.WeightedRandomPicker;
 import data.kaysaar.aotd.tot.intel.AoTDContractFinished;
-import data.kaysaar.aotd.tot.scripts.economy.AoTDSectorProductionDemandDataUtils;
 import data.kaysaar.aotd.tot.scripts.trade.contracts.rewards.TradeContractRewardDataAPI;
 import data.kaysaar.aotd.tot.scripts.trade.contracts.rewards.contract.BlueprintReward;
 import data.kaysaar.aotd.tot.scripts.trade.contracts.rewards.contract.FactionReputationReward;
@@ -22,48 +17,44 @@ import data.kaysaar.aotd.tot.scripts.trade.contracts.rewards.monthly.MonthlyComm
 import data.kaysaar.aotd.tot.scripts.trade.manager.AoTDTradeManager;
 import data.kaysaar.aotd.tot.scripts.trade.models.AoTDFactionTradeData;
 import data.kaysaar.aotd.tot.scripts.trade.models.AoTDMarketData;
-import data.kaysaar.aotd.tot.ui.income.AoTDMonthlyTooltipCreator;
-import org.lazywizard.lazylib.MathUtils;
-
 import java.util.*;
-import java.util.function.BiFunction;
-import java.util.function.Function;
-import java.util.function.Supplier;
+import org.lazywizard.lazylib.MathUtils;
 
 public class AoTDTradeContractManager {
 
     public static final String MEM_KEY = "$aotd_trade_contract_manager";
     AoTDTradeContractLevelData currLevel = new AoTDTradeContractLevelData();
-    LinkedHashMap<String,AoTDTradeContract>currentlyGeneratedInBrowser = new LinkedHashMap<>();
+    LinkedHashMap<String, AoTDTradeContract> currentlyGeneratedInBrowser = new LinkedHashMap<>();
 
-    public static MonthlyReport.FDNode getNodeForContracts(){
+    public static MonthlyReport.FDNode getNodeForContracts() {
         return SharedData.getData().getCurrentReport().getNode("aotd_trade_contracts");
     }
-    public static LinkedHashSet<String>viableExoticCommodities = new LinkedHashSet<>();
+
+    public static LinkedHashSet<String> viableExoticCommodities = new LinkedHashSet<>();
+
     public LinkedHashMap<String, AoTDTradeContract> getCurrentlyGeneratedInBrowser() {
-        if(currentlyGeneratedInBrowser==null)currentlyGeneratedInBrowser = new LinkedHashMap<>();
+        if (currentlyGeneratedInBrowser == null)
+            currentlyGeneratedInBrowser = new LinkedHashMap<>();
         return currentlyGeneratedInBrowser;
     }
 
+    public void generateNewContractsForBrowser() {
 
-
-    public void generateNewContractsForBrowser(){
-
-        List<AoTDTradeContract> gen = AoTDTradeContractBrowserCreator.generateContractsForBrowser(
-                getCurrLevelData().getMaxGeneratedContractsForLevel(),
-                getCurrLevelData().getCurrentLevel()
-        );
+        List<AoTDTradeContract> gen =
+                AoTDTradeContractBrowserCreator.generateContractsForBrowser(
+                        getCurrLevelData().getMaxGeneratedContractsForLevel(),
+                        getCurrLevelData().getCurrentLevel());
 
         getCurrentlyGeneratedInBrowser().clear();
         for (AoTDTradeContract c : gen) getCurrentlyGeneratedInBrowser().put(c.getId(), c);
-
     }
-    public static int getDurationOfPrivateContract(){
-        return MathUtils.getRandomNumberInRange(2,8);
+
+    public static int getDurationOfPrivateContract() {
+        return MathUtils.getRandomNumberInRange(2, 8);
     }
 
     public AoTDTradeContractLevelData getCurrLevelData() {
-        if(currLevel==null)currLevel = new AoTDTradeContractLevelData();
+        if (currLevel == null) currLevel = new AoTDTradeContractLevelData();
         return currLevel;
     }
 
@@ -74,9 +65,10 @@ public class AoTDTradeContractManager {
         }
         return (AoTDTradeContractManager) pd.get(MEM_KEY);
     }
+
     public void terminateContract(String contractId) {
         if (contractId == null) return;
-        if(activeContracts.get(contractId) != null) {
+        if (activeContracts.get(contractId) != null) {
             activeContracts.get(contractId).terminateContract();
         }
         if (activeContracts.remove(contractId) != null) {
@@ -93,6 +85,7 @@ public class AoTDTradeContractManager {
         c.setFrozen(frozen);
         invalidatePredictions();
     }
+
     private final LinkedHashMap<String, AoTDTradeContract> activeContracts = new LinkedHashMap<>();
 
     private int lastPredictedCycle = Integer.MIN_VALUE;
@@ -136,7 +129,8 @@ public class AoTDTradeContractManager {
 
     private void rebuildPredictions() {
         String playerFactionId = Global.getSector().getPlayerFaction().getId();
-        AoTDFactionTradeData playerTrade = AoTDTradeManager.getInstance().getFactionTradeData(playerFactionId);
+        AoTDFactionTradeData playerTrade =
+                AoTDTradeManager.getInstance().getFactionTradeData(playerFactionId);
         if (playerTrade == null) return;
 
         for (AoTDMarketData md : playerTrade.getTradeData().values()) {
@@ -168,7 +162,8 @@ public class AoTDTradeContractManager {
             for (String commodityId : contractCommodities) {
                 int avail = md.getRemainingNet(commodityId);
                 if (avail > 0) {
-                    available.computeIfAbsent(md.marketId, k -> new HashMap<>())
+                    available
+                            .computeIfAbsent(md.marketId, k -> new HashMap<>())
                             .put(commodityId, avail);
                 }
             }
@@ -188,7 +183,8 @@ public class AoTDTradeContractManager {
             exportersByCommodity.put(commodityId, exporters);
         }
 
-        // deterministic allocation: contracts in insertion order, and lines in insertion order (LinkedHashMap)
+        // deterministic allocation: contracts in insertion order, and lines in insertion order
+        // (LinkedHashMap)
         for (AoTDTradeContract c : activeContracts.values()) {
             if (c == null) continue;
             if (c.isExpired() || c.isTerminated()) continue;
@@ -223,7 +219,6 @@ public class AoTDTradeContractManager {
         }
     }
 
-
     public void pruneEmptyContracts() {
         if (activeContracts.isEmpty()) return;
 
@@ -234,7 +229,11 @@ public class AoTDTradeContractManager {
             Map.Entry<String, AoTDTradeContract> entry = it.next();
             AoTDTradeContract c = entry.getValue();
 
-            if (c == null || c.getContractData() == null || c.getContractData().isEmpty()||c.isTerminated()||c.isExpired()) {
+            if (c == null
+                    || c.getContractData() == null
+                    || c.getContractData().isEmpty()
+                    || c.isTerminated()
+                    || c.isExpired()) {
                 it.remove();
                 removed = true;
             }
@@ -244,15 +243,17 @@ public class AoTDTradeContractManager {
             invalidatePredictions();
         }
     }
+
     /**
-     * Runs monthly after INTERNAL trade, before EXTERNAL trade.
-     * Consumes player's remainingNet exports for each contract line.
+     * Runs monthly after INTERNAL trade, before EXTERNAL trade. Consumes player's remainingNet
+     * exports for each contract line.
      */
     public void runMonthlyContracts() {
         if (activeContracts.isEmpty()) return;
 
         String playerFactionId = Global.getSector().getPlayerFaction().getId();
-        AoTDFactionTradeData playerTrade = AoTDTradeManager.getInstance().getFactionTradeData(playerFactionId);
+        AoTDFactionTradeData playerTrade =
+                AoTDTradeManager.getInstance().getFactionTradeData(playerFactionId);
         if (playerTrade == null) return;
 
         for (AoTDMarketData md : playerTrade.getTradeData().values()) {
@@ -267,16 +268,18 @@ public class AoTDTradeContractManager {
         mainNodeContracts.custom = "node_id_contracts_";
         for (AoTDTradeContract c : activeContracts.values()) {
             if (c == null) continue;
-            if(c.isContractFrozen()) continue;
+            if (c.isContractFrozen()) continue;
             if (c.isExpired() || c.isTerminated()) {
                 toRemove.add(c.getId());
                 continue;
             }
-            if(c.isIssuedByPlayer()&& AoTDPlayerContractCreatorManager.getCreator(c.getContractTypeId())!=null){
-                PlayerContractCreatorAPI creatorAPI = AoTDPlayerContractCreatorManager.getCreator(c.getContractTypeId());
+            if (c.isIssuedByPlayer()
+                    && AoTDPlayerContractCreatorManager.getCreator(c.getContractTypeId()) != null) {
+                PlayerContractCreatorAPI creatorAPI =
+                        AoTDPlayerContractCreatorManager.getCreator(c.getContractTypeId());
                 creatorAPI.applyChangesToContractIfNecessary(c);
             }
-            if(c.getContractData().isEmpty()){
+            if (c.getContractData().isEmpty()) {
                 toRemove.add(c.getId());
                 continue;
             }
@@ -291,36 +294,39 @@ public class AoTDTradeContractManager {
                 int required = Math.max(0, line.getReqMonthly());
                 if (commodityId == null || required <= 0) continue;
 
-                int delivered = pullFromPlayerExports(playerTrade, commodityId, required, c.getId());
+                int delivered =
+                        pullFromPlayerExports(playerTrade, commodityId, required, c.getId());
 
                 if (delivered < required) {
                     missedThisMonth = true;
                 }
-                float progress = (float) delivered /required;
-                contractProgressMonth+= progress;
-                c.executeMonthEndForCommodity(delivered,commodityId);
+                float progress = (float) delivered / required;
+                contractProgressMonth += progress;
+                c.executeMonthEndForCommodity(delivered, commodityId);
                 // credits delta (profit or cost)
                 int creditsDelta = c.getMoneyFromMonth(commodityId, delivered);
 
                 if (creditsDelta != 0) {
-                    MonthlyReport.FDNode curr = report.getNode(mainNodeContracts,"node_id_contracts_"+c.getId());
+                    MonthlyReport.FDNode curr =
+                            report.getNode(mainNodeContracts, "node_id_contracts_" + c.getId());
                     curr.icon = c.getIconName();
                     curr.name = c.getNameOfContract();
-                    if(c.getSubTypeOfContractString()!=null) {
-                        curr.name = c.getNameOfContract()+" - "+c.getSubTypeOfContractString();
+                    if (c.getSubTypeOfContractString() != null) {
+                        curr.name = c.getNameOfContract() + " - " + c.getSubTypeOfContractString();
                     }
-                    if(c.isIssuedByPlayer()){
+                    if (c.isIssuedByPlayer()) {
                         curr.name = c.getSubTypeOfContractString();
                     }
-                    MonthlyReport.FDNode nodeCommodityEach = report.getNode(curr,commodityId);
-                    nodeCommodityEach.icon = Global.getSettings().getCommoditySpec(commodityId).getIconName();
-                    nodeCommodityEach.name = Global.getSettings().getCommoditySpec(commodityId).getName();
+                    MonthlyReport.FDNode nodeCommodityEach = report.getNode(curr, commodityId);
+                    nodeCommodityEach.icon =
+                            Global.getSettings().getCommoditySpec(commodityId).getIconName();
+                    nodeCommodityEach.name =
+                            Global.getSettings().getCommoditySpec(commodityId).getName();
 
-                    if(creditsDelta>0){
-                            nodeCommodityEach.income+=creditsDelta;
-                    }
-                    else{
-                        nodeCommodityEach.upkeep+=(-creditsDelta);
+                    if (creditsDelta > 0) {
+                        nodeCommodityEach.income += creditsDelta;
+                    } else {
+                        nodeCommodityEach.upkeep += (-creditsDelta);
                     }
                 }
                 pointsOfProgress++;
@@ -331,8 +337,8 @@ public class AoTDTradeContractManager {
                     distributeToFactionEqually(c.getFactionId(), commodityId, delivered);
                 }
             }
-            c.executeMonthEnd(contractProgressMonth/pointsOfProgress);
-            if (missedThisMonth&&!c.isIssuedByPlayer()) {
+            c.executeMonthEnd(contractProgressMonth / pointsOfProgress);
+            if (missedThisMonth && !c.isIssuedByPlayer()) {
                 c.addMiss();
                 if (c.isTerminated()) {
                     for (TradeContractRewardDataAPI s : c.getRewards().values()) {
@@ -345,7 +351,7 @@ public class AoTDTradeContractManager {
 
             c.decrementMonth();
             if (c.isExpired()) {
-                if(!c.isTerminated()&&!c.isIssuedByPlayer()){
+                if (!c.isTerminated() && !c.isIssuedByPlayer()) {
                     for (TradeContractRewardDataAPI value : c.getRewards().values()) {
                         value.executeRewardAtTheEndOfContract();
                     }
@@ -353,15 +359,15 @@ public class AoTDTradeContractManager {
                 toRemove.add(c.getId());
             }
         }
-        ArrayList<AoTDTradeContract>contracts = new ArrayList<>();
+        ArrayList<AoTDTradeContract> contracts = new ArrayList<>();
         for (String id : toRemove) {
 
-           AoTDTradeContract contract =  activeContracts.remove(id);
-           if(contract!=null){
-               contracts.add(contract);
-           }
+            AoTDTradeContract contract = activeContracts.remove(id);
+            if (contract != null) {
+                contracts.add(contract);
+            }
         }
-        if(!contracts.isEmpty()){
+        if (!contracts.isEmpty()) {
             AoTDContractFinished finished = new AoTDContractFinished(contracts);
             Global.getSector().getIntelManager().addIntel(finished);
         }
@@ -369,15 +375,17 @@ public class AoTDTradeContractManager {
         invalidatePredictions();
     }
 
-    private int pullFromPlayerExports(AoTDFactionTradeData playerTrade, String commodityId, int need, String contractId) {
+    private int pullFromPlayerExports(
+            AoTDFactionTradeData playerTrade, String commodityId, int need, String contractId) {
         if (need <= 0) return 0;
 
         ArrayList<AoTDMarketData> exporters = new ArrayList<>();
         for (AoTDMarketData md : playerTrade.getTradeData().values()) {
             if (md == null) continue;
             MarketAPI market = Global.getSector().getEconomy().getMarket(md.marketId);
-            if(market==null)continue;
-            if(!market.hasSpaceport()||market.getAccessibilityMod().computeEffective(0f)<=0f)continue;
+            if (market == null) continue;
+            if (!market.hasSpaceport() || market.getAccessibilityMod().computeEffective(0f) <= 0f)
+                continue;
             int avail = md.getRemainingNet(commodityId);
             if (avail > 0) exporters.add(md);
         }
@@ -414,7 +422,8 @@ public class AoTDTradeContractManager {
         if (delivered <= 0) return;
         if (factionId == null || factionId.isEmpty()) return;
 
-        AoTDFactionTradeData facTrade = AoTDTradeManager.getInstance().getFactionTradeData(factionId);
+        AoTDFactionTradeData facTrade =
+                AoTDTradeManager.getInstance().getFactionTradeData(factionId);
         if (facTrade == null) return;
 
         ArrayList<AoTDMarketData> markets = new ArrayList<>(facTrade.getTradeData().values());
@@ -439,53 +448,44 @@ public class AoTDTradeContractManager {
     }
 
     public static AoTDTradeContract createTestContract() {
-        AoTDTradeContract contract = new AoTDTradeContract(
-                "test",
-                null,
-                "",
-                8
-        );
+        AoTDTradeContract contract = new AoTDTradeContract("test", null, "", 8);
 
         contract.addContractData("hand_weapons", 1234, 0.60f);
-//        contract.addContractData("fuel", 1234, 0.60f);
-//        contract.addContractData("supplies", 1234, 0.60f);
-//        contract.addContractData("food", 1234, 0.60f);
+        //        contract.addContractData("fuel", 1234, 0.60f);
+        //        contract.addContractData("supplies", 1234, 0.60f);
+        //        contract.addContractData("food", 1234, 0.60f);
         return contract;
     }
-    public static AoTDTradeContract createTestContract(FactionAPI faction,boolean withPerson,float cut) {
+
+    public static AoTDTradeContract createTestContract(
+            FactionAPI faction, boolean withPerson, float cut) {
         AoTDTradeContract contract = null;
-        if(withPerson) {
-             contract= new AoTDTradeContract(
-                    "test"+faction.getId(),
-                    faction.createRandomPerson(),
-                    null,
-                    8
-            );
+        if (withPerson) {
+            contract =
+                    new AoTDTradeContract(
+                            "test" + faction.getId(), faction.createRandomPerson(), null, 8);
             contract.addContractData("drugs", 1000, 0.60f);
             int money = contract.getPredictedMoneyWorthForMonth();
             int exp = AoTDTradeContractLevelData.getXpForMonthlyContractValue(money);
-            contract.addReward("rep_merchant",new MerchantReputationReward(exp));
-            contract.addReward("rep_"+ Factions.PIRATES,new FactionReputationReward(Factions.PIRATES,10,5));
-            contract.addReward("blueprint_"+Global.getSettings().getFighterWingSpec("gladius_wing"),new BlueprintReward("gladius_wing", BlueprintReward.BlueprintData.FIGHTER));
+            contract.addReward("rep_merchant", new MerchantReputationReward(exp));
+            contract.addReward(
+                    "rep_" + Factions.PIRATES,
+                    new FactionReputationReward(Factions.PIRATES, 10, 5));
+            contract.addReward(
+                    "blueprint_" + Global.getSettings().getFighterWingSpec("gladius_wing"),
+                    new BlueprintReward("gladius_wing", BlueprintReward.BlueprintData.FIGHTER));
 
-        }
-        else{
-            contract= new AoTDTradeContract(
-                    "test"+faction.getId(),
-                    null,
-                    faction.getId(),
-                    8
-            );
+        } else {
+            contract = new AoTDTradeContract("test" + faction.getId(), null, faction.getId(), 8);
             contract.addContractData("fuel", 4000, 0.60f);
             contract.addContractData("supplies", 10000, 0.60f);
-            contract.addReward("monthly_storage",new MonthlyCommodityToStorageReward());
+            contract.addReward("monthly_storage", new MonthlyCommodityToStorageReward());
         }
-
-
 
         getInstance().addContract(contract);
         return contract;
     }
+
     public void moveToTop(String contractId) {
         if (contractId == null) return;
 

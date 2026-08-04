@@ -5,7 +5,6 @@ import com.fs.starfarer.api.campaign.econ.MarketDemandAPI;
 import com.fs.starfarer.campaign.econ.Market;
 import com.fs.starfarer.campaign.econ.MarketDemand;
 import com.fs.starfarer.campaign.econ.MarketDemandData;
-
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;

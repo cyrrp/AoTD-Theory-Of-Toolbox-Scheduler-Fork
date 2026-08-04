@@ -5,9 +5,7 @@ import com.fs.starfarer.api.ui.CustomPanelAPI;
 import com.fs.starfarer.api.ui.TooltipMakerAPI;
 import com.fs.starfarer.api.util.Misc;
 import data.kaysaar.aotd.tot.ui.economy.EconomyCommodityData;
-import data.kaysaar.aotd.tot.ui.economy.commoditydata.buttons.FactionChooserButton;
 import data.kaysaar.aotd.tot.ui.economy.commoditydata.buttons.GraphPeriodChosenButton;
-
 import java.util.ArrayList;
 
 public class ChoosePeriodPopUp extends PopUpUI {
@@ -15,7 +13,8 @@ public class ChoosePeriodPopUp extends PopUpUI {
     int currMonths;
     EconomyCommodityData data;
     CustomPanelAPI mainPanel;
-    public static ArrayList<Integer>monthsIntervals = new ArrayList<>();
+    public static ArrayList<Integer> monthsIntervals = new ArrayList<>();
+
     static {
         monthsIntervals.add(1);
         monthsIntervals.add(6);
@@ -29,10 +28,12 @@ public class ChoosePeriodPopUp extends PopUpUI {
 
         monthsIntervals.add(Integer.MAX_VALUE);
     }
-    public  ChoosePeriodPopUp(int currChosenFaction,EconomyCommodityData data) {
+
+    public ChoosePeriodPopUp(int currChosenFaction, EconomyCommodityData data) {
         this.currMonths = currChosenFaction;
         this.data = data;
     }
+
     @Override
     public void createUI(CustomPanelAPI panelAPI) {
         createUIMockup(panelAPI);
@@ -41,20 +42,37 @@ public class ChoosePeriodPopUp extends PopUpUI {
 
     @Override
     public float createUIMockup(CustomPanelAPI panelAPI) {
-        mainPanel = panelAPI.createCustomPanel(panelAPI.getPosition().getWidth(), panelAPI.getPosition().getHeight(), null);
-        TooltipMakerAPI tooltipMakerAPI = mainPanel.createUIElement(mainPanel.getPosition().getWidth(),mainPanel.getPosition().getHeight(),true);
-        if(graphsIntervals.isEmpty()){
+        mainPanel =
+                panelAPI.createCustomPanel(
+                        panelAPI.getPosition().getWidth(),
+                        panelAPI.getPosition().getHeight(),
+                        null);
+        TooltipMakerAPI tooltipMakerAPI =
+                mainPanel.createUIElement(
+                        mainPanel.getPosition().getWidth(),
+                        mainPanel.getPosition().getHeight(),
+                        true);
+        if (graphsIntervals.isEmpty()) {
             for (Integer monthsInterval : monthsIntervals) {
-                graphsIntervals.add(new GraphPeriodChosenButton(panelAPI.getPosition().getWidth()-20,30,monthsInterval,0f, Misc.getBasePlayerColor(),Misc.getDarkPlayerColor(),Misc.getBrightPlayerColor(),false));
+                graphsIntervals.add(
+                        new GraphPeriodChosenButton(
+                                panelAPI.getPosition().getWidth() - 20,
+                                30,
+                                monthsInterval,
+                                0f,
+                                Misc.getBasePlayerColor(),
+                                Misc.getDarkPlayerColor(),
+                                Misc.getBrightPlayerColor(),
+                                false));
             }
         }
 
         for (GraphPeriodChosenButton faction : graphsIntervals) {
             faction.createUI();
-            tooltipMakerAPI.addCustom(faction.getMainPanel(),2f);
+            tooltipMakerAPI.addCustom(faction.getMainPanel(), 2f);
         }
-        mainPanel.addUIElement(tooltipMakerAPI).inTL(0,0);
-        return Math.min(panelAPI.getPosition().getHeight(),tooltipMakerAPI.getHeightSoFar());
+        mainPanel.addUIElement(tooltipMakerAPI).inTL(0, 0);
+        return Math.min(panelAPI.getPosition().getHeight(), tooltipMakerAPI.getHeightSoFar());
     }
 
     @Override
@@ -71,18 +89,16 @@ public class ChoosePeriodPopUp extends PopUpUI {
     public void advance(float amount) {
         super.advance(amount);
         for (GraphPeriodChosenButton faction : graphsIntervals) {
-            if(faction.getMonths()==(currMonths)) {
+            if (faction.getMonths() == (currMonths)) {
                 faction.mainButton.highlight();
-            }
-            else{
+            } else {
                 faction.mainButton.unhighlight();
             }
-            if(faction.mainButton.isChecked()){
+            if (faction.mainButton.isChecked()) {
                 faction.setChecked(false);
                 currMonths = faction.getMonths();
                 this.forceDismiss();
                 return;
-
             }
         }
     }

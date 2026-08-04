@@ -7,22 +7,20 @@ import com.fs.starfarer.api.input.InputEventAPI;
 import com.fs.starfarer.api.ui.CustomPanelAPI;
 import com.fs.starfarer.api.ui.PositionAPI;
 import com.fs.starfarer.api.ui.UIComponentAPI;
-import org.apache.log4j.Logger;
-
 import java.util.ArrayList;
 import java.util.List;
+import org.apache.log4j.Logger;
 
 /**
  * Virtualized scroll content panel.
  *
- * You create ALL items once (buttons/components) and register them in order via addItem(...).
+ * <p>You create ALL items once (buttons/components) and register them in order via addItem(...).
  * This class will only attach a moving "window" of items to mainPanel depending on scroll position.
  *
- * Window policy: 2x viewport of absolutePanel (buffer = 0.5*viewport above and below).
+ * <p>Window policy: 2x viewport of absolutePanel (buffer = 0.5*viewport above and below).
  *
- * Coordinate assumptions:
- * - Items are laid out in mainPanel using inTL(0, i*stride).
- * - Fixed item height/spacing defined by heightOfEachItem/spacingBetweenItems.
+ * <p>Coordinate assumptions: - Items are laid out in mainPanel using inTL(0, i*stride). - Fixed
+ * item height/spacing defined by heightOfEachItem/spacingBetweenItems.
  */
 public class ProductionDynamicPanelForScroll implements ExtendedUIPanelPlugin {
     public static final Logger log = Global.getLogger(ProductionDynamicPanelForScroll.class);
@@ -52,8 +50,7 @@ public class ProductionDynamicPanelForScroll implements ExtendedUIPanelPlugin {
             CustomPanelAPI absolutePanel,
             int visibleAtOnce,
             float heightOfEachItem,
-            int spacingBetweenItems
-    ) {
+            int spacingBetweenItems) {
         this.baseWidth = width;
         this.baseHeight = height;
 
@@ -86,8 +83,8 @@ public class ProductionDynamicPanelForScroll implements ExtendedUIPanelPlugin {
      * Register an item in strict order. Call this during construction/setup (not while scrolling).
      * The item is NOT automatically attached; attachment is controlled by refreshWindow().
      *
-     * If you add items after the panel is already on screen, consider calling resizeContentToItems(true)
-     * and refreshWindow().
+     * <p>If you add items after the panel is already on screen, consider calling
+     * resizeContentToItems(true) and refreshWindow().
      */
     public void addItem(UIComponentAPI comp) {
         allItems.add(comp);
@@ -104,10 +101,9 @@ public class ProductionDynamicPanelForScroll implements ExtendedUIPanelPlugin {
     /**
      * Resizes the mainPanel's height based on item count, item height and spacing.
      *
-     * Important notes:
-     * - We keep width fixed (baseWidth).
-     * - Height becomes max(baseHeight, computedListHeight) so the content is never smaller than initial.
-     * - We do NOT touch X/Y; only size.
+     * <p>Important notes: - We keep width fixed (baseWidth). - Height becomes max(baseHeight,
+     * computedListHeight) so the content is never smaller than initial. - We do NOT touch X/Y; only
+     * size.
      *
      * @param refreshAfter if true, will call refreshWindow() after resizing
      */
@@ -121,7 +117,9 @@ public class ProductionDynamicPanelForScroll implements ExtendedUIPanelPlugin {
         }
     }
 
-    /** Call this after you've added all items (or after changing height/spacing) to sync visibility. */
+    /**
+     * Call this after you've added all items (or after changing height/spacing) to sync visibility.
+     */
     public void refreshWindow() {
         int[] desired = computeDesiredWindow();
         setWindowIncremental(desired[0], desired[1]);
@@ -146,7 +144,8 @@ public class ProductionDynamicPanelForScroll implements ExtendedUIPanelPlugin {
         if (n <= 0) return baseHeight;
 
         // total list height:
-        // n items of height, plus (n-1) gaps. If you intentionally want a trailing gap, use n gaps instead.
+        // n items of height, plus (n-1) gaps. If you intentionally want a trailing gap, use n gaps
+        // instead.
         float total = (n * (float) heightOfEachItem) + ((n - 1) * (float) spacingBetweenItems);
 
         // Ensure at least initial height so the panel doesn't collapse smaller than intended.
@@ -160,12 +159,12 @@ public class ProductionDynamicPanelForScroll implements ExtendedUIPanelPlugin {
     }
 
     /**
-     * Computes the desired attached window [start,end] based on mainPanel position and absolutePanel viewport.
-     * Window is 2x viewport (buffer=0.5 viewport above and below).
+     * Computes the desired attached window [start,end] based on mainPanel position and
+     * absolutePanel viewport. Window is 2x viewport (buffer=0.5 viewport above and below).
      */
     private int[] computeDesiredWindow() {
         int total = allItems.size();
-        if (absolutePanel == null || total == 0) return new int[]{-1, -1};
+        if (absolutePanel == null || total == 0) return new int[] {-1, -1};
 
         float contentY = mainPanel.getPosition().getY();
         float contentH = mainPanel.getPosition().getHeight();
@@ -174,7 +173,7 @@ public class ProductionDynamicPanelForScroll implements ExtendedUIPanelPlugin {
         float viewH = absolutePanel.getPosition().getHeight();
         float viewTop = viewBottom + viewH;
 
-        float buffer = viewH * 0.5f;   // 0.5 bottom + 0.5 top => 2x viewport window
+        float buffer = viewH * 0.5f; // 0.5 bottom + 0.5 top => 2x viewport window
         float windowBottom = viewBottom - buffer;
         float windowTop = viewTop + buffer;
 
@@ -182,7 +181,7 @@ public class ProductionDynamicPanelForScroll implements ExtendedUIPanelPlugin {
 
         // Convert window screen-space to TL-space:
         // yTL = contentY + contentH - screenY
-        float yTL_at_windowTop = contentY + contentH - windowTop;       // smaller yTL
+        float yTL_at_windowTop = contentY + contentH - windowTop; // smaller yTL
         float yTL_at_windowBottom = contentY + contentH - windowBottom; // larger yTL
 
         // Compute indices covered by that TL range (+ padding for rounding/partial overlap)
@@ -201,7 +200,7 @@ public class ProductionDynamicPanelForScroll implements ExtendedUIPanelPlugin {
             end = clamp(end, 0, total - 1);
         }
 
-        return new int[]{start, end};
+        return new int[] {start, end};
     }
 
     // --------------------------
@@ -209,8 +208,8 @@ public class ProductionDynamicPanelForScroll implements ExtendedUIPanelPlugin {
     // --------------------------
 
     /**
-     * Incrementally moves the attached window, removing/adding only the delta.
-     * This minimizes work and avoids rebuilding the entire window on small scroll changes.
+     * Incrementally moves the attached window, removing/adding only the delta. This minimizes work
+     * and avoids rebuilding the entire window on small scroll changes.
      */
     private void setWindowIncremental(int newStart, int newEnd) {
         if (newStart < 0 || newEnd < 0) {
@@ -233,7 +232,8 @@ public class ProductionDynamicPanelForScroll implements ExtendedUIPanelPlugin {
 
         // If the window jumped far (e.g. scrollbar dragged), full rebuild is simpler/safer.
         int oldSize = attachedEnd - attachedStart + 1;
-        if (Math.abs(newStart - attachedStart) > oldSize || Math.abs(newEnd - attachedEnd) > oldSize) {
+        if (Math.abs(newStart - attachedStart) > oldSize
+                || Math.abs(newEnd - attachedEnd) > oldSize) {
             detachRange(attachedStart, attachedEnd);
             attachedStart = newStart;
             attachedEnd = newEnd;
@@ -254,8 +254,8 @@ public class ProductionDynamicPanelForScroll implements ExtendedUIPanelPlugin {
     }
 
     /**
-     * Attach items in [start,end] to mainPanel using fixed TL layout.
-     * NOTE: add order can matter for draw order; we add from top to bottom (increasing index => larger yTL).
+     * Attach items in [start,end] to mainPanel using fixed TL layout. NOTE: add order can matter
+     * for draw order; we add from top to bottom (increasing index => larger yTL).
      */
     private void attachRange(int start, int end) {
         if (start < 0 || end < 0) return;
@@ -263,9 +263,9 @@ public class ProductionDynamicPanelForScroll implements ExtendedUIPanelPlugin {
 
         for (int i = start; i <= end; i++) {
             UIComponentAPI comp = allItems.get(i);
-            if(comp instanceof CustomPanelAPI panel){
-                if(panel.getPlugin() instanceof CustomButton plugin){
-                    if(!plugin.isCreated()){
+            if (comp instanceof CustomPanelAPI panel) {
+                if (panel.getPlugin() instanceof CustomButton plugin) {
+                    if (!plugin.isCreated()) {
                         plugin.createUI();
                     }
                 }
@@ -290,9 +290,18 @@ public class ProductionDynamicPanelForScroll implements ExtendedUIPanelPlugin {
     // Plugin no-ops
     // --------------------------
 
-    @Override public void renderBelow(float alphaMult) {}
-    @Override public void render(float alphaMult) {}
-    @Override public void advance(float amount) {}
-    @Override public void processInput(List<InputEventAPI> events) {}
-    @Override public void buttonPressed(Object buttonId) {}
+    @Override
+    public void renderBelow(float alphaMult) {}
+
+    @Override
+    public void render(float alphaMult) {}
+
+    @Override
+    public void advance(float amount) {}
+
+    @Override
+    public void processInput(List<InputEventAPI> events) {}
+
+    @Override
+    public void buttonPressed(Object buttonId) {}
 }

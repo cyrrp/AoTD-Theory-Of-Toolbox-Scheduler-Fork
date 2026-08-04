@@ -1,7 +1,5 @@
 package data.kaysaar.aotd.tot.ui.starsystems.components;
 
-
-
 import ashlib.data.plugins.ui.models.CustomButton;
 import ashlib.data.plugins.ui.models.DropDownButton;
 import ashlib.data.plugins.ui.plugins.UILinesRenderer;
@@ -13,7 +11,6 @@ import com.fs.starfarer.api.ui.ButtonAPI;
 import com.fs.starfarer.api.ui.CustomPanelAPI;
 import com.fs.starfarer.api.util.Misc;
 import data.kaysaar.aotd.tot.scripts.HoldingsUtilis;
-
 import java.awt.*;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -34,6 +31,7 @@ public class StarSystemHoldingTable extends UITableImpl {
         widthMap.put("income", 100);
         widthMap.put("admin", 75);
     }
+
     public static void reDestributeAdditionalWidth(float additionalWidth) {
         if (additionalWidth <= 0) {
             return;
@@ -61,7 +59,6 @@ public class StarSystemHoldingTable extends UITableImpl {
         }
     }
 
-
     public static int getWidth() {
         int width = 0;
         for (Integer value : widthMap.values()) {
@@ -83,18 +80,35 @@ public class StarSystemHoldingTable extends UITableImpl {
         return x;
     }
 
-    public StarSystemHoldingTable(float width, float height, CustomPanelAPI panelToPlace, boolean doesHaveScroller, float xCord, float yCord, Object originalPanel) {
+    public StarSystemHoldingTable(
+            float width,
+            float height,
+            CustomPanelAPI panelToPlace,
+            boolean doesHaveScroller,
+            float xCord,
+            float yCord,
+            Object originalPanel) {
         super(width, height, panelToPlace, doesHaveScroller, xCord, yCord);
         renderer.setPanel(this.mainPanel);
         if (dropDownButtons.isEmpty()) {
             ArrayList<StarSystemAPI> systems = HoldingsUtilis.getSystemsWithPlayerFactionColonies();
             for (StarSystemAPI system : systems) {
-                StarSystemHoldingDropDown button = new StarSystemHoldingDropDown(this, width - 13, 75, 0, 0, false, system, HoldingsUtilis.getFactionMarketsInSystem(Global.getSector().getPlayerFaction(), system),originalPanel);
+                StarSystemHoldingDropDown button =
+                        new StarSystemHoldingDropDown(
+                                this,
+                                width - 13,
+                                75,
+                                0,
+                                0,
+                                false,
+                                system,
+                                HoldingsUtilis.getFactionMarketsInSystem(
+                                        Global.getSector().getPlayerFaction(), system),
+                                originalPanel);
                 dropDownButtons.add(button);
             }
             HoldingsUtilis.sortDropDownButtonsIncome(dropDownButtons, false);
         }
-
     }
 
     @Override
@@ -112,13 +126,50 @@ public class StarSystemHoldingTable extends UITableImpl {
         Color base = Misc.getBasePlayerColor();
         Color bg = Misc.getDarkPlayerColor();
         Color bright = Misc.getBrightPlayerColor();
-        buttonName = tooltipOfButtons.addAreaCheckbox("Name", SortingState.NON_INITIALIZED, base, bg, bright, widthMap.get("name"), 20, 0f);
-        buttonData = tooltipOfButtons.addAreaCheckbox("Data", SortingState.NON_INITIALIZED, base, bg, bright, widthMap.get("data"), 20, 0f);
-        buttonIncome = tooltipOfButtons.addAreaCheckbox("Income", SortingState.NON_INITIALIZED, base, bg, bright, widthMap.get("income"), 20, 0f);
-        buttonAdmin = tooltipOfButtons.addAreaCheckbox("Admin", SortingState.DESCENDING, base, bg, bright, widthMap.get("admin"), 20, 0f);
+        buttonName =
+                tooltipOfButtons.addAreaCheckbox(
+                        "Name",
+                        SortingState.NON_INITIALIZED,
+                        base,
+                        bg,
+                        bright,
+                        widthMap.get("name"),
+                        20,
+                        0f);
+        buttonData =
+                tooltipOfButtons.addAreaCheckbox(
+                        "Data",
+                        SortingState.NON_INITIALIZED,
+                        base,
+                        bg,
+                        bright,
+                        widthMap.get("data"),
+                        20,
+                        0f);
+        buttonIncome =
+                tooltipOfButtons.addAreaCheckbox(
+                        "Income",
+                        SortingState.NON_INITIALIZED,
+                        base,
+                        bg,
+                        bright,
+                        widthMap.get("income"),
+                        20,
+                        0f);
+        buttonAdmin =
+                tooltipOfButtons.addAreaCheckbox(
+                        "Admin",
+                        SortingState.DESCENDING,
+                        base,
+                        bg,
+                        bright,
+                        widthMap.get("admin"),
+                        20,
+                        0f);
         buttonName.getPosition().inTL(10, 0);
         buttonData.getPosition().inTL(buttonName.getPosition().getWidth() + 11, 0);
-        float x = buttonName.getPosition().getWidth() + 11 + buttonData.getPosition().getWidth() + 1;
+        float x =
+                buttonName.getPosition().getWidth() + 11 + buttonData.getPosition().getWidth() + 1;
         buttonIncome.getPosition().inTL(x, 0);
         x += buttonIncome.getPosition().getWidth() + 1;
         buttonAdmin.getPosition().inTL(x, 0);
@@ -133,7 +184,7 @@ public class StarSystemHoldingTable extends UITableImpl {
             StarSystemHoldingDropDown button = (StarSystemHoldingDropDown) dropDownButton;
             if (currSystem != null && !button.main.getId().equals(currSystem.getId())) {
                 button.isDropped = false;
-            } else if (currSystem!=null&&button.main.getId().equals(currSystem.getId())) {
+            } else if (currSystem != null && button.main.getId().equals(currSystem.getId())) {
                 button.isDropped = true;
             }
 
@@ -144,8 +195,12 @@ public class StarSystemHoldingTable extends UITableImpl {
 
         panelToWorkWith.addUIElement(tooltipOfImpl).inTL(0, 0);
         if (tooltipOfImpl.getExternalScroller() != null) {
-            if (currYPos + panelToWorkWith.getPosition().getHeight() - 2 >= tooltipOfImpl.getHeightSoFar()) {
-                currYPos = tooltipOfImpl.getHeightSoFar() - panelToWorkWith.getPosition().getHeight() + 2;
+            if (currYPos + panelToWorkWith.getPosition().getHeight() - 2
+                    >= tooltipOfImpl.getHeightSoFar()) {
+                currYPos =
+                        tooltipOfImpl.getHeightSoFar()
+                                - panelToWorkWith.getPosition().getHeight()
+                                + 2;
             }
             if (currYPos <= 0) {
                 currYPos = 0;
@@ -188,7 +243,6 @@ public class StarSystemHoldingTable extends UITableImpl {
             buttonName.setCustomData(state);
 
             this.recreateTable();
-
         }
         if (buttonIncome.isChecked()) {
             buttonIncome.setChecked(false);
@@ -203,21 +257,22 @@ public class StarSystemHoldingTable extends UITableImpl {
             buttonIncome.setCustomData(state);
             this.recreateTable();
         }
-        dropDownButtons.forEach(x -> {
-            x.buttons.forEach(y -> {
-                if (y.buttonData instanceof MarketAPI market) {
-                    if (currentlyChosenMarket != null && market.getId().equals(currentlyChosenMarket.getId())) {
-                        y.mainButton.highlight();
-                    } else {
-                        y.mainButton.unhighlight();
-                    }
-                }
-            });
-        });
-
-
+        dropDownButtons.forEach(
+                x -> {
+                    x.buttons.forEach(
+                            y -> {
+                                if (y.buttonData instanceof MarketAPI market) {
+                                    if (currentlyChosenMarket != null
+                                            && market.getId()
+                                                    .equals(currentlyChosenMarket.getId())) {
+                                        y.mainButton.highlight();
+                                    } else {
+                                        y.mainButton.unhighlight();
+                                    }
+                                }
+                            });
+                });
     }
-
 
     @Override
     public void reportButtonPressed(CustomButton buttonPressed) {
@@ -227,7 +282,6 @@ public class StarSystemHoldingTable extends UITableImpl {
         if (buttonPressed.buttonData instanceof MarketAPI market) {
             this.currentlyChosenMarket = market;
         }
-
     }
 
     @Override

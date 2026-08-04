@@ -8,21 +8,20 @@ import com.fs.starfarer.campaign.econ.CommodityOnMarket;
 import com.fs.starfarer.campaign.econ.Economy;
 import com.fs.starfarer.campaign.econ.Market;
 import com.fs.starfarer.campaign.econ.reach.MainWorkTask;
-import data.kaysaar.aotd.tot.plugins.ReflectionUtilis;
-import data.kaysaar.aotd.tot.compat.SchedulerBridge;
 import data.kaysaar.aotd.tot.compat.MarketRegistry;
 import data.kaysaar.aotd.tot.compat.PrepatcherContract;
+import data.kaysaar.aotd.tot.compat.SchedulerBridge;
+import data.kaysaar.aotd.tot.plugins.ReflectionUtilis;
 import data.kaysaar.aotd.tot.scripts.commoditydata.AoTDCommodityOnMarket;
 import data.kaysaar.aotd.tot.scripts.commoditydata.AoTDMarketDemandData;
 import data.kaysaar.aotd.tot.scripts.trade.manager.AoTDTradeManager;
-
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class AoTDEconomy extends Economy {
     private static final int SUPPORTED_UI_MUTATION_REASON_MASK =
-            (1 << 4) | (1 << 5) | (1 << 6) | (1 << 7) | (1 << 8)
-                    | (1 << 9) | (1 << 10) | (1 << 11) | (1 << 12) | (1 << 13);
+            (1 << 4) | (1 << 5) | (1 << 6) | (1 << 7) | (1 << 8) | (1 << 9) | (1 << 10) | (1 << 11)
+                    | (1 << 12) | (1 << 13);
     private static final int SUPPORTED_UI_REFRESH_SCOPE_MASK =
             SchedulerBridge.REFRESH_LOCAL_STATS
                     | SchedulerBridge.REFRESH_LOCAL_COMMODITIES
@@ -49,26 +48,28 @@ public class AoTDEconomy extends Economy {
     private transient AoTDUIEconomyRefreshCoordinator uiRefreshCoordinator;
     public static boolean runningPrePlayerEconomy = false;
     public static boolean mustPruneCommodities = true;
-    public static AoTDEconomy getInstance(){
-        if(Global.getSector().getEconomy() instanceof AoTDEconomy){
-            return (AoTDEconomy)Global.getSector().getEconomy();
+
+    public static AoTDEconomy getInstance() {
+        if (Global.getSector().getEconomy() instanceof AoTDEconomy) {
+            return (AoTDEconomy) Global.getSector().getEconomy();
         }
         return null;
     }
-    public void doEconomyStepOnNewGameLoad(){
+
+    public void doEconomyStepOnNewGameLoad() {
         AoTDEconomyReachStepper stepper = (AoTDEconomyReachStepper) getStepper();
         stepper.doEconomyTick();
         for (MarketAPI market : getMarkets()) {
             AoTDIndustryData data = AoTDIndustryData.getInstance(market);
             data.applyEndOfMonthChange(market);
             for (CommodityOnMarketAPI allCommodity : market.getAllCommodities()) {
-                if(allCommodity instanceof AoTDCommodityOnMarket commodity){
+                if (allCommodity instanceof AoTDCommodityOnMarket commodity) {
                     commodity.getExcDefData().applyDeficitDueToSuddenChangeOfDemand(commodity);
                 }
             }
         }
-
     }
+
     public MarketAPI getMarketThreadSave(String id) {
         if (id == null) return null;
         Object indexed = MarketRegistry.lookupMarket(id);
@@ -79,8 +80,7 @@ public class AoTDEconomy extends Economy {
 
         // A full boundary publication keeps the previous complete snapshot visible.
         // Do not mutate the registry or create a negative entry until it is READY.
-        if (MarketRegistry.getRegistryLifecycle()
-                == MarketRegistry.RegistryLifecycle.BUILDING) {
+        if (MarketRegistry.getRegistryLifecycle() == MarketRegistry.RegistryLifecycle.BUILDING) {
             AoTDEconomySemanticBaseline.operation(
                     "economy.registry-market-lookup.during-build", 1L);
             return super.getMarket(id);
@@ -125,8 +125,7 @@ public class AoTDEconomy extends Economy {
 
                 MarketRegistry.recordLookupMiss();
                 NEGATIVE_MARKET_LOOKUPS.put(id, MarketRegistry.getRegistryGeneration());
-                AoTDEconomySemanticBaseline.operation(
-                        "economy.registry-market-lookup.miss", 1L);
+                AoTDEconomySemanticBaseline.operation("economy.registry-market-lookup.miss", 1L);
                 return null;
             }
         } finally {
@@ -148,26 +147,22 @@ public class AoTDEconomy extends Economy {
     }
 
     /**
-     * Save loading may invoke the mod plugin before the deserialized economy has
-     * restored its complete market list. Repair that early empty or partial
-     * publication once a post-save callback proves that the installed economy
-     * contains the restored market.
+     * Save loading may invoke the mod plugin before the deserialized economy has restored its
+     * complete market list. Repair that early empty or partial publication once a post-save
+     * callback proves that the installed economy contains the restored market.
      */
     private static void repairMarketRegistryAfterLoad(MarketAPI restoredMarket) {
         if (restoredMarket == null) return;
 
-        List<MarketAPI> restoredMarkets =
-                Global.getSector().getEconomy().getMarketsCopy();
-        if (MarketRegistry.getRegistryLifecycle()
-                    == MarketRegistry.RegistryLifecycle.READY
+        List<MarketAPI> restoredMarkets = Global.getSector().getEconomy().getMarketsCopy();
+        if (MarketRegistry.getRegistryLifecycle() == MarketRegistry.RegistryLifecycle.READY
                 && MarketRegistry.getRegisteredMarketCount() == restoredMarkets.size()
                 && MarketRegistry.lookupMarket(restoredMarket.getId()) == restoredMarket) {
             return;
         }
         synchronized (MARKET_REGISTRY_LOAD_REPAIR_LOCK) {
             restoredMarkets = Global.getSector().getEconomy().getMarketsCopy();
-            if (MarketRegistry.getRegistryLifecycle()
-                        == MarketRegistry.RegistryLifecycle.READY
+            if (MarketRegistry.getRegistryLifecycle() == MarketRegistry.RegistryLifecycle.READY
                     && MarketRegistry.getRegisteredMarketCount() == restoredMarkets.size()
                     && MarketRegistry.lookupMarket(restoredMarket.getId()) == restoredMarket) {
                 return;
@@ -190,18 +185,20 @@ public class AoTDEconomy extends Economy {
             MARKET_REPAIR_LOCKS.clear();
         }
     }
-    public AoTDReachEconomy getReachEconomy(){
+
+    public AoTDReachEconomy getReachEconomy() {
         return (AoTDReachEconomy) getEconomy();
     }
+
     public AoTDEconomy(boolean b, Economy currentEconomyToReplace) {
         super(b);
         AoTDWorkerManager.replaceEconomy(this, "AoTDEconomy-constructor");
-        ArrayList<MarketAPI>current = new ArrayList<>(currentEconomyToReplace.getMarkets());
+        ArrayList<MarketAPI> current = new ArrayList<>(currentEconomyToReplace.getMarkets());
         this.setEcon(new AoTDReachEconomy());
-        ReflectionUtilis.setPrivateVariableFromSuperclass("stepper",this,new AoTDEconomyReachStepper(this.getEconomy()));
+        ReflectionUtilis.setPrivateVariableFromSuperclass(
+                "stepper", this, new AoTDEconomyReachStepper(this.getEconomy()));
         this.getMarkets().addAll(current);
         current.clear();
-
 
         this.getUpdateListeners().addAll(currentEconomyToReplace.getUpdateListeners());
         currentEconomyToReplace.getUpdateListeners().clear();
@@ -211,7 +208,6 @@ public class AoTDEconomy extends Economy {
         }
         rebuildMarketRegistry();
     }
-
 
     @Override
     public void nextStep(MainWorkTask.EconWorkParams econWorkParams) {
@@ -224,14 +220,12 @@ public class AoTDEconomy extends Economy {
         runGlobalEconomyStep(null, "global-double-step-2");
     }
 
-    private void runGlobalEconomyStep(
-            MainWorkTask.EconWorkParams econWorkParams, String reason) {
+    private void runGlobalEconomyStep(MainWorkTask.EconWorkParams econWorkParams, String reason) {
         uiRefreshCoordinator().invalidate(reason);
         super.nextStep(econWorkParams);
     }
 
-    private MainWorkTask.EconWorkParams normalizeWorkParams(
-            MainWorkTask.EconWorkParams params) {
+    private MainWorkTask.EconWorkParams normalizeWorkParams(MainWorkTask.EconWorkParams params) {
         if (params != null) return params;
         MainWorkTask.EconWorkParams normalized = new MainWorkTask.EconWorkParams();
         normalized.withIncomeAndUpkeep = false;
@@ -259,9 +253,12 @@ public class AoTDEconomy extends Economy {
     }
 
     private boolean runUiMarketRefresh(
-            MarketAPI market, MainWorkTask.EconWorkParams params,
-            String reason, boolean allowCoalescing,
-            String completionDiagnostic, long completionDetail) {
+            MarketAPI market,
+            MainWorkTask.EconWorkParams params,
+            String reason,
+            boolean allowCoalescing,
+            String completionDiagnostic,
+            long completionDetail) {
         AoTDUIEconomyRefreshCoordinator coordinator = prepareUiRefreshCoordinator();
         if (allowCoalescing && coordinator.isCurrent(market)) {
             return recordUiRefreshSkipNoThrow(coordinator);
@@ -282,13 +279,14 @@ public class AoTDEconomy extends Economy {
     }
 
     private static boolean recordUiRefreshCompletedNoThrow(
-            AoTDUIEconomyRefreshCoordinator coordinator, MarketAPI market,
-            String diagnostic, long detail) {
+            AoTDUIEconomyRefreshCoordinator coordinator,
+            MarketAPI market,
+            String diagnostic,
+            long detail) {
         try {
             coordinator.recordCompleted(market);
             if (diagnostic == null) {
-                AoTDEconomySemanticBaseline.operation(
-                        "ui-economy.refresh-completed", market);
+                AoTDEconomySemanticBaseline.operation("ui-economy.refresh-completed", market);
             } else {
                 AoTDEconomySemanticBaseline.operation(diagnostic, detail);
             }
@@ -298,12 +296,10 @@ public class AoTDEconomy extends Economy {
         return true;
     }
 
-    private static boolean recordUiRefreshSkipNoThrow(
-            AoTDUIEconomyRefreshCoordinator coordinator) {
+    private static boolean recordUiRefreshSkipNoThrow(AoTDUIEconomyRefreshCoordinator coordinator) {
         try {
             coordinator.recordSkip();
-            AoTDEconomySemanticBaseline.operation(
-                    "ui-economy.refresh-coalesced", 1L);
+            AoTDEconomySemanticBaseline.operation("ui-economy.refresh-coalesced", 1L);
         } catch (Throwable ignored) {
             // Coalescing was already proven before this diagnostic counter.
         }
@@ -338,21 +334,23 @@ public class AoTDEconomy extends Economy {
         return uiRefreshCoordinator().statusSummary();
     }
 
-
     @Override
     public void removeMarket(MarketAPI marketAPI) {
         uiRefreshCoordinator().invalidate("remove-market");
-        long token = SchedulerBridge.beforeMarketMutation(
-                marketAPI, SchedulerBridge.MUTATION_MARKET_MEMBERSHIP);
+        long token =
+                SchedulerBridge.beforeMarketMutation(
+                        marketAPI, SchedulerBridge.MUTATION_MARKET_MEMBERSHIP);
         try {
             AoTDEconomySemanticBaseline.operation("economy.remove-market", marketAPI);
             super.removeMarket(marketAPI);
             AoTDTradeManager.getInstance().removeMarket(marketAPI);
         } finally {
             try {
-                SchedulerBridge.afterMarketMutation(token, marketAPI,
-                        SchedulerBridge.DIRTY_STRUCTURE
-                                | SchedulerBridge.DIRTY_DERIVED_ECONOMY, 0L);
+                SchedulerBridge.afterMarketMutation(
+                        token,
+                        marketAPI,
+                        SchedulerBridge.DIRTY_STRUCTURE | SchedulerBridge.DIRTY_DERIVED_ECONOMY,
+                        0L);
             } finally {
                 if (!getMarkets().contains(marketAPI)) {
                     MarketRegistry.unregisterMarket(marketAPI.getId(), marketAPI);
@@ -364,28 +362,32 @@ public class AoTDEconomy extends Economy {
     @Override
     public void addMarket(MarketAPI marketAPI, boolean addJunk) {
         uiRefreshCoordinator().invalidate("add-market");
-        long token = SchedulerBridge.beforeMarketMutation(
-                marketAPI, SchedulerBridge.MUTATION_MARKET_MEMBERSHIP);
+        long token =
+                SchedulerBridge.beforeMarketMutation(
+                        marketAPI, SchedulerBridge.MUTATION_MARKET_MEMBERSHIP);
         try {
             AoTDEconomySemanticBaseline.operation("economy.add-market", marketAPI);
             super.addMarket(marketAPI, addJunk);
             Market market = (Market) marketAPI;
             market.clearCommodities();
             initCommodities(market);
-            if(!market.hasCondition("aotd_toolbox_food_corrector")){
+            if (!market.hasCondition("aotd_toolbox_food_corrector")) {
                 market.addCondition("aotd_toolbox_food_corrector");
                 market.getCondition("aotd_toolbox_food_corrector").getPlugin().apply(null);
             }
             MarketRegistry.registerMarket(marketAPI.getId(), marketAPI);
         } finally {
-            SchedulerBridge.afterMarketMutation(token, marketAPI,
+            SchedulerBridge.afterMarketMutation(
+                    token,
+                    marketAPI,
                     SchedulerBridge.DIRTY_STRUCTURE
                             | SchedulerBridge.DIRTY_CONDITIONS
-                            | SchedulerBridge.DIRTY_DERIVED_ECONOMY, 0L);
+                            | SchedulerBridge.DIRTY_DERIVED_ECONOMY,
+                    0L);
         }
     }
 
-    public void runMarketAdjustmentAfterEconomyCreation(){
+    public void runMarketAdjustmentAfterEconomyCreation() {
         for (MarketAPI market : getMarkets()) {
             adjustMarketAfterEconomyCreation(market);
         }
@@ -394,11 +396,12 @@ public class AoTDEconomy extends Economy {
 
     private static void adjustMarketAfterEconomyCreation(MarketAPI market) {
         int reason = SchedulerBridge.MUTATION_COMMODITY_STRUCTURE;
-        int dirty = SchedulerBridge.DIRTY_STRUCTURE
-                | SchedulerBridge.DIRTY_DERIVED_ECONOMY
-                | MarketRegistry.DIRTY_VALUE_STATE
-                | MarketRegistry.DIRTY_PRICE
-                | MarketRegistry.DIRTY_STOCKPILE;
+        int dirty =
+                SchedulerBridge.DIRTY_STRUCTURE
+                        | SchedulerBridge.DIRTY_DERIVED_ECONOMY
+                        | MarketRegistry.DIRTY_VALUE_STATE
+                        | MarketRegistry.DIRTY_PRICE
+                        | MarketRegistry.DIRTY_STOCKPILE;
         if (!market.hasCondition("aotd_toolbox_food_corrector")) {
             reason |= SchedulerBridge.MUTATION_CONDITION_STRUCTURE;
             dirty |= SchedulerBridge.DIRTY_CONDITIONS;
@@ -414,6 +417,7 @@ public class AoTDEconomy extends Economy {
             SchedulerBridge.afterMarketMutation(token, market, dirty, 0L);
         }
     }
+
     @Override
     public void tripleStep() {
         runGlobalEconomyStep(null, "global-triple-step-1");
@@ -422,14 +426,12 @@ public class AoTDEconomy extends Economy {
     }
 
     /**
-     * Executes only an exact UI action already classified by Prepatcher. The
-     * normal Economy step methods above deliberately never infer UI intent.
+     * Executes only an exact UI action already classified by Prepatcher. The normal Economy step
+     * methods above deliberately never infer UI intent.
      */
     public final boolean dispatchPrepatcherUiEconomyStep(
-            int action, MarketAPI market, long detail,
-            String[] affectedCommodityIds) {
-        if (!SchedulerBridge.hasCapability(
-                PrepatcherContract.CAPABILITY_UI_ECONOMY_DISPATCH)) {
+            int action, MarketAPI market, long detail, String[] affectedCommodityIds) {
+        if (!SchedulerBridge.hasCapability(PrepatcherContract.CAPABILITY_UI_ECONOMY_DISPATCH)) {
             return false;
         }
         if (action == PrepatcherContract.UI_ECONOMY_ACTION_MARKET_OPEN) {
@@ -439,8 +441,8 @@ public class AoTDEconomy extends Economy {
                 return recordConditionOnlySkipNoThrow(uiRefreshCoordinator());
             }
             if (!isLiveMarket(market)) return false;
-            return runUiMarketRefresh(market, normalizeWorkParams(null),
-                    "open-market", true, null, 0L);
+            return runUiMarketRefresh(
+                    market, normalizeWorkParams(null), "open-market", true, null, 0L);
         }
         if (action == PrepatcherContract.UI_ECONOMY_ACTION_CARGO) {
             if (!hasNoCommodityIds(affectedCommodityIds)) return false;
@@ -452,8 +454,7 @@ public class AoTDEconomy extends Economy {
                     || !isLiveMarket(market)) {
                 return false;
             }
-            return runUiMarketRefresh(market, normalizeWorkParams(null),
-                    "cargo", true, null, 0L);
+            return runUiMarketRefresh(market, normalizeWorkParams(null), "cargo", true, null, 0L);
         }
         if (action != PrepatcherContract.UI_ECONOMY_ACTION_MARKET_MUTATION) {
             return false;
@@ -461,8 +462,7 @@ public class AoTDEconomy extends Economy {
 
         int reason = SchedulerBridge.mutationReason(detail);
         int scope = SchedulerBridge.mutationScope(detail);
-        if (!SchedulerBridge.hasCapability(
-                PrepatcherContract.CAPABILITY_UI_MARKET_MUTATION_REFRESH)
+        if (!SchedulerBridge.hasCapability(PrepatcherContract.CAPABILITY_UI_MARKET_MUTATION_REFRESH)
                 || !isLiveMarket(market)
                 || reason == 0
                 || (reason & ~SUPPORTED_UI_MUTATION_REASON_MASK) != 0
@@ -473,32 +473,38 @@ public class AoTDEconomy extends Economy {
             return false;
         }
 
-        boolean targeted = (scope
-                & SchedulerBridge.REFRESH_AFFECTED_GLOBAL_COMMODITIES) != 0;
-        String[] affected = affectedCommodityIds == null
-                ? new String[0] : affectedCommodityIds.clone();
-        if (targeted ? !areSortedUniqueCommodityIds(affected)
-                : affected.length != 0) {
+        boolean targeted = (scope & SchedulerBridge.REFRESH_AFFECTED_GLOBAL_COMMODITIES) != 0;
+        String[] affected =
+                affectedCommodityIds == null ? new String[0] : affectedCommodityIds.clone();
+        if (targeted ? !areSortedUniqueCommodityIds(affected) : affected.length != 0) {
             return false;
         }
 
         AoTDUIEconomyRefreshCoordinator coordinator = prepareUiRefreshCoordinator();
-        MarketRegistry.markDirty(market, dirtyMaskForUiMutationScope(scope),
-                MarketRegistry.PRIORITY_IMMEDIATE);
+        MarketRegistry.markDirty(
+                market, dirtyMaskForUiMutationScope(scope), MarketRegistry.PRIORITY_IMMEDIATE);
 
         if (targeted) {
             ((Market) market).updatePrevStability();
-            getReachEconomy().nextStepForUiMarketMutation(
-                    normalizeWorkParams(null), market, affected, scope,
-                    "mutation-reason-0x" + Integer.toHexString(reason));
+            getReachEconomy()
+                    .nextStepForUiMarketMutation(
+                            normalizeWorkParams(null),
+                            market,
+                            affected,
+                            scope,
+                            "mutation-reason-0x" + Integer.toHexString(reason));
             return recordUiRefreshCompletedNoThrow(
-                    coordinator, market,
+                    coordinator,
+                    market,
                     "ui-economy.mutation-targeted-commodities",
                     ((long) reason << 32) | (scope & 0xffffffffL));
         }
 
-        return runUiMarketRefresh(market, normalizeWorkParams(null),
-                "mutation-reason-0x" + Integer.toHexString(reason), false,
+        return runUiMarketRefresh(
+                market,
+                normalizeWorkParams(null),
+                "mutation-reason-0x" + Integer.toHexString(reason),
+                false,
                 "ui-economy.mutation-reason-localized",
                 ((long) reason << 32) | (scope & 0xffffffffL));
     }
@@ -511,8 +517,7 @@ public class AoTDEconomy extends Economy {
         if (commodityIds == null || commodityIds.length == 0) return false;
         String previous = null;
         for (String id : commodityIds) {
-            if (id == null || id.isBlank()
-                    || (previous != null && previous.compareTo(id) >= 0)) {
+            if (id == null || id.isBlank() || (previous != null && previous.compareTo(id) >= 0)) {
                 return false;
             }
             previous = id;
@@ -522,11 +527,12 @@ public class AoTDEconomy extends Economy {
 
     private static int dirtyMaskForUiMutationScope(int scope) {
         int dirty = 0;
-        if ((scope & (SchedulerBridge.REFRESH_LOCAL_STATS
-                | SchedulerBridge.REFRESH_IMMIGRATION
-                | SchedulerBridge.REFRESH_LOCAL_COMMODITIES)) != 0) {
-            dirty |= MarketRegistry.DIRTY_VALUE_STATE
-                    | SchedulerBridge.DIRTY_DERIVED_ECONOMY;
+        if ((scope
+                        & (SchedulerBridge.REFRESH_LOCAL_STATS
+                                | SchedulerBridge.REFRESH_IMMIGRATION
+                                | SchedulerBridge.REFRESH_LOCAL_COMMODITIES))
+                != 0) {
+            dirty |= MarketRegistry.DIRTY_VALUE_STATE | SchedulerBridge.DIRTY_DERIVED_ECONOMY;
         }
         if ((scope & SchedulerBridge.REFRESH_LOCAL_PRICE_STOCKPILE) != 0) {
             dirty |= MarketRegistry.DIRTY_PRICE | MarketRegistry.DIRTY_STOCKPILE;
@@ -540,7 +546,7 @@ public class AoTDEconomy extends Economy {
         return dirty == 0 ? MarketRegistry.DIRTY_VALUE_STATE : dirty;
     }
 
-    public static void pruneCommodities(){
+    public static void pruneCommodities() {
         for (MarketAPI market : Global.getSector().getEconomy().getMarketsCopy()) {
             pruneCommoditiesThatMightAppear((Market) market);
         }
@@ -589,7 +595,8 @@ public class AoTDEconomy extends Economy {
 
         commodities.clear();
 
-        ReflectionUtilis.setPrivateVariableFromSuperclass("demandData", market, new AoTDMarketDemandData(market));
+        ReflectionUtilis.setPrivateVariableFromSuperclass(
+                "demandData", market, new AoTDMarketDemandData(market));
 
         for (CommoditySpecAPI spec : Global.getSettings().getAllCommoditySpecs()) {
             market.getDemandData().getDemand(spec.getDemandClass());
@@ -608,26 +615,32 @@ public class AoTDEconomy extends Economy {
         Object demandData = ReflectionUtilis.getPrivateVariableFromSuperClass("demandData", market);
 
         if (!(demandData instanceof AoTDMarketDemandData)) {
-            ReflectionUtilis.setPrivateVariableFromSuperclass("demandData", market, new AoTDMarketDemandData(market));
+            ReflectionUtilis.setPrivateVariableFromSuperclass(
+                    "demandData", market, new AoTDMarketDemandData(market));
         }
     }
 
     @SuppressWarnings("unchecked")
-    private static void rebuildCommodityLookupMaps(Market market, List<CommodityOnMarket> commodities) {
-        Map<String, CommodityOnMarket> commodityMap = (Map<String, CommodityOnMarket>) ReflectionUtilis
-            .getPrivateVariableFromSuperClass("commodityMap", market);
+    private static void rebuildCommodityLookupMaps(
+            Market market, List<CommodityOnMarket> commodities) {
+        Map<String, CommodityOnMarket> commodityMap =
+                (Map<String, CommodityOnMarket>)
+                        ReflectionUtilis.getPrivateVariableFromSuperClass("commodityMap", market);
 
         if (commodityMap == null) {
             commodityMap = new HashMap<>();
             ReflectionUtilis.setPrivateVariableFromSuperclass("commodityMap", market, commodityMap);
         }
 
-        var commoditiesByDemandClass = (Map<String, List<CommodityOnMarket>>) ReflectionUtilis.
-            getPrivateVariableFromSuperClass("commoditiesByDemandClass", market);
+        var commoditiesByDemandClass =
+                (Map<String, List<CommodityOnMarket>>)
+                        ReflectionUtilis.getPrivateVariableFromSuperClass(
+                                "commoditiesByDemandClass", market);
 
         if (commoditiesByDemandClass == null) {
             commoditiesByDemandClass = new HashMap<>();
-            ReflectionUtilis.setPrivateVariableFromSuperclass("commoditiesByDemandClass", market, commoditiesByDemandClass);
+            ReflectionUtilis.setPrivateVariableFromSuperclass(
+                    "commoditiesByDemandClass", market, commoditiesByDemandClass);
         }
 
         commodityMap.clear();
@@ -645,7 +658,8 @@ public class AoTDEconomy extends Economy {
             commodityMap.put(commodity.getId(), commodity);
 
             String demandClass = ((AoTDCommodityOnMarket) commodity).getSpec().getDemandClass();
-            List<CommodityOnMarket> demandClassCommodities = commoditiesByDemandClass.get(demandClass);
+            List<CommodityOnMarket> demandClassCommodities =
+                    commoditiesByDemandClass.get(demandClass);
 
             if (demandClassCommodities == null) {
                 demandClassCommodities = new ArrayList<>();
@@ -658,8 +672,9 @@ public class AoTDEconomy extends Economy {
 
     @SuppressWarnings("unchecked")
     private static List<CommodityOnMarket> getCommodities(final MarketAPI market) {
-        List<CommodityOnMarket> commodities = (List<CommodityOnMarket>) ReflectionUtilis
-            .getPrivateVariableFromSuperClass("commodities", market);
+        List<CommodityOnMarket> commodities =
+                (List<CommodityOnMarket>)
+                        ReflectionUtilis.getPrivateVariableFromSuperClass("commodities", market);
 
         if (commodities == null) {
             commodities = new ArrayList<>();

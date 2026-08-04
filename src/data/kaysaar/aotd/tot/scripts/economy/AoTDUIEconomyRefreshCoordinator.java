@@ -6,11 +6,10 @@ import data.kaysaar.aotd.tot.compat.MarketRegistry;
 /**
  * Owner-local revision gate for synchronous UI economy refreshes.
  *
- * <p>The coordinator deliberately stores only a market id and primitive
- * revisions. It never becomes a process-lifetime root for a campaign market.
- * A repeated Cargo/market UI request is skipped only when the exact runtime,
- * registry and market revisions are unchanged and the market has no pending
- * derived work.</p>
+ * <p>The coordinator deliberately stores only a market id and primitive revisions. It never becomes
+ * a process-lifetime root for a campaign market. A repeated Cargo/market UI request is skipped only
+ * when the exact runtime, registry and market revisions are unchanged and the market has no pending
+ * derived work.
  */
 final class AoTDUIEconomyRefreshCoordinator {
     private long completedCampaignEpoch;
@@ -36,14 +35,15 @@ final class AoTDUIEconomyRefreshCoordinator {
                 return false;
             }
             String id = market.getId();
-            if (id == null || !id.equals(completedMarketId)
+            if (id == null
+                    || !id.equals(completedMarketId)
                     || completedMarketIdentityHash != System.identityHashCode(market)) {
                 return false;
             }
             if (MarketRegistry.getRegistryGeneration() != completedRegistryGeneration
                     || MarketRegistry.getDirtyGeneration() != completedDirtyGeneration
                     || MarketRegistry.getMarketDirtyGeneration(market)
-                    != completedMarketDirtyGeneration) {
+                            != completedMarketDirtyGeneration) {
                 return false;
             }
             if (MarketRegistry.lookupMarket(id) != market) return false;
@@ -56,10 +56,10 @@ final class AoTDUIEconomyRefreshCoordinator {
     }
 
     /**
-     * Publishes a coalescing token after the semantic refresh has committed.
-     * All fallible reads happen before publication and the market id is the
-     * final validity marker. Failure only disables future coalescing; it must
-     * never escape and make the caller repeat the committed work globally.
+     * Publishes a coalescing token after the semantic refresh has committed. All fallible reads
+     * happen before publication and the market id is the final validity marker. Failure only
+     * disables future coalescing; it must never escape and make the caller repeat the committed
+     * work globally.
      */
     void recordCompleted(MarketAPI market) {
         clearCompletedToken();
@@ -111,8 +111,7 @@ final class AoTDUIEconomyRefreshCoordinator {
         clearCompletedToken();
         invalidations++;
         try {
-            AoTDEconomySemanticBaseline.operation(
-                    "ui-economy.refresh-invalidated", 1L);
+            AoTDEconomySemanticBaseline.operation("ui-economy.refresh-invalidated", 1L);
         } catch (Throwable ignored) {
             // Diagnostics must not prevent the following global economy step.
         }
@@ -129,17 +128,29 @@ final class AoTDUIEconomyRefreshCoordinator {
     }
 
     String statusSummary() {
-        return "completed=" + completedRefreshes
-                + ", skipped=" + skippedRefreshes
-                + ", syntheticCargoSkipped=" + syntheticCargoSkips
-                + ", conditionOnlySkipped=" + conditionOnlySkips
-                + ", invalidations=" + invalidations
-                + ", publicationFailures=" + publicationFailures
-                + ", market=" + completedMarketId
-                + ", campaignEpoch=" + completedCampaignEpoch
-                + ", economyEpoch=" + completedEconomyEpoch
-                + ", registryGeneration=" + completedRegistryGeneration
-                + ", dirtyGeneration=" + completedDirtyGeneration
-                + ", marketDirtyGeneration=" + completedMarketDirtyGeneration;
+        return "completed="
+                + completedRefreshes
+                + ", skipped="
+                + skippedRefreshes
+                + ", syntheticCargoSkipped="
+                + syntheticCargoSkips
+                + ", conditionOnlySkipped="
+                + conditionOnlySkips
+                + ", invalidations="
+                + invalidations
+                + ", publicationFailures="
+                + publicationFailures
+                + ", market="
+                + completedMarketId
+                + ", campaignEpoch="
+                + completedCampaignEpoch
+                + ", economyEpoch="
+                + completedEconomyEpoch
+                + ", registryGeneration="
+                + completedRegistryGeneration
+                + ", dirtyGeneration="
+                + completedDirtyGeneration
+                + ", marketDirtyGeneration="
+                + completedMarketDirtyGeneration;
     }
 }

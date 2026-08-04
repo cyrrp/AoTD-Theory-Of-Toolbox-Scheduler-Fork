@@ -1,7 +1,6 @@
 package data.kaysaar.aotd.tot.scripts.economy;
 
 import data.kaysaar.aotd.tot.compat.SchedulerBridge;
-
 import java.io.Serial;
 import java.io.Serializable;
 import java.util.Objects;
@@ -9,9 +8,9 @@ import java.util.Objects;
 /**
  * Process-local identity of the currently installed campaign/economy runtime.
  *
- * <p>Domain revisions validate causality inside one economy. This epoch stamp
- * additionally proves that a batch belongs to the currently installed campaign
- * and Economy instance. Epochs are deliberately not persisted in campaign data.</p>
+ * <p>Domain revisions validate causality inside one economy. This epoch stamp additionally proves
+ * that a batch belongs to the currently installed campaign and Economy instance. Epochs are
+ * deliberately not persisted in campaign data.
  */
 public final class AoTDRuntimeEpoch {
     private static final Object LOCK = new Object();
@@ -27,15 +26,18 @@ public final class AoTDRuntimeEpoch {
     public static Stamp captureBatch(String purpose) {
         synchronized (LOCK) {
             batchRevision = nextPositive(batchRevision);
-            return new Stamp(campaignEpoch, economyEpoch, batchRevision,
+            return new Stamp(
+                    campaignEpoch,
+                    economyEpoch,
+                    batchRevision,
                     purpose == null ? "unspecified" : purpose);
         }
     }
 
     public static EpochSnapshot snapshot() {
         synchronized (LOCK) {
-            return new EpochSnapshot(campaignEpoch, economyEpoch, batchRevision,
-                    economyIdentity, lastReason);
+            return new EpochSnapshot(
+                    campaignEpoch, economyEpoch, batchRevision, economyIdentity, lastReason);
         }
     }
 
@@ -86,8 +88,13 @@ public final class AoTDRuntimeEpoch {
         }
     }
 
-    public static long getCampaignEpoch() { return campaignEpoch; }
-    public static long getEconomyEpoch() { return economyEpoch; }
+    public static long getCampaignEpoch() {
+        return campaignEpoch;
+    }
+
+    public static long getEconomyEpoch() {
+        return economyEpoch;
+    }
 
     public static boolean isCurrentEconomy(Object economy) {
         return economy != null && economyIdentity == economy;
@@ -95,11 +102,16 @@ public final class AoTDRuntimeEpoch {
 
     public static String statusSummary() {
         EpochSnapshot snapshot = snapshot();
-        return "campaignEpoch=" + snapshot.campaignEpoch
-                + ", economyEpoch=" + snapshot.economyEpoch
-                + ", batchRevision=" + snapshot.lastBatchRevision
-                + ", economyIdentity=" + identity(snapshot.economyIdentity)
-                + ", reason=" + snapshot.reason;
+        return "campaignEpoch="
+                + snapshot.campaignEpoch
+                + ", economyEpoch="
+                + snapshot.economyEpoch
+                + ", batchRevision="
+                + snapshot.lastBatchRevision
+                + ", economyIdentity="
+                + identity(snapshot.economyIdentity)
+                + ", reason="
+                + snapshot.reason;
     }
 
     private static void publishToPrepatcherLocked() {
@@ -107,8 +119,8 @@ public final class AoTDRuntimeEpoch {
     }
 
     private static EpochSnapshot snapshotLocked() {
-        return new EpochSnapshot(campaignEpoch, economyEpoch, batchRevision,
-                economyIdentity, lastReason);
+        return new EpochSnapshot(
+                campaignEpoch, economyEpoch, batchRevision, economyIdentity, lastReason);
     }
 
     private static long nextPositive(long value) {
@@ -122,13 +134,13 @@ public final class AoTDRuntimeEpoch {
 
     private static String identity(Object value) {
         if (value == null) return "null";
-        return value.getClass().getName() + '@'
+        return value.getClass().getName()
+                + '@'
                 + Integer.toHexString(System.identityHashCode(value));
     }
 
     public static final class Stamp implements Serializable {
-        @Serial
-        private static final long serialVersionUID = 1L;
+        @Serial private static final long serialVersionUID = 1L;
 
         public final long campaignEpoch;
         public final long economyEpoch;
@@ -142,7 +154,9 @@ public final class AoTDRuntimeEpoch {
             this.purpose = purpose;
         }
 
-        public boolean isCurrent() { return AoTDRuntimeEpoch.isCurrent(this); }
+        public boolean isCurrent() {
+            return AoTDRuntimeEpoch.isCurrent(this);
+        }
 
         @Override
         public boolean equals(Object other) {
@@ -160,8 +174,15 @@ public final class AoTDRuntimeEpoch {
 
         @Override
         public String toString() {
-            return "{campaign=" + campaignEpoch + ", economy=" + economyEpoch
-                    + ", batch=" + batchRevision + ", purpose=" + purpose + '}';
+            return "{campaign="
+                    + campaignEpoch
+                    + ", economy="
+                    + economyEpoch
+                    + ", batch="
+                    + batchRevision
+                    + ", purpose="
+                    + purpose
+                    + '}';
         }
     }
 
@@ -172,8 +193,12 @@ public final class AoTDRuntimeEpoch {
         public final Object economyIdentity;
         public final String reason;
 
-        EpochSnapshot(long campaignEpoch, long economyEpoch, long lastBatchRevision,
-                      Object economyIdentity, String reason) {
+        EpochSnapshot(
+                long campaignEpoch,
+                long economyEpoch,
+                long lastBatchRevision,
+                Object economyIdentity,
+                String reason) {
             this.campaignEpoch = campaignEpoch;
             this.economyEpoch = economyEpoch;
             this.lastBatchRevision = lastBatchRevision;

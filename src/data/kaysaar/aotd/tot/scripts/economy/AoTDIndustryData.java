@@ -7,7 +7,6 @@ import com.fs.starfarer.api.impl.campaign.econ.impl.PopulationAndInfrastructure;
 import com.fs.starfarer.api.impl.campaign.econ.impl.Spaceport;
 import data.kaysaar.aotd.tot.plugins.ReflectionUtilis;
 import data.kaysaar.aotd.tot.strings.AoTDIndTags;
-
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -18,10 +17,9 @@ import java.util.Map;
 /**
  * Authoritative AoTD state for industries on one market.
  *
- * <p>{@link #statesOnMarket} is the desired economic state. The separate
- * reconciled map records which state was actually materialized through
- * apply/unapply. This lets the economy update reconcile only transitions
- * instead of replaying every industry on every pass.</p>
+ * <p>{@link #statesOnMarket} is the desired economic state. The separate reconciled map records
+ * which state was actually materialized through apply/unapply. This lets the economy update
+ * reconcile only transitions instead of replaying every industry on every pass.
  */
 public class AoTDIndustryData {
     public enum AoTDIndustryState {
@@ -31,7 +29,8 @@ public class AoTDIndustryData {
 
     public LinkedHashMap<String, String> industriesToIgnoreDueToUpgrade = new LinkedHashMap<>();
     public LinkedHashMap<String, AoTDIndustryState> statesOnMarket = new LinkedHashMap<>();
-    public LinkedHashMap<String, AoTDIndustryState> reconciledStatesOnMarket = new LinkedHashMap<>();
+    public LinkedHashMap<String, AoTDIndustryState> reconciledStatesOnMarket =
+            new LinkedHashMap<>();
 
     private transient List<Industry> stableIndustryOrder = List.of();
 
@@ -39,12 +38,14 @@ public class AoTDIndustryData {
     public static String memKey = "$aotd_industry_data";
 
     public LinkedHashMap<String, String> getIndustriesToIgnoreDueToUpgrade() {
-        if (industriesToIgnoreDueToUpgrade == null) industriesToIgnoreDueToUpgrade = new LinkedHashMap<>();
+        if (industriesToIgnoreDueToUpgrade == null)
+            industriesToIgnoreDueToUpgrade = new LinkedHashMap<>();
         return industriesToIgnoreDueToUpgrade;
     }
 
     private Object readResolve() {
-        if (industriesToIgnoreDueToUpgrade == null) industriesToIgnoreDueToUpgrade = new LinkedHashMap<>();
+        if (industriesToIgnoreDueToUpgrade == null)
+            industriesToIgnoreDueToUpgrade = new LinkedHashMap<>();
         if (statesOnMarket == null) statesOnMarket = new LinkedHashMap<>();
         if (reconciledStatesOnMarket == null) reconciledStatesOnMarket = new LinkedHashMap<>();
         stableIndustryOrder = List.of();
@@ -60,7 +61,8 @@ public class AoTDIndustryData {
             market.getMemoryWithoutUpdate().set(memKey, data);
         }
         AoTDIndustryData data = (AoTDIndustryData) market.getMemoryWithoutUpdate().get(memKey);
-        if (data.reconciledStatesOnMarket == null) data.reconciledStatesOnMarket = new LinkedHashMap<>();
+        if (data.reconciledStatesOnMarket == null)
+            data.reconciledStatesOnMarket = new LinkedHashMap<>();
         if (data.stableIndustryOrder == null) data.stableIndustryOrder = List.of();
         return data;
     }
@@ -71,8 +73,8 @@ public class AoTDIndustryData {
     }
 
     /**
-     * Refreshes desired states and returns true only when market membership or
-     * an AoTD pending/active state changed.
+     * Refreshes desired states and returns true only when market membership or an AoTD
+     * pending/active state changed.
      */
     public boolean checkForNewIndustriesAndReport(MarketAPI market) {
         boolean changed = false;
@@ -94,7 +96,8 @@ public class AoTDIndustryData {
 
             if (industry.isUpgrading()) {
                 String id = (String) ReflectionUtilis.getPrivateVariable("upgradeId", industry);
-                if (AshMisc.isStringValid(id) && !getIndustriesToIgnoreDueToUpgrade().containsKey(id)) {
+                if (AshMisc.isStringValid(id)
+                        && !getIndustriesToIgnoreDueToUpgrade().containsKey(id)) {
                     getIndustriesToIgnoreDueToUpgrade().put(industryId, id);
                 }
             }
@@ -116,8 +119,8 @@ public class AoTDIndustryData {
         for (Map.Entry<String, String> entry : getIndustriesToIgnoreDueToUpgrade().entrySet()) {
             if (!market.hasIndustry(entry.getKey())) {
                 if (market.getIndustry(entry.getValue()) != null) {
-                    AoTDIndustryState previous = statesOnMarket.put(
-                            entry.getValue(), AoTDIndustryState.ALREADY_WORKING);
+                    AoTDIndustryState previous =
+                            statesOnMarket.put(entry.getValue(), AoTDIndustryState.ALREADY_WORKING);
                     if (previous != AoTDIndustryState.ALREADY_WORKING) changed = true;
                     statesOnMarket.remove(entry.getKey());
                     reconciledStatesOnMarket.remove(entry.getKey());
@@ -166,15 +169,15 @@ public class AoTDIndustryData {
     }
 
     /**
-     * Stable order used by deficit/availability calculations. The sorted list
-     * is returned directly without per-query allocation. A cheap identity
-     * validation detects membership/replacement changes even before the next
-     * economy reconciliation pass, without acquiring the registry monitor.
+     * Stable order used by deficit/availability calculations. The sorted list is returned directly
+     * without per-query allocation. A cheap identity validation detects membership/replacement
+     * changes even before the next economy reconciliation pass, without acquiring the registry
+     * monitor.
      */
     public List<Industry> getStableIndustryOrder(MarketAPI market) {
         List<Industry> industries = market.getIndustries();
-        boolean rebuild = stableIndustryOrder == null
-                || stableIndustryOrder.size() != industries.size();
+        boolean rebuild =
+                stableIndustryOrder == null || stableIndustryOrder.size() != industries.size();
         if (!rebuild) {
             for (Industry cached : stableIndustryOrder) {
                 if (market.getIndustry(cached.getId()) != cached) {
@@ -187,8 +190,8 @@ public class AoTDIndustryData {
             ArrayList<Industry> sorted = new ArrayList<>(industries);
             // Java List.sort is stable: equal-order industries preserve the
             // market list order required by AoTD deficit semantics.
-            sorted.sort(Comparator.comparingInt(
-                    (Industry industry) -> industry.getSpec().getOrder()));
+            sorted.sort(
+                    Comparator.comparingInt((Industry industry) -> industry.getSpec().getOrder()));
             stableIndustryOrder = List.copyOf(sorted);
         }
         return stableIndustryOrder;

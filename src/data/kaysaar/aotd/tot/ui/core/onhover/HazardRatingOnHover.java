@@ -8,7 +8,6 @@ import com.fs.starfarer.api.impl.campaign.econ.impl.PopulationAndInfrastructure;
 import com.fs.starfarer.api.impl.campaign.population.CoreImmigrationPluginImpl;
 import com.fs.starfarer.api.ui.TooltipMakerAPI;
 import com.fs.starfarer.api.util.Misc;
-
 import java.awt.*;
 
 public class HazardRatingOnHover implements TooltipMakerAPI.TooltipCreator {
@@ -51,11 +50,12 @@ public class HazardRatingOnHover implements TooltipMakerAPI.TooltipCreator {
         tooltip.addTitle("Hazard Rating", baseColor);
 
         tooltip.addPara(
-                "The hazard rating at " + market.getName() + " is %s. The following contributing factors were identified:",
+                "The hazard rating at "
+                        + market.getName()
+                        + " is %s. The following contributing factors were identified:",
                 paddingLarge,
                 highlightColor,
-                new String[]{hazardPercent}
-        );
+                new String[] {hazardPercent});
 
         tooltip.addStatModGrid(
                 getTooltipWidth(tooltipParam),
@@ -86,10 +86,10 @@ public class HazardRatingOnHover implements TooltipMakerAPI.TooltipCreator {
                     public Color getModColor(MutableStat.StatMod mod) {
                         return null;
                     }
-                }
-        );
+                });
 
-        float upkeepMultiplier = PopulationAndInfrastructure.getUpkeepHazardMult(market.getHazardValue());
+        float upkeepMultiplier =
+                PopulationAndInfrastructure.getUpkeepHazardMult(market.getHazardValue());
         float immigrationPerHazard = Global.getSettings().getFloat("immigrationPerHazard");
 
         String upkeepPercent = Math.round(upkeepMultiplier * 100.0F) + "%";
@@ -99,7 +99,8 @@ public class HazardRatingOnHover implements TooltipMakerAPI.TooltipCreator {
         float immigrationPenaltySizeMult = 0.0F;
 
         if (immigrationPenalty != 0.0F) {
-            immigrationPenaltySizeMult = CoreImmigrationPluginImpl.getImmigrationHazardPenaltySizeMult(market);
+            immigrationPenaltySizeMult =
+                    CoreImmigrationPluginImpl.getImmigrationHazardPenaltySizeMult(market);
         }
 
         float baseHazard = market.getHazardValue();
@@ -119,18 +120,17 @@ public class HazardRatingOnHover implements TooltipMakerAPI.TooltipCreator {
         if (penaltyMagnitude == 0) {
             tooltip.addPara(
                     "The hazard rating results in a %s upkeep multiplier.",
-                    paddingLarge,
-                    highlightColor,
-                    new String[]{upkeepPercent}
-            );
+                    paddingLarge, highlightColor, new String[] {upkeepPercent});
         } else {
             tooltip.addPara(
-                    "The hazard rating results in a %s upkeep multiplier, and " +
-                            effectVerb + " the population growth rate by %s " + unit + ". The growth penalty increases with colony size.",
+                    "The hazard rating results in a %s upkeep multiplier, and "
+                            + effectVerb
+                            + " the population growth rate by %s "
+                            + unit
+                            + ". The growth penalty increases with colony size.",
                     paddingLarge,
                     highlightColor,
-                    new String[]{upkeepMultString, String.valueOf(penaltyMagnitude)}
-            );
+                    new String[] {upkeepMultString, String.valueOf(penaltyMagnitude)});
         }
     }
 }

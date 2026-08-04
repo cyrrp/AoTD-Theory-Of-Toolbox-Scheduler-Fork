@@ -21,7 +21,8 @@ public class AoTDMarketDemand extends MarketDemand {
     }
 
     Object readResolve() {
-        ReflectionUtilis.setPrivateVariableFromSuperclass("baseCommodity", this, Global.getSettings().getCommoditySpec(demandClass));
+        ReflectionUtilis.setPrivateVariableFromSuperclass(
+                "baseCommodity", this, Global.getSettings().getCommoditySpec(demandClass));
 
         if (market != null && demandClass != null) {
             ReflectionUtilis.setPrivateVariableFromSuperclass("demand", this, new MutableStat(0f));
@@ -67,6 +68,4 @@ public class AoTDMarketDemand extends MarketDemand {
 
         return Math.max(0f, totalUtility);
     }
-
-
 }

@@ -10,25 +10,25 @@ import com.fs.starfarer.api.loading.Description;
 import com.fs.starfarer.api.loading.FighterWingSpecAPI;
 import com.fs.starfarer.api.ui.TooltipMakerAPI;
 import data.kaysaar.aotd.tot.produciton.specs.AoTDProductionSpec;
-
-
 import java.util.Set;
-
 
 public class ProducitonHoverInfo implements TooltipMakerAPI.TooltipCreator {
 
     AoTDProductionSpec spec;
-    int index =-1;
+    int index = -1;
     Set<String> weapons;
     boolean embraced = false;
     boolean currentMode = false;
-    public
-    ProducitonHoverInfo(AoTDProductionSpec spec) {
+
+    public ProducitonHoverInfo(AoTDProductionSpec spec) {
         this.spec = spec;
-        if(spec.getProductionType().equals(AoTDProductionSpec.AoTDProductionSpecType.FIGHTER)){
-            weapons = FighterInfoGenerator.getFighterWeapons((FighterWingSpecAPI) spec.getUnderlyingSpec());
+        if (spec.getProductionType().equals(AoTDProductionSpec.AoTDProductionSpecType.FIGHTER)) {
+            weapons =
+                    FighterInfoGenerator.getFighterWeapons(
+                            (FighterWingSpecAPI) spec.getUnderlyingSpec());
         }
     }
+
     @Override
     public boolean isTooltipExpandable(Object tooltipParam) {
         return true;
@@ -49,20 +49,32 @@ public class ProducitonHoverInfo implements TooltipMakerAPI.TooltipCreator {
             // Edge-case fix regarding Wormhole Anchor item requiring data when showing tooltip
             final CargoStackAPI stack;
             if (spec.getId().equals("wormhole_anchor")) {
-                WormholeManager.WormholeItemData itemData = new WormholeManager.WormholeItemData("standard", "unknown", "Unknown");
-                stack = Global.getFactory().createCargoStack(CargoAPI.CargoItemType.SPECIAL, new SpecialItemData(spec.getId(), itemData.toJsonStr()), null);
+                WormholeManager.WormholeItemData itemData =
+                        new WormholeManager.WormholeItemData("standard", "unknown", "Unknown");
+                stack =
+                        Global.getFactory()
+                                .createCargoStack(
+                                        CargoAPI.CargoItemType.SPECIAL,
+                                        new SpecialItemData(spec.getId(), itemData.toJsonStr()),
+                                        null);
 
-            }
-            else {
-                stack = Global.getFactory().createCargoStack(CargoAPI.CargoItemType.SPECIAL, new SpecialItemData(spec.getId(), null), null);
+            } else {
+                stack =
+                        Global.getFactory()
+                                .createCargoStack(
+                                        CargoAPI.CargoItemType.SPECIAL,
+                                        new SpecialItemData(spec.getId(), null),
+                                        null);
             }
             stack.getPlugin().createTooltip(tooltip, expanded, null, null);
-
         }
         if (spec.getProductionType() == AoTDProductionSpec.AoTDProductionSpecType.COMMODITY_ITEM) {
             tooltip.addTitle(spec.getName());
-            tooltip.addPara(Global.getSettings().getDescription(spec.getId(), Description.Type.RESOURCE).getText1FirstPara(),10f);
-
+            tooltip.addPara(
+                    Global.getSettings()
+                            .getDescription(spec.getId(), Description.Type.RESOURCE)
+                            .getText1FirstPara(),
+                    10f);
         }
     }
 }

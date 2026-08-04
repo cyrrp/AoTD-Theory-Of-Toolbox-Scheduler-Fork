@@ -4,13 +4,11 @@ package data.kaysaar.aotd.tot.scripts.trade.tasks;
 import com.fs.starfarer.api.Global;
 import com.fs.starfarer.api.campaign.CampaignClockAPI;
 import com.fs.starfarer.api.util.WeightedRandomPicker;
-
 import data.kaysaar.aotd.tot.scripts.economy.AoTDSectorProductionDemandDataUtils;
 import data.kaysaar.aotd.tot.scripts.trade.AoTDSectorExternalIndex;
 import data.kaysaar.aotd.tot.scripts.trade.ScavengerGuildUtils;
 import data.kaysaar.aotd.tot.scripts.trade.SectorSurplusConsumptionStats;
 import data.kaysaar.aotd.tot.scripts.trade.SurplusConsumptionUtils;
-
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Random;
@@ -20,16 +18,14 @@ import java.util.TreeSet;
 public class AoTDExternalTradeSolver {
 
     /**
-     * Scavenger Guild mechanic:
-     * If sector demand exceeds sector production by more than threshold,
+     * Scavenger Guild mechanic: If sector demand exceeds sector production by more than threshold,
      * inject enough synthetic supply so that remaining shortage is capped to threshold*production.
      */
     private void applyScavengerGuildIfNeeded(
             AoTDSectorExternalIndex idx,
             String commodityId,
             ArrayList<AoTDSectorExternalIndex.Offer> exporters,
-            ArrayList<AoTDSectorExternalIndex.Offer> importers
-    ) {
+            ArrayList<AoTDSectorExternalIndex.Offer> importers) {
         if (importers == null || importers.isEmpty()) return;
 
         int extra = ScavengerGuildUtils.getCoveredAmountFromSector(commodityId);
@@ -44,29 +40,27 @@ public class AoTDExternalTradeSolver {
 
         float scavWeight = maxW * 1.25f + 1f;
 
-        AoTDSectorExternalIndex.Offer scav = idx.createScavengerOffer(commodityId, extra, scavWeight);
+        AoTDSectorExternalIndex.Offer scav =
+                idx.createScavengerOffer(commodityId, extra, scavWeight);
         exporters.add(scav);
 
         idx.exportersByCommodity.put(commodityId, exporters);
     }
 
     /**
-     * Sector Surplus Cap (AFTER matching):
-     * For covered commodities, reduce leftover (unmatched) exporter supply so that:
+     * Sector Surplus Cap (AFTER matching): For covered commodities, reduce leftover (unmatched)
+     * exporter supply so that:
      *
-     *   sectorSupply <= sectorDemand * (1 + cap)
+     * <p>sectorSupply <= sectorDemand * (1 + cap)
      *
-     * This is done ONLY on remaining exporter offer amounts after matching,
-     * so it cannot create shortages when the sector can satisfy them.
+     * <p>This is done ONLY on remaining exporter offer amounts after matching, so it cannot create
+     * shortages when the sector can satisfy them.
      *
-     * It records:
-     *  - per faction totals in SectorSurplusConsumptionStats
-     *  - per market amount removed in AoTDMarketData.externalExcessExported
+     * <p>It records: - per faction totals in SectorSurplusConsumptionStats - per market amount
+     * removed in AoTDMarketData.externalExcessExported
      */
     private void applySurplusCapAfterMatching(
-            String commodityId,
-            ArrayList<AoTDSectorExternalIndex.Offer> exporters
-    ) {
+            String commodityId, ArrayList<AoTDSectorExternalIndex.Offer> exporters) {
         if (!SurplusConsumptionUtils.doesCoverCommodity(commodityId)) return;
         if (exporters == null || exporters.isEmpty()) return;
 
@@ -79,8 +73,10 @@ public class AoTDExternalTradeSolver {
         }
         if (leftoverSupply <= 0) return;
 
-        int sectorSupply = AoTDSectorProductionDemandDataUtils.getTotalProductionFromSector(commodityId);
-        int sectorDemand = AoTDSectorProductionDemandDataUtils.getTotalDemandFromSector(commodityId);
+        int sectorSupply =
+                AoTDSectorProductionDemandDataUtils.getTotalProductionFromSector(commodityId);
+        int sectorDemand =
+                AoTDSectorProductionDemandDataUtils.getTotalDemandFromSector(commodityId);
         if (sectorSupply <= 0 || sectorDemand < 0) return;
 
         float cap = SurplusConsumptionUtils.getCapPercent(commodityId); // default 0.10f
@@ -134,9 +130,7 @@ public class AoTDExternalTradeSolver {
         }
     }
 
-    /**
-     * Runs month-end matching.
-     */
+    /** Runs month-end matching. */
     public void runMonthEndExternalTrade(AoTDSectorExternalIndex idx) {
         // A stable global order makes diagnostics and any cross-commodity side effects
         // reproducible as well. Each commodity also has its own independent PRNG seed.
@@ -150,8 +144,10 @@ public class AoTDExternalTradeSolver {
     }
 
     private void runForCommodity(AoTDSectorExternalIndex idx, String commodityId) {
-        ArrayList<AoTDSectorExternalIndex.Offer> exporters = idx.exportersByCommodity.get(commodityId);
-        ArrayList<AoTDSectorExternalIndex.Offer> importers = idx.importersByCommodity.get(commodityId);
+        ArrayList<AoTDSectorExternalIndex.Offer> exporters =
+                idx.exportersByCommodity.get(commodityId);
+        ArrayList<AoTDSectorExternalIndex.Offer> importers =
+                idx.importersByCommodity.get(commodityId);
 
         // If nobody needs it, nothing to match.
         // (Keep this early return: scavengers and matching only matter if there is demand.)
@@ -168,8 +164,10 @@ public class AoTDExternalTradeSolver {
         exporters.sort(Comparator.comparing(AoTDExternalTradeSolver::stableOfferId));
         importers.sort(Comparator.comparing(AoTDExternalTradeSolver::stableOfferId));
         Random random = new Random(computeExternalTradeSeed(commodityId));
-        WeightedRandomPicker<AoTDSectorExternalIndex.Offer> expPicker = new WeightedRandomPicker<>(random);
-        WeightedRandomPicker<AoTDSectorExternalIndex.Offer> impPicker = new WeightedRandomPicker<>(random);
+        WeightedRandomPicker<AoTDSectorExternalIndex.Offer> expPicker =
+                new WeightedRandomPicker<>(random);
+        WeightedRandomPicker<AoTDSectorExternalIndex.Offer> impPicker =
+                new WeightedRandomPicker<>(random);
 
         for (AoTDSectorExternalIndex.Offer e : exporters) {
             if (e != null && e.amount > 0) expPicker.add(e, e.weight);
@@ -186,8 +184,14 @@ public class AoTDExternalTradeSolver {
             AoTDSectorExternalIndex.Offer exp = expPicker.pick();
             if (imp == null || exp == null) break;
 
-            if (imp.amount <= 0) { impPicker.remove(imp); continue; }
-            if (exp.amount <= 0) { expPicker.remove(exp); continue; }
+            if (imp.amount <= 0) {
+                impPicker.remove(imp);
+                continue;
+            }
+            if (exp.amount <= 0) {
+                expPicker.remove(exp);
+                continue;
+            }
 
             int moved = Math.min(exp.amount, imp.amount);
 
@@ -216,12 +220,11 @@ public class AoTDExternalTradeSolver {
     }
 
     /**
-     * Stable identity used for canonical ordering. A normal market id is unique for
-     * one commodity. Synthetic scavenger supply receives its own fixed identity.
+     * Stable identity used for canonical ordering. A normal market id is unique for one commodity.
+     * Synthetic scavenger supply receives its own fixed identity.
      */
     private static int compareSurplusPriority(
-            AoTDSectorExternalIndex.Offer left,
-            AoTDSectorExternalIndex.Offer right) {
+            AoTDSectorExternalIndex.Offer left, AoTDSectorExternalIndex.Offer right) {
         if (left == right) return 0;
         if (left == null) return 1;
         if (right == null) return -1;
@@ -243,9 +246,9 @@ public class AoTDExternalTradeSolver {
     }
 
     /**
-     * Seed contract: campaign seed + economy month-cycle + commodity id.
-     * The month-cycle is cycle*12+month, so each monthly settlement has a unique,
-     * replayable seed while remaining independent of thread and collection order.
+     * Seed contract: campaign seed + economy month-cycle + commodity id. The month-cycle is
+     * cycle*12+month, so each monthly settlement has a unique, replayable seed while remaining
+     * independent of thread and collection order.
      */
     private static long computeExternalTradeSeed(String commodityId) {
         String campaignSeed = "";

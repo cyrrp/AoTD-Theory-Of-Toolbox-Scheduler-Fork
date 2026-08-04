@@ -3,10 +3,8 @@ package data.kaysaar.aotd.tot.scripts.trade;
 
 import com.fs.starfarer.api.campaign.econ.CommodityOnMarketAPI;
 import com.fs.starfarer.api.campaign.econ.MarketAPI;
-import data.kaysaar.aotd.tot.plugins.AoTDCommodityEconSpecManager;
 import data.kaysaar.aotd.tot.scripts.commoditydata.AoTDCommodityOnMarket;
 import data.kaysaar.aotd.tot.scripts.trade.models.AoTDMarketData;
-
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
@@ -54,23 +52,28 @@ public class AoTDSectorExternalIndex {
             if (net > 0) {
                 float bonus = 0;
                 int supply = net;
-                float w = computeOfferWeight(md.outsideWeight, bonus,false);
-                exportersByCommodity.computeIfAbsent(commodityId, k -> new ArrayList<>())
+                float w = computeOfferWeight(md.outsideWeight, bonus, false);
+                exportersByCommodity
+                        .computeIfAbsent(commodityId, k -> new ArrayList<>())
                         .add(new Offer(market, md, supply, w));
             } else {
                 float bonus = 0;
                 int need = -net;
-                if(commodity instanceof AoTDCommodityOnMarket commodityOnMarket){
+                if (commodity instanceof AoTDCommodityOnMarket commodityOnMarket) {
                     int deficit = commodityOnMarket.getDeficitQuantity();
-                    int totalDemand = commodityOnMarket.getSupplyDemandData().getTotalRawUnitsFromDemand();
-                    int mult = Math.max(commodityOnMarket.getExcDefData().getDeficitConsequtiveMonths(),1);
-                    if(deficit>0){
-                        bonus = ((float) (deficit*1.5f) /totalDemand) * mult;
+                    int totalDemand =
+                            commodityOnMarket.getSupplyDemandData().getTotalRawUnitsFromDemand();
+                    int mult =
+                            Math.max(
+                                    commodityOnMarket.getExcDefData().getDeficitConsequtiveMonths(),
+                                    1);
+                    if (deficit > 0) {
+                        bonus = ((float) (deficit * 1.5f) / totalDemand) * mult;
                     }
-
                 }
-                float w = computeOfferWeight(md.outsideWeight, bonus,true);
-                importersByCommodity.computeIfAbsent(commodityId, k -> new ArrayList<>())
+                float w = computeOfferWeight(md.outsideWeight, bonus, true);
+                importersByCommodity
+                        .computeIfAbsent(commodityId, k -> new ArrayList<>())
                         .add(new Offer(market, md, need, w));
             }
         }
@@ -87,17 +90,15 @@ public class AoTDSectorExternalIndex {
     }
 
     /**
-     * Base = outsideWeight (accessibility).
-     * Tiny bonus for bigger deficit/excess (caps at +40%).
+     * Base = outsideWeight (accessibility). Tiny bonus for bigger deficit/excess (caps at +40%).
      */
-    public static float computeOfferWeight(float baseOutsideWeight, float amount,boolean deficit) {
+    public static float computeOfferWeight(float baseOutsideWeight, float amount, boolean deficit) {
         float base = Math.max(0.01f, baseOutsideWeight);
-        float amountFactor =1f;
+        float amountFactor = 1f;
         // up to +10% at 100k
-        if(amount>0){
-             amountFactor = amount;
+        if (amount > 0) {
+            amountFactor = amount;
         }
-
 
         return base * amountFactor;
     }

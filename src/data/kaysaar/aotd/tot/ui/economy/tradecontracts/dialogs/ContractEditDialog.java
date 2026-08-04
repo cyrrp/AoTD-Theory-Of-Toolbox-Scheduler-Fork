@@ -13,6 +13,7 @@ public class ContractEditDialog extends BasePopUpDialog {
     AoTDTradeContract newContract;
     ContractCreatorDetailsPlugin plugin;
     DetailedTradeContractUI tradeContractUI;
+
     public ContractEditDialog(AoTDTradeContract contract, DetailedTradeContractUI tradeContractUI) {
         super("Edit Contract");
         this.newContract = contract.clone();
@@ -22,9 +23,9 @@ public class ContractEditDialog extends BasePopUpDialog {
 
     @Override
     public void createContentForDialog(TooltipMakerAPI tooltip, float width) {
-        float height = getPanelToInfluence().getPosition().getHeight()-50;
-        plugin = new ContractCreatorDetailsPlugin(width,height,existingContract);
-        tooltip.addCustom(plugin.getMainPanel(),5f);
+        float height = getPanelToInfluence().getPosition().getHeight() - 50;
+        plugin = new ContractCreatorDetailsPlugin(width, height, existingContract);
+        tooltip.addCustom(plugin.getMainPanel(), 5f);
     }
 
     @Override
@@ -32,14 +33,12 @@ public class ContractEditDialog extends BasePopUpDialog {
         super.applyConfirmScript();
         AoTDTradeContractManager.getInstance().removeContract(existingContract.getId());
         newContract.runCleanUp();
-        if(!newContract.getContractData().isEmpty()){
+        if (!newContract.getContractData().isEmpty()) {
             AoTDTradeContractManager.getInstance().addContract(newContract);
             tradeContractUI.setContract(newContract);
-        }
-        else{
+        } else {
             tradeContractUI.setContract(null);
         }
         EconomyTradeDealsData.forceTableUpdate = true;
-
     }
 }

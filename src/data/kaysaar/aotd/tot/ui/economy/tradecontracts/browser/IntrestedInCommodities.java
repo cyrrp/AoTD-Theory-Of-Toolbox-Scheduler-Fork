@@ -7,18 +7,16 @@ import com.fs.starfarer.api.input.InputEventAPI;
 import com.fs.starfarer.api.ui.Alignment;
 import com.fs.starfarer.api.ui.CustomPanelAPI;
 import com.fs.starfarer.api.ui.PositionAPI;
-
 import java.util.List;
 
 public class IntrestedInCommodities implements ExtendedUIPanelPlugin {
     CustomPanelAPI mainPanel;
-    public IntrestedInCommodities(float width,
-                                  float iconSize,
-                                  Alignment alignment,
-                                  String... commodities) {
+
+    public IntrestedInCommodities(
+            float width, float iconSize, Alignment alignment, String... commodities) {
 
         final float sepX = 10f; // spacing between icons (x)
-        final float sepY = 5f;  // spacing between rows (y)
+        final float sepY = 5f; // spacing between rows (y)
 
         int count = commodities == null ? 0 : commodities.length;
 
@@ -60,57 +58,40 @@ public class IntrestedInCommodities implements ExtendedUIPanelPlugin {
             float y = row * (iconSize + sepY);
 
             String commodityId = commodities[i];
-            String icon = Global.getSettings()
-                    .getCommoditySpec(commodityId)
-                    .getIconName();
+            String icon = Global.getSettings().getCommoditySpec(commodityId).getIconName();
 
             ImageViewer viewer = new ImageViewer(iconSize, iconSize, icon);
 
             mainPanel.addComponent(viewer.getComponentPanel()).inTL(x, y);
         }
     }
+
     @Override
     public CustomPanelAPI getMainPanel() {
         return mainPanel;
     }
 
     @Override
-    public void createUI() {
-
-    }
+    public void createUI() {}
 
     @Override
-    public void clearUI() {
-
-    }
+    public void clearUI() {}
 
     @Override
-    public void positionChanged(PositionAPI position) {
-
-    }
+    public void positionChanged(PositionAPI position) {}
 
     @Override
-    public void renderBelow(float alphaMult) {
-
-    }
+    public void renderBelow(float alphaMult) {}
 
     @Override
-    public void render(float alphaMult) {
-
-    }
+    public void render(float alphaMult) {}
 
     @Override
-    public void advance(float amount) {
-
-    }
+    public void advance(float amount) {}
 
     @Override
-    public void processInput(List<InputEventAPI> events) {
-
-    }
+    public void processInput(List<InputEventAPI> events) {}
 
     @Override
-    public void buttonPressed(Object buttonId) {
-
-    }
+    public void buttonPressed(Object buttonId) {}
 }

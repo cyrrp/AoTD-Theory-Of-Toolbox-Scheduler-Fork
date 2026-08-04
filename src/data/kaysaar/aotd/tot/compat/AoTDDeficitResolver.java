@@ -8,8 +8,8 @@ import com.fs.starfarer.api.util.Pair;
 import data.kaysaar.aotd.tot.scripts.economy.AoTDIndustryData;
 
 /**
- * Source-level AoTD priority-deficit semantics used by the clean BaseIndustry
- * wrapper installed by StarsectorPrepatcher.
+ * Source-level AoTD priority-deficit semantics used by the clean BaseIndustry wrapper installed by
+ * StarsectorPrepatcher.
  */
 public final class AoTDDeficitResolver {
     private AoTDDeficitResolver() {}
@@ -27,15 +27,14 @@ public final class AoTDDeficitResolver {
         AoTDIndustryData industryData = AoTDIndustryData.getInstance(market);
         String targetId = target.getId();
         for (String commodityId : commodityIds) {
-            int demand = (int) target.getDemand(commodityId)
-                    .getQuantity().getModifiedValue();
+            int demand = (int) target.getDemand(commodityId).getQuantity().getModifiedValue();
             CommodityOnMarketAPI commodity = market.getCommodityData(commodityId);
             int available = commodity.getAvailable();
 
             for (Industry industry : industryData.getStableIndustryOrder(market)) {
                 if (industry.getId().equals(targetId)) break;
-                int priorDemand = (int) industry.getDemand(commodityId)
-                        .getQuantity().getModifiedValue();
+                int priorDemand =
+                        (int) industry.getDemand(commodityId).getQuantity().getModifiedValue();
                 available -= Math.max(0, priorDemand);
             }
 

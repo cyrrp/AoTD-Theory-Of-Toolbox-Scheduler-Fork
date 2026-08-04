@@ -8,7 +8,6 @@ import com.fs.starfarer.api.ui.Alignment;
 import com.fs.starfarer.api.ui.TooltipMakerAPI;
 import com.fs.starfarer.api.util.Misc;
 import data.kaysaar.aotd.tot.misc.AoTDToolboxMisc;
-
 import java.awt.*;
 
 public class AccessibilityOnHover implements TooltipMakerAPI.TooltipCreator {
@@ -47,9 +46,8 @@ public class AccessibilityOnHover implements TooltipMakerAPI.TooltipCreator {
 
         tooltip.addTitle("Accessibility", baseColor);
 
-        int accessibilityPercent = Math.round(
-                market.getAccessibilityMod().computeEffective(0.0F) * 100.0F
-        );
+        int accessibilityPercent =
+                Math.round(market.getAccessibilityMod().computeEffective(0.0F) * 100.0F);
 
         Color accessibilityColor = highlightColor;
         if (accessibilityPercent <= 0) {
@@ -58,18 +56,11 @@ public class AccessibilityOnHover implements TooltipMakerAPI.TooltipCreator {
 
         tooltip.addPara(
                 "Accessibility reflects how attractive this colony is to %s, both domestic and foreign, and determines its priority in %s.",
-                paddingMedium,
-                highlightColor,
-                "traders",
-                "trade"
-        );
+                paddingMedium, highlightColor, "traders", "trade");
 
         tooltip.addPara(
                 "Accessibility: %s",
-                paddingLarge,
-                accessibilityColor,
-                new String[]{accessibilityPercent + "%"}
-        );
+                paddingLarge, accessibilityColor, new String[] {accessibilityPercent + "%"});
 
         tooltip.addStatModGrid(
                 getTooltipWidth(tooltipParam),
@@ -99,12 +90,10 @@ public class AccessibilityOnHover implements TooltipMakerAPI.TooltipCreator {
                         int percent = Math.round(mod.value * 100.0F);
                         return mod.value >= 0.0F ? "+" + percent + "%" : percent + "%";
                     }
-                }
-        );
+                });
 
-        tooltip.addSectionHeading("Trade Priority", baseColor, darkColor, Alignment.MID, paddingLarge);
-
-
+        tooltip.addSectionHeading(
+                "Trade Priority", baseColor, darkColor, Alignment.MID, paddingLarge);
 
         tooltip.addPara(
                 "Colonies with higher accessibility are more likely to participate in %s, allowing them to more reliably %s and %s.",
@@ -112,8 +101,7 @@ public class AccessibilityOnHover implements TooltipMakerAPI.TooltipCreator {
                 highlightColor,
                 "external trade",
                 "import goods",
-                "export their products"
-        );
+                "export their products");
 
         tooltip.addPara(
                 "During %s, low-accessibility colonies may be unable to %s. During %s, they may fail to %s, resulting in %s.",
@@ -123,31 +111,25 @@ public class AccessibilityOnHover implements TooltipMakerAPI.TooltipCreator {
                 "export their goods",
                 "global shortages",
                 "import enough goods",
-                "shortages"
-        );
+                "shortages");
         tooltip.addPara(
                 "If a colony's accessibility falls to %s or below, it will be unable to participate in external trade entirely, preventing it from both importing and exporting goods.",
-                paddingMedium,
-                highlightColor,
-                "0"
-        );
-        if(market.getAccessibilityMod().computeEffective(0f)<=0||!market.hasSpaceport()){
-            tooltip.addPara("Warning, this market is unable to participate in trade, can't export, nor import goods!",Misc.getNegativeHighlightColor(),3f);
+                paddingMedium, highlightColor, "0");
+        if (market.getAccessibilityMod().computeEffective(0f) <= 0 || !market.hasSpaceport()) {
+            tooltip.addPara(
+                    "Warning, this market is unable to participate in trade, can't export, nor import goods!",
+                    Misc.getNegativeHighlightColor(),
+                    3f);
         }
         int totalMarkets = Global.getSector().getEconomy().getNumMarkets() - 1;
         int marketsWithHigherAccessibility =
                 AoTDToolboxMisc.getAmountOfMarketsGreaterAccThanTargetedMarket(
-                        Global.getSector().getEconomy().getMarketsCopy(),
-                        market
-                );
+                        Global.getSector().getEconomy().getMarketsCopy(), market);
 
         if (marketsWithHigherAccessibility <= 0) {
             tooltip.addPara(
                     "No other markets have higher accessibility than %s.",
-                    paddingLarge,
-                    Color.ORANGE,
-                    market.getName()
-            );
+                    paddingLarge, Color.ORANGE, market.getName());
         } else {
             tooltip.addPara(
                     "%s out of %s markets have higher accessibility than %s.",
@@ -155,10 +137,7 @@ public class AccessibilityOnHover implements TooltipMakerAPI.TooltipCreator {
                     Color.ORANGE,
                     String.valueOf(marketsWithHigherAccessibility),
                     String.valueOf(totalMarkets),
-                    market.getName()
-            );
+                    market.getName());
         }
-
-
     }
 }

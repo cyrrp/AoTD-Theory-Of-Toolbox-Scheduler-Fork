@@ -2,7 +2,6 @@ package data.kaysaar.aotd.tot.listeners;
 
 import ashlib.data.plugins.ui.models.ExtendedUIPanelPlugin;
 import com.fs.starfarer.api.Global;
-import com.fs.starfarer.api.campaign.CustomUIPanelPlugin;
 import com.fs.starfarer.api.campaign.PlanetAPI;
 import com.fs.starfarer.api.campaign.StarSystemAPI;
 import com.fs.starfarer.api.campaign.econ.MarketAPI;
@@ -17,7 +16,6 @@ import data.kaysaar.aotd.tot.plugins.ReflectionUtilis;
 import data.kaysaar.aotd.tot.scripts.commoditydata.AoTDCommodityOnMarket;
 import data.kaysaar.aotd.tot.scripts.economy.AoTdMainWorkTask2;
 import data.kaysaar.aotd.tot.scripts.submarket.aotd.AoTDOpenMarketPlugin;
-
 import java.awt.*;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -47,19 +45,13 @@ public class AoTDPriceTableRemoval implements ExtendedUIPanelPlugin {
     }
 
     @Override
-    public void positionChanged(PositionAPI position) {
-
-    }
+    public void positionChanged(PositionAPI position) {}
 
     @Override
-    public void renderBelow(float alphaMult) {
-
-    }
+    public void renderBelow(float alphaMult) {}
 
     @Override
-    public void render(float alphaMult) {
-
-    }
+    public void render(float alphaMult) {}
 
     @Override
     public void advance(float amount) {
@@ -81,25 +73,27 @@ public class AoTDPriceTableRemoval implements ExtendedUIPanelPlugin {
 
         buildRowsFromCache(sellRows, buyRows);
 
-        sellRows.sort(new Comparator<SellRowData>() {
-            @Override
-            public int compare(SellRowData a, SellRowData b) {
-                int priceCompare = Integer.compare(b.pricePerUnit, a.pricePerUnit);
-                if (priceCompare != 0) return priceCompare;
+        sellRows.sort(
+                new Comparator<SellRowData>() {
+                    @Override
+                    public int compare(SellRowData a, SellRowData b) {
+                        int priceCompare = Integer.compare(b.pricePerUnit, a.pricePerUnit);
+                        if (priceCompare != 0) return priceCompare;
 
-                return Integer.compare(b.demand, a.demand);
-            }
-        });
+                        return Integer.compare(b.demand, a.demand);
+                    }
+                });
 
-        buyRows.sort(new Comparator<BuyRowData>() {
-            @Override
-            public int compare(BuyRowData a, BuyRowData b) {
-                int priceCompare = Integer.compare(a.pricePerUnit, b.pricePerUnit);
-                if (priceCompare != 0) return priceCompare;
+        buyRows.sort(
+                new Comparator<BuyRowData>() {
+                    @Override
+                    public int compare(BuyRowData a, BuyRowData b) {
+                        int priceCompare = Integer.compare(a.pricePerUnit, b.pricePerUnit);
+                        if (priceCompare != 0) return priceCompare;
 
-                return Integer.compare(b.availableForSort, a.availableForSort);
-            }
-        });
+                        return Integer.compare(b.availableForSort, a.availableForSort);
+                    }
+                });
 
         removeVanillaRows(holder, comps, sellRows.isEmpty(), buyRows.isEmpty());
 
@@ -124,14 +118,17 @@ public class AoTDPriceTableRemoval implements ExtendedUIPanelPlugin {
         repositionTooltip();
     }
 
-    private void buildRowsFromCache(ArrayList<SellRowData> sellRows, ArrayList<BuyRowData> buyRows) {
-        AoTDTradePriceCache.CandidateSet candidates = AoTDTradePriceCache.getCandidates(commodityId);
+    private void buildRowsFromCache(
+            ArrayList<SellRowData> sellRows, ArrayList<BuyRowData> buyRows) {
+        AoTDTradePriceCache.CandidateSet candidates =
+                AoTDTradePriceCache.getCandidates(commodityId);
 
         for (AoTDTradePriceCache.Candidate candidate : candidates.sellCandidates) {
             MarketAPI market = candidate.getMarket();
             if (market == null || market.isHidden()) continue;
 
-            AoTDCommodityOnMarket com = AoTDCommodityOnMarket.getComMarketInstanceSave(market, commodityId);
+            AoTDCommodityOnMarket com =
+                    AoTDCommodityOnMarket.getComMarketInstanceSave(market, commodityId);
             if (com == null) continue;
 
             int demand = com.getSupplyDemandData().getTotalRawUnitsFromDemand();
@@ -150,14 +147,19 @@ public class AoTDPriceTableRemoval implements ExtendedUIPanelPlugin {
             if (market == null || market.isHidden()) continue;
             if (!(market instanceof Market)) continue;
 
-            AoTDCommodityOnMarket com = AoTDCommodityOnMarket.getComMarketInstanceSave(market, commodityId);
+            AoTDCommodityOnMarket com =
+                    AoTDCommodityOnMarket.getComMarketInstanceSave(market, commodityId);
             if (com == null) continue;
 
             int supply = com.getSupplyDemandData().getTotalRawUnitsFromSupply();
-            int stableAvailable = (int) AoTdMainWorkTask2.getAoTDStableSharedSubmarketLimit((Market) market, com, supply);
+            int stableAvailable =
+                    (int)
+                            AoTdMainWorkTask2.getAoTDStableSharedSubmarketLimit(
+                                    (Market) market, com, supply);
             int liveAvailable = AoTDOpenMarketPlugin.getStockPileToolbox(com);
 
-            // The table displays liveAvailable, so a market with liveAvailable == 0 must never appear
+            // The table displays liveAvailable, so a market with liveAvailable == 0 must never
+            // appear
             // even if the stable shared limit is still positive due to economy/cache state.
             if (stableAvailable <= 0 || liveAvailable <= 0) continue;
 
@@ -174,7 +176,8 @@ public class AoTDPriceTableRemoval implements ExtendedUIPanelPlugin {
         }
     }
 
-    private void removeVanillaRows(UIPanelAPI holder, List<UIComponentAPI> comps, boolean noSellRows, boolean noBuyRows) {
+    private void removeVanillaRows(
+            UIPanelAPI holder, List<UIComponentAPI> comps, boolean noSellRows, boolean noBuyRows) {
         int toRemove = 6;
 
         if (noSellRows) {
@@ -197,13 +200,18 @@ public class AoTDPriceTableRemoval implements ExtendedUIPanelPlugin {
         originalTooltip.beginTable(
                 Global.getSector().getPlayerFaction(),
                 20f,
-                "Price / 500*", 100,
-                "Demand", 70,
-                "Deficit", 70,
-                "Location", 230,
-                "Star System", 140,
-                "Dist (LY)", 80
-        );
+                "Price / 500*",
+                100,
+                "Demand",
+                70,
+                "Deficit",
+                70,
+                "Location",
+                230,
+                "Star System",
+                140,
+                "Dist (LY)",
+                80);
 
         int max = Math.min(DISPLAY_LIMIT, rows.size());
         for (int i = 0; i < max; i++) {
@@ -219,21 +227,21 @@ public class AoTDPriceTableRemoval implements ExtendedUIPanelPlugin {
 
             MarketDisplayData display = getMarketDisplayData(market);
 
-            Object row = originalTooltip.addRow(
-                    Color.ORANGE,
-                    Misc.getDGSCredits(rowData.pricePerUnit),
-                    Color.ORANGE,
-                    Misc.getWithDGS(rowData.demand),
-                    deficitStrColor,
-                    deficitString,
-                    Alignment.LMID,
-                    market.getFaction().getBaseUIColor(),
-                    market.getName() + " - " + display.factionName,
-                    display.locationColor,
-                    display.location,
-                    Color.ORANGE,
-                    Misc.getRoundedValueMaxOneAfterDecimal(display.distanceLY)
-            );
+            Object row =
+                    originalTooltip.addRow(
+                            Color.ORANGE,
+                            Misc.getDGSCredits(rowData.pricePerUnit),
+                            Color.ORANGE,
+                            Misc.getWithDGS(rowData.demand),
+                            deficitStrColor,
+                            deficitString,
+                            Alignment.LMID,
+                            market.getFaction().getBaseUIColor(),
+                            market.getName() + " - " + display.factionName,
+                            display.locationColor,
+                            display.location,
+                            Color.ORANGE,
+                            Misc.getRoundedValueMaxOneAfterDecimal(display.distanceLY));
 
             attachStarSystemPointer(row, market, display.locationColor);
         }
@@ -246,13 +254,18 @@ public class AoTDPriceTableRemoval implements ExtendedUIPanelPlugin {
         originalTooltip.beginTable(
                 Global.getSector().getPlayerFaction(),
                 20f,
-                "Price / 500*", 100,
-                "Available", 70,
-                "Excess", 70,
-                "Location", 230,
-                "Star System", 140,
-                "Dist (LY)", 80
-        );
+                "Price / 500*",
+                100,
+                "Available",
+                70,
+                "Excess",
+                70,
+                "Location",
+                230,
+                "Star System",
+                140,
+                "Dist (LY)",
+                80);
 
         int max = Math.min(DISPLAY_LIMIT, rows.size());
         for (int i = 0; i < max; i++) {
@@ -268,21 +281,21 @@ public class AoTDPriceTableRemoval implements ExtendedUIPanelPlugin {
 
             MarketDisplayData display = getMarketDisplayData(market);
 
-            Object row = originalTooltip.addRow(
-                    Color.ORANGE,
-                    Misc.getDGSCredits(rowData.pricePerUnit),
-                    Color.ORANGE,
-                    Misc.getWithDGS(rowData.availableDisplay),
-                    excessColor,
-                    excessString,
-                    Alignment.LMID,
-                    market.getFaction().getBaseUIColor(),
-                    market.getName() + " - " + display.factionName,
-                    display.locationColor,
-                    display.location,
-                    Color.ORANGE,
-                    Misc.getRoundedValueMaxOneAfterDecimal(display.distanceLY)
-            );
+            Object row =
+                    originalTooltip.addRow(
+                            Color.ORANGE,
+                            Misc.getDGSCredits(rowData.pricePerUnit),
+                            Color.ORANGE,
+                            Misc.getWithDGS(rowData.availableDisplay),
+                            excessColor,
+                            excessString,
+                            Alignment.LMID,
+                            market.getFaction().getBaseUIColor(),
+                            market.getName() + " - " + display.factionName,
+                            display.locationColor,
+                            display.location,
+                            Color.ORANGE,
+                            Misc.getRoundedValueMaxOneAfterDecimal(display.distanceLY));
 
             attachStarSystemPointer(row, market, display.locationColor);
         }
@@ -294,22 +307,16 @@ public class AoTDPriceTableRemoval implements ExtendedUIPanelPlugin {
         originalTooltip.addPara(
                 "*All values approximate. Prices do not include tariffs, which can be avoided through black market trade.",
                 Misc.getGrayColor(),
-                5f
-        );
+                5f);
 
         originalTooltip.addPara(
                 "*Per-unit prices assume buying or selling a batch of %s units. Each unit bought costs more as the market’s supply is reduced, and each unit sold brings in less as demand is fulfilled.",
-                5f,
-                Misc.getGrayColor(),
-                Color.ORANGE,
-                String.valueOf(PRICE_QUANTITY)
-        );
+                5f, Misc.getGrayColor(), Color.ORANGE, String.valueOf(PRICE_QUANTITY));
 
         originalTooltip.addPara(
                 "*Deficit and excess values may change next month due to trade events, so they should be considered reliable only for the current month.",
                 Misc.getGrayColor(),
-                5f
-        );
+                5f);
     }
 
     private void repositionTooltip() {
@@ -317,10 +324,7 @@ public class AoTDPriceTableRemoval implements ExtendedUIPanelPlugin {
         final int prevX = (int) posit.getX();
 
         ReflectionUtilis.invokeStaticMethodWithAutoProjection(
-                StandardTooltipV2Expandable.class,
-                "updateSizeAsUIElement",
-                originalTooltip
-        );
+                StandardTooltipV2Expandable.class, "updateSizeAsUIElement", originalTooltip);
 
         posit.inBL(0f, 0f);
 
@@ -352,26 +356,30 @@ public class AoTDPriceTableRemoval implements ExtendedUIPanelPlugin {
         return data;
     }
 
-    private static void attachStarSystemPointer(final Object row, final MarketAPI market, final Color locationColor) {
-        ReflectionUtilis.invokeMethodWithAutoProjection("setAfterCreate", row, new Runnable() {
-            @Override
-            public void run() {
-                AoTDPointerToStarSystem pointer = new AoTDPointerToStarSystem(
-                        (Float) ReflectionUtilis.invokeMethod("getHeight", row),
-                        market.getLocationInHyperspace(),
-                        locationColor
-                );
+    private static void attachStarSystemPointer(
+            final Object row, final MarketAPI market, final Color locationColor) {
+        ReflectionUtilis.invokeMethodWithAutoProjection(
+                "setAfterCreate",
+                row,
+                new Runnable() {
+                    @Override
+                    public void run() {
+                        AoTDPointerToStarSystem pointer =
+                                new AoTDPointerToStarSystem(
+                                        (Float) ReflectionUtilis.invokeMethod("getHeight", row),
+                                        market.getLocationInHyperspace(),
+                                        locationColor);
 
-                Object columns = ReflectionUtilis.invokeMethodWithAutoProjection("getCol", row, 4);
-                PositionAPI pos = (PositionAPI) ReflectionUtilis.invokeMethodWithAutoProjection(
-                        "addComponent",
-                        columns,
-                        pointer.getMainPanel()
-                );
+                        Object columns =
+                                ReflectionUtilis.invokeMethodWithAutoProjection("getCol", row, 4);
+                        PositionAPI pos =
+                                (PositionAPI)
+                                        ReflectionUtilis.invokeMethodWithAutoProjection(
+                                                "addComponent", columns, pointer.getMainPanel());
 
-                pos.inRMid(5f);
-            }
-        });
+                        pos.inRMid(5f);
+                    }
+                });
     }
 
     private static int getBuyPricePerUnit(MarketAPI market, String commodityId) {
@@ -387,14 +395,10 @@ public class AoTDPriceTableRemoval implements ExtendedUIPanelPlugin {
     }
 
     @Override
-    public void processInput(List<InputEventAPI> events) {
-
-    }
+    public void processInput(List<InputEventAPI> events) {}
 
     @Override
-    public void buttonPressed(Object buttonId) {
-
-    }
+    public void buttonPressed(Object buttonId) {}
 
     @Override
     public CustomPanelAPI getMainPanel() {
@@ -402,14 +406,10 @@ public class AoTDPriceTableRemoval implements ExtendedUIPanelPlugin {
     }
 
     @Override
-    public void createUI() {
-
-    }
+    public void createUI() {}
 
     @Override
-    public void clearUI() {
-
-    }
+    public void clearUI() {}
 
     private static class SellRowData {
         MarketAPI market;

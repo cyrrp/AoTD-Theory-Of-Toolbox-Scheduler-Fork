@@ -10,7 +10,5 @@ public class AoTDDeliveryMissionIntel extends DeliveryMissionIntel {
     }
 
     @Override
-    protected void applyTradeValueImpact(float totalReward) {
-
-    }
+    protected void applyTradeValueImpact(float totalReward) {}
 }

@@ -4,9 +4,13 @@ import java.util.LinkedHashMap;
 
 public class FactionProductionData {
     int month;
-    LinkedHashMap<String,Integer>production = new LinkedHashMap<>();
-    LinkedHashMap<String,Integer>demand = new LinkedHashMap<>();
-    public FactionProductionData(int month, LinkedHashMap<String,Integer>production,LinkedHashMap<String,Integer>demand) {
+    LinkedHashMap<String, Integer> production = new LinkedHashMap<>();
+    LinkedHashMap<String, Integer> demand = new LinkedHashMap<>();
+
+    public FactionProductionData(
+            int month,
+            LinkedHashMap<String, Integer> production,
+            LinkedHashMap<String, Integer> demand) {
         this.month = month;
         this.production = production;
         this.demand = demand;
@@ -24,12 +28,11 @@ public class FactionProductionData {
         return demand;
     }
 
-    public int getProductionValueFromMonth(String commodityId){
+    public int getProductionValueFromMonth(String commodityId) {
         return getProduction().getOrDefault(commodityId, 0);
     }
-    public int getDemandValueFromMonth(String commodityId){
+
+    public int getDemandValueFromMonth(String commodityId) {
         return getDemand().getOrDefault(commodityId, 0);
     }
-
-
 }

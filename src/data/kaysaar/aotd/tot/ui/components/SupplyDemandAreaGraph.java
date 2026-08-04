@@ -5,27 +5,23 @@ import com.fs.starfarer.api.Global;
 import com.fs.starfarer.api.input.InputEventAPI;
 import com.fs.starfarer.api.ui.CustomPanelAPI;
 import com.fs.starfarer.api.ui.PositionAPI;
-import org.lwjgl.opengl.GL11;
-
 import java.awt.*;
 import java.util.ArrayList;
 import java.util.List;
+import org.lwjgl.opengl.GL11;
 
 /**
  * Supply/Demand area graph.
  *
- * Visual meaning:
- *  - ORANGE = covered demand / existing production: baseline -> min(supply, demand)
- *  - GREEN  = surplus: demand -> supply, when supply > demand
- *  - RED    = shortage: supply -> demand, when demand > supply
+ * <p>Visual meaning: - ORANGE = covered demand / existing production: baseline -> min(supply,
+ * demand) - GREEN = surplus: demand -> supply, when supply > demand - RED = shortage: supply ->
+ * demand, when demand > supply
  *
- * AA:
- *  - Outer visible top edge is anti-aliased.
- *  - Internal covered boundary is also anti-aliased:
- *      green lower edge -> feather down into orange
- *      red lower edge   -> feather down into orange
+ * <p>AA: - Outer visible top edge is anti-aliased. - Internal covered boundary is also
+ * anti-aliased: green lower edge -> feather down into orange red lower edge -> feather down into
+ * orange
  *
- * This keeps orange visible when production exists, while avoiding orange fringe over red/green.
+ * <p>This keeps orange visible when production exists, while avoiding orange fringe over red/green.
  */
 public class SupplyDemandAreaGraph implements ExtendedUIPanelPlugin {
 
@@ -46,19 +42,14 @@ public class SupplyDemandAreaGraph implements ExtendedUIPanelPlugin {
     private boolean aaEnabled = true;
     private float aaFeatherPx = 1.25f;
 
-    /**
-     * Kept for compatibility with existing callers.
-     */
+    /** Kept for compatibility with existing callers. */
     private float crossingOverlapPx = 0f;
 
-    /**
-     * Kept for compatibility with existing callers.
-     */
+    /** Kept for compatibility with existing callers. */
     private float aaCrossCutPx = 0f;
 
-    public SupplyDemandAreaGraph(float width, float height,
-                                 List<Float> supplySamplesY,
-                                 List<Float> demandSamplesY) {
+    public SupplyDemandAreaGraph(
+            float width, float height, List<Float> supplySamplesY, List<Float> demandSamplesY) {
         this.mainPanel = Global.getSettings().createCustom(width, height, this);
         setData(supplySamplesY, demandSamplesY);
         createUI();
@@ -70,47 +61,31 @@ public class SupplyDemandAreaGraph implements ExtendedUIPanelPlugin {
     }
 
     @Override
-    public void createUI() {
-
-    }
+    public void createUI() {}
 
     @Override
-    public void clearUI() {
-
-    }
+    public void clearUI() {}
 
     @Override
-    public void positionChanged(PositionAPI position) {
-
-    }
+    public void positionChanged(PositionAPI position) {}
 
     @Override
-    public void renderBelow(float alphaMult) {
-
-    }
+    public void renderBelow(float alphaMult) {}
 
     @Override
-    public void advance(float amount) {
-
-    }
+    public void advance(float amount) {}
 
     @Override
-    public void processInput(List<InputEventAPI> events) {
-
-    }
+    public void processInput(List<InputEventAPI> events) {}
 
     @Override
-    public void buttonPressed(Object buttonId) {
-
-    }
+    public void buttonPressed(Object buttonId) {}
 
     public void setAlphaMult(float alphaMult) {
         this.alphaMult = alphaMult;
     }
 
-    /**
-     * Green / Orange / Red.
-     */
+    /** Green / Orange / Red. */
     public void setColors(Color green, Color orange, Color red) {
         if (green != null) this.greenFill = green;
         if (orange != null) this.orangeFill = orange;
@@ -218,7 +193,8 @@ public class SupplyDemandAreaGraph implements ExtendedUIPanelPlugin {
         }
     }
 
-    private void drawOrangeCoveredArea(float baseline, float top, List<P> points, Color color, float alphaMult) {
+    private void drawOrangeCoveredArea(
+            float baseline, float top, List<P> points, Color color, float alphaMult) {
         setColor(color, alphaMult);
         GL11.glBegin(GL11.GL_TRIANGLES);
 
@@ -242,7 +218,8 @@ public class SupplyDemandAreaGraph implements ExtendedUIPanelPlugin {
         GL11.glEnd();
     }
 
-    private void drawGreenSurplusArea(float baseline, float top, List<P> points, Color color, float alphaMult) {
+    private void drawGreenSurplusArea(
+            float baseline, float top, List<P> points, Color color, float alphaMult) {
         setColor(color, alphaMult);
         GL11.glBegin(GL11.GL_TRIANGLES);
 
@@ -266,7 +243,8 @@ public class SupplyDemandAreaGraph implements ExtendedUIPanelPlugin {
         GL11.glEnd();
     }
 
-    private void drawRedShortageArea(float baseline, float top, List<P> points, Color color, float alphaMult) {
+    private void drawRedShortageArea(
+            float baseline, float top, List<P> points, Color color, float alphaMult) {
         setColor(color, alphaMult);
         GL11.glBegin(GL11.GL_TRIANGLES);
 
@@ -339,8 +317,8 @@ public class SupplyDemandAreaGraph implements ExtendedUIPanelPlugin {
         emitBand(a.x, lowerA, upperA, b.x, lowerB, upperB);
     }
 
-    private static void emitBand(float xA, float lowerA, float upperA,
-                                 float xB, float lowerB, float upperB) {
+    private static void emitBand(
+            float xA, float lowerA, float upperA, float xB, float lowerB, float upperB) {
         GL11.glVertex2f(xA, lowerA);
         GL11.glVertex2f(xA, upperA);
         GL11.glVertex2f(xB, lowerB);
@@ -353,18 +331,17 @@ public class SupplyDemandAreaGraph implements ExtendedUIPanelPlugin {
     /**
      * AA for the orange covered boundary.
      *
-     * In surplus:
-     *   orange ends at demand, green starts at demand.
-     *   Use green AA feathering downward into orange.
+     * <p>In surplus: orange ends at demand, green starts at demand. Use green AA feathering
+     * downward into orange.
      *
-     * In shortage:
-     *   orange ends at supply, red starts at supply.
-     *   Use red AA feathering downward into orange.
+     * <p>In shortage: orange ends at supply, red starts at supply. Use red AA feathering downward
+     * into orange.
      *
-     * This makes the visible orange boundary smooth without drawing orange AA on top of red/green.
+     * <p>This makes the visible orange boundary smooth without drawing orange AA on top of
+     * red/green.
      */
-    private void drawCoveredBoundaryAA(float baseline, float top, List<P> points,
-                                       float alphaMult, float featherPx) {
+    private void drawCoveredBoundaryAA(
+            float baseline, float top, List<P> points, float alphaMult, float featherPx) {
         GL11.glBegin(GL11.GL_TRIANGLES);
 
         for (int i = 0; i < points.size() - 1; i++) {
@@ -387,8 +364,8 @@ public class SupplyDemandAreaGraph implements ExtendedUIPanelPlugin {
         GL11.glEnd();
     }
 
-    private void emitCoveredBoundaryAAPiece(float baseline, float top, P a, P b,
-                                            float alphaMult, float featherPx) {
+    private void emitCoveredBoundaryAAPiece(
+            float baseline, float top, P a, P b, float alphaMult, float featherPx) {
         float diffA = a.s - a.d;
         float diffB = b.s - b.d;
 
@@ -424,11 +401,9 @@ public class SupplyDemandAreaGraph implements ExtendedUIPanelPlugin {
         aaStripVertical(a.x, yA, b.x, yB, -featherPx, r, g, bCol, aCol);
     }
 
-    /**
-     * AA for the outer visible top edge of the graph.
-     */
-    private void drawVisibleTopEdgeAA(float baseline, float top, List<P> points,
-                                      float alphaMult, float featherPx) {
+    /** AA for the outer visible top edge of the graph. */
+    private void drawVisibleTopEdgeAA(
+            float baseline, float top, List<P> points, float alphaMult, float featherPx) {
         GL11.glBegin(GL11.GL_TRIANGLES);
 
         for (int i = 0; i < points.size() - 1; i++) {
@@ -451,8 +426,8 @@ public class SupplyDemandAreaGraph implements ExtendedUIPanelPlugin {
         GL11.glEnd();
     }
 
-    private void emitVisibleTopAAPiece(float baseline, float top, P a, P b,
-                                       float alphaMult, float featherPx) {
+    private void emitVisibleTopAAPiece(
+            float baseline, float top, P a, P b, float alphaMult, float featherPx) {
         float diffA = a.s - a.d;
         float diffB = b.s - b.d;
 
@@ -479,9 +454,16 @@ public class SupplyDemandAreaGraph implements ExtendedUIPanelPlugin {
         aaStripVertical(a.x, yA, b.x, yB, featherPx, r, g, bCol, aCol);
     }
 
-    private static void aaStripVertical(float x0, float y0, float x1, float y1,
-                                        float dy,
-                                        float r, float g, float b, float aInner) {
+    private static void aaStripVertical(
+            float x0,
+            float y0,
+            float x1,
+            float y1,
+            float dy,
+            float r,
+            float g,
+            float b,
+            float aInner) {
         float x0Outer = x0;
         float y0Outer = y0 + dy;
 
@@ -510,11 +492,7 @@ public class SupplyDemandAreaGraph implements ExtendedUIPanelPlugin {
     private static P createCrossingPoint(P a, P b, float diffA, float diffB) {
         float t = solveT(diffA, diffB, 0f);
 
-        return new P(
-                lerp(a.x, b.x, t),
-                lerp(a.s, b.s, t),
-                lerp(a.d, b.d, t)
-        );
+        return new P(lerp(a.x, b.x, t), lerp(a.s, b.s, t), lerp(a.d, b.d, t));
     }
 
     private static boolean crossesZero(float a, float b) {
@@ -547,10 +525,11 @@ public class SupplyDemandAreaGraph implements ExtendedUIPanelPlugin {
     }
 
     /**
-     * Converts integer values to panel-local Y samples [0..height].
-     * highest should be max across both supply and demand.
+     * Converts integer values to panel-local Y samples [0..height]. highest should be max across
+     * both supply and demand.
      */
-    public static ArrayList<Float> createSeriesForGraph(float height, List<Integer> values, float highest) {
+    public static ArrayList<Float> createSeriesForGraph(
+            float height, List<Integer> values, float highest) {
         ArrayList<Float> out = new ArrayList<>();
         if (values == null || values.isEmpty()) return out;
 

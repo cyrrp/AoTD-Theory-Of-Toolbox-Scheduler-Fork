@@ -2,52 +2,43 @@ package data.kaysaar.aotd.tot.listeners.ui;
 
 import ashlib.data.plugins.ui.models.ExtendedUIPanelPlugin;
 import com.fs.starfarer.api.Global;
-import com.fs.starfarer.api.campaign.LocationAPI;
 import com.fs.starfarer.api.graphics.SpriteAPI;
 import com.fs.starfarer.api.input.InputEventAPI;
 import com.fs.starfarer.api.ui.CustomPanelAPI;
 import com.fs.starfarer.api.ui.PositionAPI;
 import com.fs.starfarer.api.util.Misc;
-import org.lwjgl.util.vector.Vector2f;
-
 import java.awt.*;
 import java.util.List;
-import java.util.Vector;
+import org.lwjgl.util.vector.Vector2f;
 
 public class AoTDPointerToStarSystem implements ExtendedUIPanelPlugin {
     CustomPanelAPI mainPanel;
-    SpriteAPI arrow = Global.getSettings().getSprite("ui","marketArrow");
+    SpriteAPI arrow = Global.getSettings().getSprite("ui", "marketArrow");
     Vector2f location;
     Color color;
-    public AoTDPointerToStarSystem(float iconSize, Vector2f locationInHyperspace, Color color){
-        mainPanel = Global.getSettings().createCustom(iconSize,iconSize,this);
+
+    public AoTDPointerToStarSystem(float iconSize, Vector2f locationInHyperspace, Color color) {
+        mainPanel = Global.getSettings().createCustom(iconSize, iconSize, this);
         location = locationInHyperspace;
         this.color = color;
     }
+
     @Override
     public CustomPanelAPI getMainPanel() {
         return mainPanel;
     }
 
     @Override
-    public void createUI() {
-
-    }
+    public void createUI() {}
 
     @Override
-    public void clearUI() {
-
-    }
+    public void clearUI() {}
 
     @Override
-    public void positionChanged(PositionAPI position) {
-
-    }
+    public void positionChanged(PositionAPI position) {}
 
     @Override
-    public void renderBelow(float alphaMult) {
-
-    }
+    public void renderBelow(float alphaMult) {}
 
     @Override
     public void render(float alphaMult) {
@@ -55,7 +46,9 @@ public class AoTDPointerToStarSystem implements ExtendedUIPanelPlugin {
         Vector2f target = this.location;
 
         if (target != null) {
-            if(player.equals(target)){return;}
+            if (player.equals(target)) {
+                return;
+            }
             float dx = target.x - player.x;
             float dy = target.y - player.y;
 
@@ -69,27 +62,16 @@ public class AoTDPointerToStarSystem implements ExtendedUIPanelPlugin {
             arrow.setAngle(-angle);
             arrow.setColor(Misc.getBasePlayerColor());
             arrow.renderAtCenter(
-                    mainPanel.getPosition().getCenterX(),
-                    mainPanel.getPosition().getCenterY()
-            );
+                    mainPanel.getPosition().getCenterX(), mainPanel.getPosition().getCenterY());
         }
-
-
-
     }
 
     @Override
-    public void advance(float amount) {
-
-    }
+    public void advance(float amount) {}
 
     @Override
-    public void processInput(List<InputEventAPI> events) {
-
-    }
+    public void processInput(List<InputEventAPI> events) {}
 
     @Override
-    public void buttonPressed(Object buttonId) {
-
-    }
+    public void buttonPressed(Object buttonId) {}
 }

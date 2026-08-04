@@ -1,9 +1,8 @@
 package data.kaysaar.aotd.tot.scripts.coreui.listeners;
 
 import com.fs.starfarer.api.Global;
-import org.apache.log4j.Logger;
-
 import java.util.concurrent.CopyOnWriteArrayList;
+import org.apache.log4j.Logger;
 
 public final class ColonyUIListener {
     private static final Logger LOG = Global.getLogger(ColonyUIListener.class);
@@ -20,16 +19,17 @@ public final class ColonyUIListener {
         MARKET_UI_LISTENERS.remove(l);
     }
 
-    public static void notifyMarketOverview(IndustryPanelContextUI ctx)  {
+    public static void notifyMarketOverview(IndustryPanelContextUI ctx) {
         for (MarketUIListener l : MARKET_UI_LISTENERS) {
             try {
                 l.onMarketOverviewDiscovered(ctx);
             } catch (RuntimeException failure) {
-                throw new RuntimeException("Market overview listener failed: "
-                        + l.getClass().getName(), failure);
+                throw new RuntimeException(
+                        "Market overview listener failed: " + l.getClass().getName(), failure);
             }
         }
     }
+
     public static void notifySurveyPanelOverview(SurveyPanelContextUI ctx) {
         for (MarketUIListener l : MARKET_UI_LISTENERS) {
             try {
@@ -39,6 +39,7 @@ public final class ColonyUIListener {
             }
         }
     }
+
     public static void notifyMarketOverview(CargoPanelContextUI ctx) {
         for (MarketUIListener l : MARKET_UI_LISTENERS) {
             try {
@@ -48,11 +49,15 @@ public final class ColonyUIListener {
             }
         }
     }
+
     /** Re-register listeners on game load. */
     public static void refresh() {
         MARKET_UI_LISTENERS.clear();
-        Global.getSettings().getModManager().getEnabledModPlugins().stream().filter(x->x instanceof MarketContextListenerInjector).forEach(x->{
-            ((MarketContextListenerInjector) x).reloadListenerContext();
-        });
+        Global.getSettings().getModManager().getEnabledModPlugins().stream()
+                .filter(x -> x instanceof MarketContextListenerInjector)
+                .forEach(
+                        x -> {
+                            ((MarketContextListenerInjector) x).reloadListenerContext();
+                        });
     }
 }

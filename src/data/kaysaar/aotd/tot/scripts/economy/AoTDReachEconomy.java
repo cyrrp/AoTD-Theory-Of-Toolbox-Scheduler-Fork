@@ -12,7 +12,6 @@ import com.fs.starfarer.campaign.econ.reach.ReachEconomy;
 import data.kaysaar.aotd.tot.compat.MarketRegistry;
 import data.kaysaar.aotd.tot.compat.SchedulerBridge;
 import data.kaysaar.aotd.tot.scripts.commoditydata.AoTDCommodityMarketData;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.TreeSet;
@@ -20,9 +19,10 @@ import java.util.TreeSet;
 public class AoTDReachEconomy extends ReachEconomy {
     public void nextStepForPlayer(MainWorkTask.EconWorkParams econWorkParams) {
         econWorkParams = normalizeWorkParams(econWorkParams);
-        final List<MarketAPI> markets = this.getMarkets().stream()
-                .filter(x -> x.isPlayerOwned() || x.getFaction().isPlayerFaction())
-                .toList();
+        final List<MarketAPI> markets =
+                this.getMarkets().stream()
+                        .filter(x -> x.isPlayerOwned() || x.getFaction().isPlayerFaction())
+                        .toList();
         refreshAdministrators(markets);
         runMainTask(markets, econWorkParams, null);
 
@@ -42,15 +42,13 @@ public class AoTDReachEconomy extends ReachEconomy {
     /**
      * Synchronous UI refresh for exactly one market.
      *
-     * <p>This path intentionally does not rebuild global commodity-market data or
-     * settle global internal trade. It publishes a complete local market revision,
-     * runs immigration and its trade snapshot only for that market, then performs
-     * one local follow-up when the snapshot dirtied price/stockpile outputs.</p>
+     * <p>This path intentionally does not rebuild global commodity-market data or settle global
+     * internal trade. It publishes a complete local market revision, runs immigration and its trade
+     * snapshot only for that market, then performs one local follow-up when the snapshot dirtied
+     * price/stockpile outputs.
      */
     final void nextStepForUiMarket(
-            MainWorkTask.EconWorkParams econWorkParams,
-            MarketAPI market,
-            String context) {
+            MainWorkTask.EconWorkParams econWorkParams, MarketAPI market, String context) {
         if (market == null) return;
         econWorkParams = normalizeWorkParams(econWorkParams);
         final ArrayList<MarketAPI> localMarkets = new ArrayList<>(1);
@@ -58,19 +56,18 @@ public class AoTDReachEconomy extends ReachEconomy {
         refreshAdministrator(market);
 
         runMainTask(localMarkets, econWorkParams, market);
-        drain(new AoTDUpdateMarketAgainTask(
-                (Economy) Global.getSector().getEconomy(), market));
+        drain(new AoTDUpdateMarketAgainTask((Economy) Global.getSector().getEconomy(), market));
 
         if (econWorkParams.withImmigration) {
-            drain(new ImmigrationTask(
-                    localMarkets, this, !econWorkParams.forceNonUIStep));
+            drain(new ImmigrationTask(localMarkets, this, !econWorkParams.forceNonUIStep));
         }
 
         // The old implementation accidentally passed every market here even in
         // the single-market branch. Keep the atomic publication contract, but
         // limit capture to the market whose UI is being opened.
-        drain(new AoTDPostImmigrationTradeSnapshotTask(
-                localMarkets, "ui-" + (context == null ? "market" : context)));
+        drain(
+                new AoTDPostImmigrationTradeSnapshotTask(
+                        localMarkets, "ui-" + (context == null ? "market" : context)));
 
         // Immigration/net-production publication may create a fresh local price
         // revision. Finish it before the UI observes the market and before the
@@ -78,8 +75,7 @@ public class AoTDReachEconomy extends ReachEconomy {
         if (MarketRegistry.needsMaterializedReconciliation(market)
                 || MarketRegistry.needsPriceRefresh(market)) {
             runMainTask(localMarkets, econWorkParams, market);
-            drain(new AoTDUpdateMarketAgainTask(
-                    (Economy) Global.getSector().getEconomy(), market));
+            drain(new AoTDUpdateMarketAgainTask((Economy) Global.getSector().getEconomy(), market));
         }
 
         // Preserve the observable Economy.nextStep listener boundary while
@@ -90,9 +86,8 @@ public class AoTDReachEconomy extends ReachEconomy {
     }
 
     /**
-     * UI mutation refresh: materialize one market, rebuild global/econ-group data
-     * only for the sorted affected IDs, then publish the local price/snapshot
-     * revision and listener boundary.
+     * UI mutation refresh: materialize one market, rebuild global/econ-group data only for the
+     * sorted affected IDs, then publish the local price/snapshot revision and listener boundary.
      */
     final void nextStepForUiMarketMutation(
             MainWorkTask.EconWorkParams econWorkParams,
@@ -100,8 +95,8 @@ public class AoTDReachEconomy extends ReachEconomy {
             String[] affectedCommodityIds,
             int scope,
             String context) {
-        if (market == null || affectedCommodityIds == null
-                || affectedCommodityIds.length == 0) return;
+        if (market == null || affectedCommodityIds == null || affectedCommodityIds.length == 0)
+            return;
         econWorkParams = normalizeWorkParams(econWorkParams);
         final ArrayList<MarketAPI> localMarkets = new ArrayList<>(1);
         localMarkets.add(market);
@@ -110,23 +105,19 @@ public class AoTDReachEconomy extends ReachEconomy {
         // Fork-native local materialization retains the exact AoTD industry and
         // pure-price commit semantics while limiting live market work to one market.
         runMainTask(localMarkets, econWorkParams, market, false);
-        drain(new AoTDUpdateMarketAgainTask(
-                (Economy) Global.getSector().getEconomy(), market));
+        drain(new AoTDUpdateMarketAgainTask((Economy) Global.getSector().getEconomy(), market));
 
-        if ((scope & SchedulerBridge.REFRESH_IMMIGRATION) != 0
-                && econWorkParams.withImmigration) {
-            drain(new ImmigrationTask(
-                    localMarkets, this, !econWorkParams.forceNonUIStep));
+        if ((scope & SchedulerBridge.REFRESH_IMMIGRATION) != 0 && econWorkParams.withImmigration) {
+            drain(new ImmigrationTask(localMarkets, this, !econWorkParams.forceNonUIStep));
         }
-        drain(new AoTDPostImmigrationTradeSnapshotTask(
-                localMarkets, "targeted-ui-"
-                        + (context == null ? "market" : context)));
+        drain(
+                new AoTDPostImmigrationTradeSnapshotTask(
+                        localMarkets, "targeted-ui-" + (context == null ? "market" : context)));
 
         if (MarketRegistry.needsMaterializedReconciliation(market)
                 || MarketRegistry.needsPriceRefresh(market)) {
             runMainTask(localMarkets, econWorkParams, market, false);
-            drain(new AoTDUpdateMarketAgainTask(
-                    (Economy) Global.getSector().getEconomy(), market));
+            drain(new AoTDUpdateMarketAgainTask((Economy) Global.getSector().getEconomy(), market));
         }
 
         rebuildAffectedCommodityData(affectedCommodityIds);
@@ -139,8 +130,8 @@ public class AoTDReachEconomy extends ReachEconomy {
     private static void notifyAffectedCommodityListeners(String[] ids) {
         Economy economy = (Economy) Global.getSector().getEconomy();
         ArrayList<EconomyAPI.EconomyUpdateListener> activeListeners = new ArrayList<>();
-        for (EconomyAPI.EconomyUpdateListener listener
-                : new ArrayList<>(economy.getUpdateListeners())) {
+        for (EconomyAPI.EconomyUpdateListener listener :
+                new ArrayList<>(economy.getUpdateListeners())) {
             if (listener == null) continue;
             if (listener.isEconomyListenerExpired()) {
                 economy.removeUpdateListener(listener);
@@ -203,9 +194,7 @@ public class AoTDReachEconomy extends ReachEconomy {
     }
 
     private void runMainTask(
-            List<MarketAPI> markets,
-            MainWorkTask.EconWorkParams params,
-            MarketAPI singleMarket) {
+            List<MarketAPI> markets, MainWorkTask.EconWorkParams params, MarketAPI singleMarket) {
         runMainTask(markets, params, singleMarket, true);
     }
 
@@ -214,10 +203,11 @@ public class AoTDReachEconomy extends ReachEconomy {
             MainWorkTask.EconWorkParams params,
             MarketAPI singleMarket,
             boolean notifyCommodityListeners) {
-        final AoTdMainWorkTask2 task = singleMarket == null
-                ? new AoTdMainWorkTask2(markets, this, params)
-                : new AoTdMainWorkTask2(
-                        markets, this, params, singleMarket, notifyCommodityListeners);
+        final AoTdMainWorkTask2 task =
+                singleMarket == null
+                        ? new AoTdMainWorkTask2(markets, this, params)
+                        : new AoTdMainWorkTask2(
+                                markets, this, params, singleMarket, notifyCommodityListeners);
         while (!task.isDone()) {
             task.doNextBatch();
             task.awaitWorkersIfSubmitted();

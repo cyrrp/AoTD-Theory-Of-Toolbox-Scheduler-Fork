@@ -9,8 +9,6 @@ import com.fs.starfarer.api.ui.TooltipMakerAPI;
 import data.kaysaar.aotd.tot.produciton.specs.AoTDProductionSpec;
 import data.kaysaar.aotd.tot.ui.customprod.components.ProductionCustomButton;
 import data.kaysaar.aotd.tot.ui.customprod.components.ProductionDynamicPanelForScroll;
-
-
 import java.util.ArrayList;
 import java.util.List;
 
@@ -31,37 +29,38 @@ public class ProductionOptionList implements ExtendedUIPanelPlugin {
         return buttonsStorage;
     }
 
-    public ProductionOptionList(List<AoTDProductionSpec> specs,
-                                float width,
-                                float height,
-                                AoTDProductionSpec.AoTDProductionSpecType prodType) {
+    public ProductionOptionList(
+            List<AoTDProductionSpec> specs,
+            float width,
+            float height,
+            AoTDProductionSpec.AoTDProductionSpecType prodType) {
         mainPanel = Global.getSettings().createCustom(width, height, this);
 
         for (AoTDProductionSpec spec : specs) {
-            ProductionCustomButton bt = createButtonForType(prodType, width - 10, heightOfButtons, spec);
-            if(bt!=null){
+            ProductionCustomButton bt =
+                    createButtonForType(prodType, width - 10, heightOfButtons, spec);
+            if (bt != null) {
                 buttonsStorage.add(bt);
             }
-
         }
     }
-    public ProductionOptionList(List<AoTDProductionSpec> specs,
-                                float width,
-                                float height,float heightOfButtons,
-                                AoTDProductionSpec.AoTDProductionSpecType prodType) {
+
+    public ProductionOptionList(
+            List<AoTDProductionSpec> specs,
+            float width,
+            float height,
+            float heightOfButtons,
+            AoTDProductionSpec.AoTDProductionSpecType prodType) {
         mainPanel = Global.getSettings().createCustom(width, height, this);
         this.setHeightOfButtons(heightOfButtons);
         for (AoTDProductionSpec spec : specs) {
-            ProductionCustomButton bt = createButtonForType(prodType, width - 10, heightOfButtons, spec);
-            if(bt!=null){
+            ProductionCustomButton bt =
+                    createButtonForType(prodType, width - 10, heightOfButtons, spec);
+            if (bt != null) {
                 buttonsStorage.add(bt);
             }
-
         }
     }
-
-
-
 
     @Override
     public CustomPanelAPI getMainPanel() {
@@ -70,17 +69,33 @@ public class ProductionOptionList implements ExtendedUIPanelPlugin {
 
     @Override
     public void createUI() {
-        if(scrollBarV2==null){
-            scrollBarV2 = new ProductionDynamicPanelForScroll(mainPanel.getPosition().getWidth(),mainPanel.getPosition().getHeight(),mainPanel,35,heightOfButtons,2);
+        if (scrollBarV2 == null) {
+            scrollBarV2 =
+                    new ProductionDynamicPanelForScroll(
+                            mainPanel.getPosition().getWidth(),
+                            mainPanel.getPosition().getHeight(),
+                            mainPanel,
+                            35,
+                            heightOfButtons,
+                            2);
         }
-        if(contentPanel!=null){
+        if (contentPanel != null) {
             mainPanel.removeComponent(contentPanel);
             scrollBarV2.clearItems();
         }
-        contentPanel = Global.getSettings().createCustom(mainPanel.getPosition().getWidth(),mainPanel.getPosition().getHeight(),null);
-        TooltipMakerAPI tl = contentPanel.createUIElement(contentPanel.getPosition().getWidth(),contentPanel.getPosition().getHeight(),true);
-        ArrayList<ProductionCustomButton>validButtons = new ArrayList<>(buttonsStorage);
-        if(filter!=null){
+        contentPanel =
+                Global.getSettings()
+                        .createCustom(
+                                mainPanel.getPosition().getWidth(),
+                                mainPanel.getPosition().getHeight(),
+                                null);
+        TooltipMakerAPI tl =
+                contentPanel.createUIElement(
+                        contentPanel.getPosition().getWidth(),
+                        contentPanel.getPosition().getHeight(),
+                        true);
+        ArrayList<ProductionCustomButton> validButtons = new ArrayList<>(buttonsStorage);
+        if (filter != null) {
             filter.pruneList(validButtons);
         }
 
@@ -89,26 +104,39 @@ public class ProductionOptionList implements ExtendedUIPanelPlugin {
         }
         scrollBarV2.createUI();
 
-        tl.addCustom(scrollBarV2.getMainPanel(),0f).getPosition().inTL(0,0);
-        contentPanel.addUIElement(tl).inTL(0,0);
-        mainPanel.addComponent(contentPanel).inTL(0,0);
+        tl.addCustom(scrollBarV2.getMainPanel(), 0f).getPosition().inTL(0, 0);
+        contentPanel.addUIElement(tl).inTL(0, 0);
+        mainPanel.addComponent(contentPanel).inTL(0, 0);
     }
-    public ProductionCustomButton createButtonForType(AoTDProductionSpec.AoTDProductionSpecType type, float width, float height, AoTDProductionSpec spec) {
+
+    public ProductionCustomButton createButtonForType(
+            AoTDProductionSpec.AoTDProductionSpecType type,
+            float width,
+            float height,
+            AoTDProductionSpec spec) {
 
         return null;
     }
-    public void resetList(List<AoTDProductionSpec> specs,AoTDProductionSpec.AoTDProductionSpecType prodType) {
+
+    public void resetList(
+            List<AoTDProductionSpec> specs, AoTDProductionSpec.AoTDProductionSpecType prodType) {
         for (ProductionCustomButton productionCustomButton : buttonsStorage) {
             productionCustomButton.clearUI();
         }
         buttonsStorage.clear();
         for (AoTDProductionSpec spec : specs) {
-            ProductionCustomButton button = createButtonForType(prodType, mainPanel.getPosition().getWidth() - 10, heightOfButtons, spec);
-            if(button!=null){
+            ProductionCustomButton button =
+                    createButtonForType(
+                            prodType,
+                            mainPanel.getPosition().getWidth() - 10,
+                            heightOfButtons,
+                            spec);
+            if (button != null) {
                 buttonsStorage.add(button);
             }
         }
     }
+
     @Override
     public void clearUI() {
         mainPanel.removeComponent(contentPanel);
@@ -120,32 +148,20 @@ public class ProductionOptionList implements ExtendedUIPanelPlugin {
     }
 
     @Override
-    public void positionChanged(PositionAPI position) {
-
-    }
+    public void positionChanged(PositionAPI position) {}
 
     @Override
-    public void renderBelow(float alphaMult) {
-
-    }
+    public void renderBelow(float alphaMult) {}
 
     @Override
-    public void render(float alphaMult) {
-
-    }
+    public void render(float alphaMult) {}
 
     @Override
-    public void advance(float amount) {
-
-    }
+    public void advance(float amount) {}
 
     @Override
-    public void processInput(List<InputEventAPI> events) {
-
-    }
+    public void processInput(List<InputEventAPI> events) {}
 
     @Override
-    public void buttonPressed(Object buttonId) {
-
-    }
+    public void buttonPressed(Object buttonId) {}
 }

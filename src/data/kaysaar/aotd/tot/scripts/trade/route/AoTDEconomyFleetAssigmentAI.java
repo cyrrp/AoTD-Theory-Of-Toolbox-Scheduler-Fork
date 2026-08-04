@@ -8,7 +8,6 @@ import com.fs.starfarer.api.campaign.econ.CommoditySpecAPI;
 import com.fs.starfarer.api.campaign.econ.MarketAPI;
 import com.fs.starfarer.api.fleet.FleetMemberAPI;
 import com.fs.starfarer.api.fleet.ShipRolePick;
-import com.fs.starfarer.api.impl.campaign.econ.impl.BaseIndustry;
 import com.fs.starfarer.api.impl.campaign.fleets.EconomyFleetAssignmentAI;
 import com.fs.starfarer.api.impl.campaign.fleets.RouteManager;
 import com.fs.starfarer.api.impl.campaign.ids.Commodities;
@@ -17,14 +16,14 @@ import com.fs.starfarer.api.impl.campaign.ids.ShipRoles;
 import com.fs.starfarer.api.util.IntervalUtil;
 import com.fs.starfarer.api.util.Misc;
 import com.fs.starfarer.api.util.WeightedRandomPicker;
-
 import java.util.*;
 
 public class AoTDEconomyFleetAssigmentAI extends EconomyFleetAssignmentAI {
-    public static class AoTDEconomyRouteData extends EconomyRouteData{
+    public static class AoTDEconomyRouteData extends EconomyRouteData {
         public void addDeliver(String id, int qty) {
             cargoDeliver.add(new EconomyFleetAssignmentAI.CargoQuantityData(id, qty));
         }
+
         public void addReturn(String id, int qty) {
             cargoReturn.add(new EconomyFleetAssignmentAI.CargoQuantityData(id, qty));
         }
@@ -32,29 +31,36 @@ public class AoTDEconomyFleetAssigmentAI extends EconomyFleetAssignmentAI {
         public static String getCargoList(List<EconomyFleetAssignmentAI.CargoQuantityData> cargo) {
             List<String> strings = new ArrayList<String>();
 
-            List<EconomyFleetAssignmentAI.CargoQuantityData> sorted = new ArrayList<EconomyFleetAssignmentAI.CargoQuantityData>(cargo);
-            Collections.sort(sorted, new Comparator<EconomyFleetAssignmentAI.CargoQuantityData>() {
-                public int compare(EconomyFleetAssignmentAI.CargoQuantityData o1, EconomyFleetAssignmentAI.CargoQuantityData o2) {
-                    if (o1.getCommodity().isPersonnel() && !o2.getCommodity().isPersonnel()) {
-                        return 1;
-                    }
-                    if (o2.getCommodity().isPersonnel() && !o1.getCommodity().isPersonnel()) {
-                        return -1;
-                    }
-                    return o2.units - o1.units;
-                }
-            });
+            List<EconomyFleetAssignmentAI.CargoQuantityData> sorted =
+                    new ArrayList<EconomyFleetAssignmentAI.CargoQuantityData>(cargo);
+            Collections.sort(
+                    sorted,
+                    new Comparator<EconomyFleetAssignmentAI.CargoQuantityData>() {
+                        public int compare(
+                                EconomyFleetAssignmentAI.CargoQuantityData o1,
+                                EconomyFleetAssignmentAI.CargoQuantityData o2) {
+                            if (o1.getCommodity().isPersonnel()
+                                    && !o2.getCommodity().isPersonnel()) {
+                                return 1;
+                            }
+                            if (o2.getCommodity().isPersonnel()
+                                    && !o1.getCommodity().isPersonnel()) {
+                                return -1;
+                            }
+                            return o2.units - o1.units;
+                        }
+                    });
 
             for (EconomyFleetAssignmentAI.CargoQuantityData curr : sorted) {
                 CommoditySpecAPI spec = curr.getCommodity();
-                //CommodityOnMarketAPI com = from.getCommodityData(curr.cargo);
-                //if (com.getId().equals(Commodities.SHIPS)) {
+                // CommodityOnMarketAPI com = from.getCommodityData(curr.cargo);
+                // if (com.getId().equals(Commodities.SHIPS)) {
                 if (spec.getId().equals(Commodities.SHIPS)) {
                     strings.add("ship hulls");
                     continue;
                 }
-                //if (com.getCommodity().isMeta()) continue;
-                //strings.add(com.getCommodity().getName().toLowerCase());
+                // if (com.getCommodity().isMeta()) continue;
+                // strings.add(com.getCommodity().getName().toLowerCase());
                 if (spec.isMeta()) continue;
                 strings.add(spec.getName().toLowerCase());
             }
@@ -69,14 +75,14 @@ public class AoTDEconomyFleetAssigmentAI extends EconomyFleetAssignmentAI {
         }
     }
 
-
     private String origFaction;
     private IntervalUtil factionChangeTracker = new IntervalUtil(0.1f, 0.3f);
+
     public AoTDEconomyFleetAssigmentAI(CampaignFleetAPI fleet, RouteManager.RouteData route) {
         super(fleet, route);
-        //origFaction = fleet.getFaction().getId();
+        // origFaction = fleet.getFaction().getId();
         origFaction = route.getFactionId();
-        factionChangeTracker = new IntervalUtil(0.1f,0.3f);
+        factionChangeTracker = new IntervalUtil(0.1f, 0.3f);
         if (!getData().smuggling) {
             origFaction = null;
         } else {
@@ -88,11 +94,14 @@ public class AoTDEconomyFleetAssigmentAI extends EconomyFleetAssignmentAI {
     public static String getCargoListDeliver(RouteManager.RouteData route) {
         return getCargoList(route, route.getSegments().get(0));
     }
+
     public static String getCargoListReturn(RouteManager.RouteData route) {
         return getCargoList(route, route.getSegments().get(3));
     }
-    public static String getCargoList(RouteManager.RouteData route, RouteManager.RouteSegment segment) {
-//		int index = route.getSegments().indexOf(segment);
+
+    public static String getCargoList(
+            RouteManager.RouteData route, RouteManager.RouteSegment segment) {
+        //		int index = route.getSegments().indexOf(segment);
         AoTDEconomyRouteData data = (AoTDEconomyRouteData) route.getCustom();
 
         Integer id = segment.getId();
@@ -102,13 +111,14 @@ public class AoTDEconomyFleetAssigmentAI extends EconomyFleetAssignmentAI {
         }
         return AoTDEconomyRouteData.getCargoList(data.cargoReturn);
     }
+
     protected String getCargoList(RouteManager.RouteSegment segment) {
         return getCargoList(route, segment);
     }
 
     @Override
     protected void updateCargo(RouteManager.RouteSegment segment) {
-        //int index = route.getSegments().indexOf(segment);
+        // int index = route.getSegments().indexOf(segment);
 
         // 0: loading from
         // 1: moving to
@@ -119,8 +129,9 @@ public class AoTDEconomyFleetAssigmentAI extends EconomyFleetAssignmentAI {
 
         Integer id = segment.getId();
 
-        if (route.isExpired() || id == AoTDEconomyRouteManager.ROUTE_SRC_LOAD ||
-                id == AoTDEconomyRouteManager.ROUTE_DST_LOAD) {
+        if (route.isExpired()
+                || id == AoTDEconomyRouteManager.ROUTE_SRC_LOAD
+                || id == AoTDEconomyRouteManager.ROUTE_DST_LOAD) {
             fleet.getCargo().clear();
             syncMothballedShips(0f, null);
             return;
@@ -172,6 +183,7 @@ public class AoTDEconomyFleetAssigmentAI extends EconomyFleetAssignmentAI {
             cargo.addCommodity(cid, ((int) qty * Math.min(1f, maxCargo / total)));
         }
     }
+
     protected void syncMothballedShips(float units, MarketAPI market) {
         for (FleetMemberAPI member : fleet.getFleetData().getMembersListCopy()) {
             if (member.isMothballed()) {
@@ -181,12 +193,11 @@ public class AoTDEconomyFleetAssigmentAI extends EconomyFleetAssignmentAI {
 
         if (units <= 0) return;
 
-
         Random random = new Random();
         if (route.getSeed() != null) {
             random = new Random(route.getSeed());
         }
-        units/=100;
+        units /= 100;
         float add = units * 1.5f + random.nextInt(3);
 
         EconomyRouteData data = getData();
@@ -218,6 +229,7 @@ public class AoTDEconomyFleetAssigmentAI extends EconomyFleetAssignmentAI {
         }
         fleet.getFleetData().sort();
     }
+
     @Override
     protected String getStartingActionText(RouteManager.RouteSegment segment) {
         String list = getCargoList(segment);
@@ -226,6 +238,7 @@ public class AoTDEconomyFleetAssigmentAI extends EconomyFleetAssignmentAI {
         }
         return "loading " + list + " at " + getData().from.getName();
     }
+
     @Override
     protected String getEndingActionText(RouteManager.RouteSegment segment) {
         String list = getCargoList(segment);
@@ -234,18 +247,21 @@ public class AoTDEconomyFleetAssigmentAI extends EconomyFleetAssignmentAI {
         }
         return "unloading " + list + " at " + getData().from.getName();
     }
+
     @Override
     protected String getTravelActionText(RouteManager.RouteSegment segment) {
         String list = getCargoList(segment);
 
-        //int index = route.getSegments().indexOf(segment);
+        // int index = route.getSegments().indexOf(segment);
         Integer id = segment.getId();
-        if (id == AoTDEconomyRouteManager.ROUTE_TRAVEL_DST || id == AoTDEconomyRouteManager.ROUTE_TRAVEL_WS) {
+        if (id == AoTDEconomyRouteManager.ROUTE_TRAVEL_DST
+                || id == AoTDEconomyRouteManager.ROUTE_TRAVEL_WS) {
             if (list.isEmpty()) {
                 return "traveling to " + getData().to.getName();
             }
             return "delivering " + list + " to " + getData().to.getName();
-        } else if (id == AoTDEconomyRouteManager.ROUTE_TRAVEL_SRC || id == AoTDEconomyRouteManager.ROUTE_TRAVEL_BACK_WS) {
+        } else if (id == AoTDEconomyRouteManager.ROUTE_TRAVEL_SRC
+                || id == AoTDEconomyRouteManager.ROUTE_TRAVEL_BACK_WS) {
             if (list.isEmpty()) {
                 return "returning to " + getData().from.getName();
             }
@@ -257,7 +273,7 @@ public class AoTDEconomyFleetAssigmentAI extends EconomyFleetAssignmentAI {
     @Override
     protected String getInSystemActionText(RouteManager.RouteSegment segment) {
         String list = getCargoList(segment);
-        //int index = route.getSegments().indexOf(segment);
+        // int index = route.getSegments().indexOf(segment);
         Integer id = segment.getId();
 
         if (id == AoTDEconomyRouteManager.ROUTE_DST_UNLOAD) {
@@ -270,32 +286,30 @@ public class AoTDEconomyFleetAssigmentAI extends EconomyFleetAssignmentAI {
                 return "orbiting " + getData().to.getName();
             }
             return "loading " + list + " at " + getData().to.getName();
-        } else if (id == AoTDEconomyRouteManager.ROUTE_RESUPPLY_WS || id == AoTDEconomyRouteManager.ROUTE_RESUPPLY_BACK_WS) {
+        } else if (id == AoTDEconomyRouteManager.ROUTE_RESUPPLY_WS
+                || id == AoTDEconomyRouteManager.ROUTE_RESUPPLY_BACK_WS) {
             return "resupplying";
         }
 
         return super.getInSystemActionText(segment);
     }
 
-
-
     protected EconomyRouteData getData() {
         EconomyRouteData data = (EconomyRouteData) route.getCustom();
         return data;
     }
 
-
     @Override
     public void doSmugglingFactionChangeCheck(float amount) {
         EconomyRouteData data = getData();
         if (!data.smuggling) return;
-        if(factionChangeTracker==null)return;
+        if (factionChangeTracker == null) return;
         float days = Global.getSector().getClock().convertToDays(amount);
 
-//		if (fleet.isInCurrentLocation()) {
-//			System.out.println("23wefwf23");
-//			days *= 100000f;
-//		}
+        //		if (fleet.isInCurrentLocation()) {
+        //			System.out.println("23wefwf23");
+        //			days *= 100000f;
+        //		}
 
         factionChangeTracker.advance(days);
         if (factionChangeTracker.intervalElapsed() && fleet.getAI() != null) {
@@ -329,26 +343,28 @@ public class AoTDEconomyFleetAssigmentAI extends EconomyFleetAssignmentAI {
                 }
             }
 
-//			SectorEntityToken target = route.getMarket().getPrimaryEntity();
-//			FleetAssignmentDataAPI assignment = fleet.getAI().getCurrentAssignment();
-//			if (assignment != null && assignment.getAssignment() != FleetAssignment.STANDING_DOWN) {
-//				target = assignment.getTarget();
-//			}
-//			if (target != null && target.getFaction() != null) {
-//				boolean targetHostile = target.getFaction().isHostileTo(origFaction);
-//				boolean mathchesTarget = fleet.getFaction().getId().equals(target.getFaction().getId());
-//				boolean mathchesOrig = fleet.getFaction().getId().equals(origFaction);
-//				float dist = Misc.getDistance(fleet.getLocation(), target.getLocation());
-//				if (dist < target.getRadius() + fleet.getRadius() + 1000) {
-//					if (targetHostile && !mathchesTarget) {
-//						fleet.setFaction(target.getFaction().getId(), true);
-//					}
-//				} else {
-//					if (!mathchesOrig) {
-//						fleet.setFaction(origFaction, true);
-//					}
-//				}
-//			}
+            //			SectorEntityToken target = route.getMarket().getPrimaryEntity();
+            //			FleetAssignmentDataAPI assignment = fleet.getAI().getCurrentAssignment();
+            //			if (assignment != null && assignment.getAssignment() !=
+            // FleetAssignment.STANDING_DOWN) {
+            //				target = assignment.getTarget();
+            //			}
+            //			if (target != null && target.getFaction() != null) {
+            //				boolean targetHostile = target.getFaction().isHostileTo(origFaction);
+            //				boolean mathchesTarget =
+            // fleet.getFaction().getId().equals(target.getFaction().getId());
+            //				boolean mathchesOrig = fleet.getFaction().getId().equals(origFaction);
+            //				float dist = Misc.getDistance(fleet.getLocation(), target.getLocation());
+            //				if (dist < target.getRadius() + fleet.getRadius() + 1000) {
+            //					if (targetHostile && !mathchesTarget) {
+            //						fleet.setFaction(target.getFaction().getId(), true);
+            //					}
+            //				} else {
+            //					if (!mathchesOrig) {
+            //						fleet.setFaction(origFaction, true);
+            //					}
+            //				}
+            //			}
         }
     }
 }

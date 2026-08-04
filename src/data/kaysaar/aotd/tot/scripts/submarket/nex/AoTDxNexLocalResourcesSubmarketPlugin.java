@@ -14,7 +14,6 @@ import data.kaysaar.aotd.tot.plugins.AoTDCommodityEconSpecManager;
 import data.kaysaar.aotd.tot.scripts.commoditydata.AoTDCommodityOnMarket;
 import data.kaysaar.aotd.tot.scripts.submarket.aotd.AoTDLocalResourcesTooltipSnapshot;
 import exerelin.campaign.submarkets.Nex_LocalResourcesSubmarketPlugin;
-
 import java.util.*;
 
 public class AoTDxNexLocalResourcesSubmarketPlugin extends Nex_LocalResourcesSubmarketPlugin {
@@ -24,9 +23,11 @@ public class AoTDxNexLocalResourcesSubmarketPlugin extends Nex_LocalResourcesSub
             int limit = commodity.getSupplyDemandData().getTotalRawUnitsFromDemand();
             String cid = com.getId();
             if (stockpilingBonus.containsKey(cid)) {
-                limit += AoTDCommodityEconSpecManager.getCargoAmountFromSupplyOrDemand((int) stockpilingBonus.get(cid).getModifiedValue(), true, cid);
+                limit +=
+                        AoTDCommodityEconSpecManager.getCargoAmountFromSupplyOrDemand(
+                                (int) stockpilingBonus.get(cid).getModifiedValue(), true, cid);
             }
-            //limit *= com.getMarket().getStockpileMult().getModifiedValue();
+            // limit *= com.getMarket().getStockpileMult().getModifiedValue();
             limit *= STOCKPILE_MAX_MONTHS;
             int deficitCountered = (int) getDeficitCountered(commodity);
 
@@ -41,7 +42,8 @@ public class AoTDxNexLocalResourcesSubmarketPlugin extends Nex_LocalResourcesSub
 
     @Override
     public int getEstimatedShortageCounteringCostPerMonth() {
-        List<CommodityOnMarketAPI> all = new ArrayList<CommodityOnMarketAPI>(market.getAllCommodities());
+        List<CommodityOnMarketAPI> all =
+                new ArrayList<CommodityOnMarketAPI>(market.getAllCommodities());
 
         float totalCost = 0f;
 
@@ -51,7 +53,9 @@ public class AoTDxNexLocalResourcesSubmarketPlugin extends Nex_LocalResourcesSub
             if (commodity instanceof AoTDCommodityOnMarket com) {
                 float units = getDeficitCountered(com);
                 if (units > 0) {
-                    float per = LocalResourcesSubmarketPlugin.getStockpilingUnitPrice(com.getSpec(), true);
+                    float per =
+                            LocalResourcesSubmarketPlugin.getStockpilingUnitPrice(
+                                    com.getSpec(), true);
                     totalCost += units * per;
                 }
             }
@@ -59,27 +63,36 @@ public class AoTDxNexLocalResourcesSubmarketPlugin extends Nex_LocalResourcesSub
         return (int) totalCost;
     }
 
-    public float getDeficitCountered(AoTDCommodityOnMarket commodity){
+    public float getDeficitCountered(AoTDCommodityOnMarket commodity) {
         float countered = 0;
-        for (Map.Entry<String, MutableStat.StatMod> entry : commodity.getExcDefData().deficit.getFlatMods().entrySet()) {
-            if(entry.getKey().contains("aotd_shortage_counter")){
+        for (Map.Entry<String, MutableStat.StatMod> entry :
+                commodity.getExcDefData().deficit.getFlatMods().entrySet()) {
+            if (entry.getKey().contains("aotd_shortage_counter")) {
                 countered += Math.abs(entry.getValue().value);
             }
         }
         return countered;
     }
+
     @Override
-    protected boolean doShortageCountering(CommodityOnMarketAPI com, float amount, boolean withShortageCountering) {
+    protected boolean doShortageCountering(
+            CommodityOnMarketAPI com, float amount, boolean withShortageCountering) {
         if (com instanceof AoTDCommodityOnMarket commodity) {
 
             float curr = cargo.getCommodityQuantity(commodity.getId());
-            float drawAmount = Math.min(curr,commodity.getDeficitQuantity());
-            if (drawAmount > 0 && withShortageCountering&&curr>0) {
+            float drawAmount = Math.min(curr, commodity.getDeficitQuantity());
+            if (drawAmount > 0 && withShortageCountering && curr > 0) {
                 float free = left.getCommodityQuantity(com.getId());
                 free = Math.min(drawAmount, free);
                 left.removeCommodity(com.getId(), free);
                 cargo.removeCommodity(com.getId(), drawAmount);
-                commodity.getExcDefData().setDeficit((int) -drawAmount,commodity,30,"aotd_shortage_counter_"+Misc.genUID());
+                commodity
+                        .getExcDefData()
+                        .setDeficit(
+                                (int) -drawAmount,
+                                commodity,
+                                30,
+                                "aotd_shortage_counter_" + Misc.genUID());
                 drawAmount -= free;
                 if (market.isPlayerOwned() && drawAmount > 0) {
                     MonthlyReport report = SharedData.getData().getCurrentReport();
@@ -94,7 +107,7 @@ public class AoTDxNexLocalResourcesSubmarketPlugin extends Nex_LocalResourcesSub
                     tooltipCargo.addCommodity(com.getId(), addToTooltipCargo);
 
                     float unitPrice = (int) getStockpilingUnitPrice(commodity.getSpec(), true);
-                    //node.upkeep += unitPrice * addAmount;
+                    // node.upkeep += unitPrice * addAmount;
 
                     MonthlyReport.FDNode comNode = report.getNode(node, com.getId());
 
@@ -106,7 +119,7 @@ public class AoTDxNexLocalResourcesSubmarketPlugin extends Nex_LocalResourcesSub
                     if (comNode.custom2 == null) {
                         comNode.custom2 = 0f;
                     }
-                    comNode.custom2 = (Float)comNode.custom2 + drawAmount;
+                    comNode.custom2 = (Float) comNode.custom2 + drawAmount;
 
                     float qty = Math.max(1, (Float) comNode.custom2);
                     qty = (float) Math.ceil(qty);
@@ -123,19 +136,17 @@ public class AoTDxNexLocalResourcesSubmarketPlugin extends Nex_LocalResourcesSub
     }
 
     @Override
-    protected void createTooltipAfterDescription(
-            TooltipMakerAPI tooltip, boolean expanded) {
-        AoTDLocalResourcesTooltipSnapshot.render(
-                this, tooltip, this::getStockpileLimitForTooltip);
+    protected void createTooltipAfterDescription(TooltipMakerAPI tooltip, boolean expanded) {
+        AoTDLocalResourcesTooltipSnapshot.render(this, tooltip, this::getStockpileLimitForTooltip);
     }
 
     private int getStockpileLimitForTooltip(CommodityOnMarketAPI commodity) {
         if (commodity instanceof AoTDCommodityOnMarket aoTDCommodity) {
-            Integer snapshot = AoTDLocalResourcesTooltipSnapshot
-                    .peekAoTDStockpileLimit(aoTDCommodity, stockpilingBonus);
+            Integer snapshot =
+                    AoTDLocalResourcesTooltipSnapshot.peekAoTDStockpileLimit(
+                            aoTDCommodity, stockpilingBonus);
             if (snapshot != null) return snapshot;
         }
         return getStockpileLimit(commodity);
     }
-
 }

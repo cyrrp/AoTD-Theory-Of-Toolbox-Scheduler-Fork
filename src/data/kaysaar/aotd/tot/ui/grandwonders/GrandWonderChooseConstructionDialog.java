@@ -7,7 +7,6 @@ import com.fs.starfarer.api.ui.ButtonAPI;
 import com.fs.starfarer.api.ui.TooltipMakerAPI;
 import data.kaysaar.aotd.tot.industries.AoTDConstructionSite;
 import data.kaysaar.aotd.tot.plugins.ReflectionUtilis;
-import kaysaar.bmo.buildingmenu.BuildingMenuMisc;
 import kaysaar.bmo.buildingmenu.MarketDialog;
 
 public class GrandWonderChooseConstructionDialog extends BasePopUpDialog {
@@ -15,11 +14,14 @@ public class GrandWonderChooseConstructionDialog extends BasePopUpDialog {
     AoTDConstructionSite site;
     GrandWonderPluginUI pluginUI;
 
-    public GrandWonderChooseConstructionDialog(DialogCreatorUI creatorUI, AoTDConstructionSite site) {
+    public GrandWonderChooseConstructionDialog(
+            DialogCreatorUI creatorUI, AoTDConstructionSite site) {
         super("Choose Grand Wonder to be constructed");
         this.site = site;
-        panelInd = ReflectionUtilis.invokeMethodWithAutoProjection("getIndustryPanel", ReflectionUtilis.findFieldWithMethodName(creatorUI, "getIndustryPanel"));
-
+        panelInd =
+                ReflectionUtilis.invokeMethodWithAutoProjection(
+                        "getIndustryPanel",
+                        ReflectionUtilis.findFieldWithMethodName(creatorUI, "getIndustryPanel"));
     }
 
     @Override
@@ -47,7 +49,6 @@ public class GrandWonderChooseConstructionDialog extends BasePopUpDialog {
         pluginUI = new GrandWonderPluginUI(width, 650 - this.y, site);
         tooltip.addCustom(pluginUI.getMainPanel(), 0f);
         tooltip.setHeightSoFar(0f);
-
     }
 
     @Override
@@ -57,20 +58,25 @@ public class GrandWonderChooseConstructionDialog extends BasePopUpDialog {
             if (pluginUI.getCurrChosen() == null && getConfirmButton().isEnabled()) {
                 getConfirmButton().setEnabled(false);
             }
-            if(pluginUI.getCurrChosen()!=null){
+            if (pluginUI.getCurrChosen() != null) {
                 if (getConfirmButton().isEnabled()) {
-                    if (!MarketDialog.isAvailableToBuild(pluginUI.getCurrChosen(), pluginUI.getCurrChosen().getMarket(), false) || !pluginUI.getCurrChosen().isAvailableToBuild()) {
+                    if (!MarketDialog.isAvailableToBuild(
+                                    pluginUI.getCurrChosen(),
+                                    pluginUI.getCurrChosen().getMarket(),
+                                    false)
+                            || !pluginUI.getCurrChosen().isAvailableToBuild()) {
                         getConfirmButton().setEnabled(false);
                     }
                 } else {
-                    if (pluginUI.getCurrChosen().isAvailableToBuild() && MarketDialog.isAvailableToBuild(pluginUI.getCurrChosen(), pluginUI.getCurrChosen().getMarket(), false)) {
+                    if (pluginUI.getCurrChosen().isAvailableToBuild()
+                            && MarketDialog.isAvailableToBuild(
+                                    pluginUI.getCurrChosen(),
+                                    pluginUI.getCurrChosen().getMarket(),
+                                    false)) {
                         getConfirmButton().setEnabled(true);
                     }
                 }
             }
-
         }
-
     }
-
 }

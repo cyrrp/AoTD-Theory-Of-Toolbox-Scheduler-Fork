@@ -6,17 +6,15 @@ import com.fs.starfarer.api.Global;
 import com.fs.starfarer.api.campaign.SectorEntityToken;
 import com.fs.starfarer.api.campaign.econ.MarketAPI;
 import com.fs.starfarer.api.input.InputEventAPI;
-import com.fs.starfarer.api.ui.Alignment;
 import com.fs.starfarer.api.ui.CustomPanelAPI;
 import com.fs.starfarer.api.ui.LabelAPI;
 import com.fs.starfarer.api.ui.PositionAPI;
 import com.fs.starfarer.api.ui.TooltipMakerAPI;
 import com.fs.starfarer.api.util.Misc;
 import data.kaysaar.aotd.tot.listeners.ui.AoTDPointerToStarSystem;
-import org.lwjgl.util.vector.Vector2f;
-
 import java.awt.*;
 import java.util.List;
+import org.lwjgl.util.vector.Vector2f;
 
 public class LocationPointerComponent implements ExtendedUIPanelPlugin {
 
@@ -41,21 +39,25 @@ public class LocationPointerComponent implements ExtendedUIPanelPlugin {
     public LocationPointerComponent(SectorEntityToken entity, float width, float height) {
         this(entity, null, width, height, Misc.getBasePlayerColor(), true);
     }
-    public LocationPointerComponent(MarketAPI market, float width, float height, Color pointerColor) {
+
+    public LocationPointerComponent(
+            MarketAPI market, float width, float height, Color pointerColor) {
         this(
                 market.getStarSystem().getStar(),
                 getLocationBetweenPlayerAndMarket(market),
                 width,
                 height,
                 pointerColor,
-                true
-        );
+                true);
     }
-    public LocationPointerComponent(SectorEntityToken entity, float width, float height, boolean showMarketSize) {
+
+    public LocationPointerComponent(
+            SectorEntityToken entity, float width, float height, boolean showMarketSize) {
         this(entity, null, width, height, Misc.getBasePlayerColor(), showMarketSize);
     }
 
-    public LocationPointerComponent(SectorEntityToken entity, Vector2f locationInHyperspace, float width, float height) {
+    public LocationPointerComponent(
+            SectorEntityToken entity, Vector2f locationInHyperspace, float width, float height) {
         this(entity, locationInHyperspace, width, height, Misc.getBasePlayerColor(), true);
     }
 
@@ -64,8 +66,7 @@ public class LocationPointerComponent implements ExtendedUIPanelPlugin {
             Vector2f locationInHyperspace,
             float width,
             float height,
-            Color pointerColor
-    ) {
+            Color pointerColor) {
         this(entity, locationInHyperspace, width, height, pointerColor, true);
     }
 
@@ -75,8 +76,7 @@ public class LocationPointerComponent implements ExtendedUIPanelPlugin {
             float width,
             float height,
             Color pointerColor,
-            boolean showMarketSize
-    ) {
+            boolean showMarketSize) {
         this.entity = entity;
         this.locationInHyperspace = locationInHyperspace;
         this.width = width;
@@ -114,38 +114,33 @@ public class LocationPointerComponent implements ExtendedUIPanelPlugin {
         float y = 0f;
 
         if (entity != null && entityHeight > 0f) {
-            EntityWithNameComponent entityComponent = new EntityWithNameComponent(
-                    entity,
-                    width,
-                    entityHeight,
-                    showMarketSize
-            );
+            EntityWithNameComponent entityComponent =
+                    new EntityWithNameComponent(entity, width, entityHeight, showMarketSize);
             entityComponent.createUI();
 
-            tooltip.addCustom(entityComponent.getMainPanel(), 0f)
-                    .getPosition()
-                    .inTL(0, y+6);
+            tooltip.addCustom(entityComponent.getMainPanel(), 0f).getPosition().inTL(0, y + 6);
 
             y += entityHeight + separator;
         }
 
         Vector2f target = getTargetLocationInHyperspace();
 
-        AoTDPointerToStarSystem pointer = new AoTDPointerToStarSystem(
-                actualPointerSize-8,
-                target,
-                pointerColor
-        );
+        AoTDPointerToStarSystem pointer =
+                new AoTDPointerToStarSystem(actualPointerSize - 8, target, pointerColor);
         pointer.createUI();
 
         tooltip.addCustom(pointer.getMainPanel(), 0f)
                 .getPosition()
-                .inTL((width - (actualPointerSize-8)) / 2f, y+13);
+                .inTL((width - (actualPointerSize - 8)) / 2f, y + 13);
 
         y += actualPointerSize + separator;
 
-        distanceLabel = tooltip.addPara(getDistanceText(), Misc.getTooltipTitleAndLightHighlightColor(), 0f);
-        distanceLabel.getPosition().inTL(width/2-(distanceLabel.computeTextWidth(distanceLabel.getText())/2), y);
+        distanceLabel =
+                tooltip.addPara(
+                        getDistanceText(), Misc.getTooltipTitleAndLightHighlightColor(), 0f);
+        distanceLabel
+                .getPosition()
+                .inTL(width / 2 - (distanceLabel.computeTextWidth(distanceLabel.getText()) / 2), y);
 
         contentPanel.addUIElement(tooltip).inTL(0f, 0f);
         mainPanel.addComponent(contentPanel).inTL(0f, 0f);
@@ -204,19 +199,13 @@ public class LocationPointerComponent implements ExtendedUIPanelPlugin {
     }
 
     @Override
-    public void positionChanged(PositionAPI position) {
-
-    }
+    public void positionChanged(PositionAPI position) {}
 
     @Override
-    public void renderBelow(float alphaMult) {
-
-    }
+    public void renderBelow(float alphaMult) {}
 
     @Override
-    public void render(float alphaMult) {
-
-    }
+    public void render(float alphaMult) {}
 
     @Override
     public void advance(float amount) {
@@ -226,9 +215,8 @@ public class LocationPointerComponent implements ExtendedUIPanelPlugin {
     }
 
     @Override
-    public void processInput(List<InputEventAPI> events) {
+    public void processInput(List<InputEventAPI> events) {}
 
-    }
     public static Vector2f getLocationBetweenPlayerAndMarket(MarketAPI market) {
         if (market == null) {
             return null;
@@ -249,13 +237,9 @@ public class LocationPointerComponent implements ExtendedUIPanelPlugin {
             return marketLoc;
         }
 
-        return new Vector2f(
-                (playerLoc.x + marketLoc.x) / 2f,
-                (playerLoc.y + marketLoc.y) / 2f
-        );
+        return new Vector2f((playerLoc.x + marketLoc.x) / 2f, (playerLoc.y + marketLoc.y) / 2f);
     }
-    @Override
-    public void buttonPressed(Object buttonId) {
 
-    }
+    @Override
+    public void buttonPressed(Object buttonId) {}
 }

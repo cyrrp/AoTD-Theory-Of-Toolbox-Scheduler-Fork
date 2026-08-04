@@ -21,23 +21,24 @@ public class GenericBlueprintCreator extends BaseContractRewardCreator {
     public int getReqMinLevelForRewardToGenerate() {
         return 5;
     }
+
     @Override
     public float getPickGateChance(AoTDTradeContract contract) {
         int lvl = AoTDTradeContractManager.getInstance().getCurrLevelData().getCurrentLevel();
         float chance = 0.03f + 0.01f * Math.max(0, lvl - 5); // 3% -> 13%
         return Math.min(chance, 0.13f);
     }
+
     @Override
     public int getMaxPicks() {
-        if(AoTDTradeContractManager.getInstance().getCurrLevelData().getCurrentLevel()<8){
+        if (AoTDTradeContractManager.getInstance().getCurrLevelData().getCurrentLevel() < 8) {
             return 1;
-        }
-        else if (AoTDTradeContractManager.getInstance().getCurrLevelData().getCurrentLevel()<10){
+        } else if (AoTDTradeContractManager.getInstance().getCurrLevelData().getCurrentLevel()
+                < 10) {
             return 2;
         }
         return 3;
     }
-
 
     @Override
     public float getProbability() {
@@ -61,7 +62,8 @@ public class GenericBlueprintCreator extends BaseContractRewardCreator {
         FactionAPI fac = contract.getFaction();
         if (fac == null) return;
 
-        WeightedRandomPicker<Pair<BlueprintReward.BlueprintData, String>> picker = new WeightedRandomPicker<>();
+        WeightedRandomPicker<Pair<BlueprintReward.BlueprintData, String>> picker =
+                new WeightedRandomPicker<>();
 
         // --- Fighters (always eligible from lvl 5; keep some baseline even if <5) ---
         float fighterMult = (level >= 5) ? 2.5f : 1f;
@@ -70,7 +72,7 @@ public class GenericBlueprintCreator extends BaseContractRewardCreator {
             String takenKey = "FIGHTER:" + wingId;
             if (getAlreadyTakenIds().contains(takenKey)) continue;
             FighterWingSpecAPI spec = Global.getSettings().getFighterWingSpec(wingId);
-            if(spec.hasTag(Tags.RESTRICTED))continue;
+            if (spec.hasTag(Tags.RESTRICTED)) continue;
 
             picker.add(new Pair<>(BlueprintReward.BlueprintData.FIGHTER, wingId), 1f * fighterMult);
         }
@@ -80,12 +82,12 @@ public class GenericBlueprintCreator extends BaseContractRewardCreator {
             if (weaponId == null) continue;
             WeaponSpecAPI w = Global.getSettings().getWeaponSpec(weaponId);
             if (w == null) continue;
-            if(w.hasTag(Tags.RESTRICTED))continue;
-            if(w.getType().equals(WeaponAPI.WeaponType.BUILT_IN))continue;
-            if(w.getType().equals(WeaponAPI.WeaponType.LAUNCH_BAY))continue;
-            if(w.getType().equals(WeaponAPI.WeaponType.DECORATIVE))continue;
-            if(w.getType().equals(WeaponAPI.WeaponType.SYSTEM))continue;
-            if(w.getType().equals(WeaponAPI.WeaponType.STATION_MODULE))continue;
+            if (w.hasTag(Tags.RESTRICTED)) continue;
+            if (w.getType().equals(WeaponAPI.WeaponType.BUILT_IN)) continue;
+            if (w.getType().equals(WeaponAPI.WeaponType.LAUNCH_BAY)) continue;
+            if (w.getType().equals(WeaponAPI.WeaponType.DECORATIVE)) continue;
+            if (w.getType().equals(WeaponAPI.WeaponType.SYSTEM)) continue;
+            if (w.getType().equals(WeaponAPI.WeaponType.STATION_MODULE)) continue;
             float mult = 1f; // baseline: can always roll
             switch (w.getSize()) {
                 case SMALL:
@@ -110,7 +112,7 @@ public class GenericBlueprintCreator extends BaseContractRewardCreator {
             ShipHullSpecAPI spec = Global.getSettings().getHullSpec(hullId);
 
             if (spec == null) continue;
-            if(spec.hasTag(Tags.RESTRICTED))continue;
+            if (spec.hasTag(Tags.RESTRICTED)) continue;
 
             if (spec.getHints().contains(ShipHullSpecAPI.ShipTypeHints.MODULE)) continue;
             if (spec.getHints().contains(ShipHullSpecAPI.ShipTypeHints.STATION)) continue;

@@ -6,7 +6,6 @@ import com.fs.starfarer.api.ui.ButtonAPI;
 import com.fs.starfarer.api.ui.UIComponentAPI;
 import com.fs.starfarer.api.ui.UIPanelAPI;
 import com.fs.starfarer.api.util.Pair;
-
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
@@ -28,12 +27,12 @@ public class ReflectionUtilis {
     private static final MethodHandle invokeMethodHandle;
     private static final MethodHandle setMethodAccessable;
     private static final MethodHandle getModifiersHandle;
-    private static final MethodHandle  getParameterTypesHandle;
+    private static final MethodHandle getParameterTypesHandle;
     private static final MethodHandle isMethodVarArgsHandle;
-    private static final MethodHandle  getFieldTypeHandle;
+    private static final MethodHandle getFieldTypeHandle;
     private static final MethodHandle getDeclaredConstructorsHandle;
-    private static final Class<?>  fileclass;
-    private static final Class<?>  fileWriterClass;
+    private static final Class<?> fileclass;
+    private static final Class<?> fileWriterClass;
     private static final Class<?> fileReaderClass;
     private static final Class<?> bufferedReaderClass;
     private static final Class<?> readerClass;
@@ -42,54 +41,88 @@ public class ReflectionUtilis {
     private static final MethodHandle fileCtorParentChildHandle;
     private static final MethodHandle fileRenameToHandle;
     private static final MethodHandle fileGetCanonicalPathHandle;
+
     static {
         try {
-            fieldClass = Class.forName("java.lang.reflect.Field", false, Class.class.getClassLoader());
-            setFieldHandle = lookup.findVirtual(fieldClass, "set", MethodType.methodType(Void.TYPE, Object.class, Object.class));
-            getFieldHandle = lookup.findVirtual(fieldClass, "get", MethodType.methodType(Object.class, Object.class));
-            getFieldNameHandle = lookup.findVirtual(fieldClass, "getName", MethodType.methodType(String.class));
-            getFieldTypeHandle = lookup.findVirtual(fieldClass, "getType", MethodType.methodType(Class.class));
-            setFieldAccessibleHandle = lookup.findVirtual(fieldClass, "setAccessible", MethodType.methodType(Void.TYPE, boolean.class));
+            fieldClass =
+                    Class.forName("java.lang.reflect.Field", false, Class.class.getClassLoader());
+            setFieldHandle =
+                    lookup.findVirtual(
+                            fieldClass,
+                            "set",
+                            MethodType.methodType(Void.TYPE, Object.class, Object.class));
+            getFieldHandle =
+                    lookup.findVirtual(
+                            fieldClass, "get", MethodType.methodType(Object.class, Object.class));
+            getFieldNameHandle =
+                    lookup.findVirtual(fieldClass, "getName", MethodType.methodType(String.class));
+            getFieldTypeHandle =
+                    lookup.findVirtual(fieldClass, "getType", MethodType.methodType(Class.class));
+            setFieldAccessibleHandle =
+                    lookup.findVirtual(
+                            fieldClass,
+                            "setAccessible",
+                            MethodType.methodType(Void.TYPE, boolean.class));
 
-            methodClass = Class.forName("java.lang.reflect.Method", false, Class.class.getClassLoader());
-            getMethodNameHandle = lookup.findVirtual(methodClass, "getName", MethodType.methodType(String.class));
-            invokeMethodHandle = lookup.findVirtual(methodClass, "invoke", MethodType.methodType(Object.class, Object.class, Object[].class));
-            setMethodAccessable = lookup.findVirtual(methodClass, "setAccessible", MethodType.methodType(Void.TYPE, boolean.class));
-            getModifiersHandle = lookup.findVirtual(methodClass, "getModifiers", MethodType.methodType(int.class));
-            getParameterTypesHandle = lookup.findVirtual(methodClass, "getParameterTypes", MethodType.methodType(Class[].class));
-            isMethodVarArgsHandle = lookup.findVirtual(methodClass, "isVarArgs", MethodType.methodType(boolean.class));
+            methodClass =
+                    Class.forName("java.lang.reflect.Method", false, Class.class.getClassLoader());
+            getMethodNameHandle =
+                    lookup.findVirtual(methodClass, "getName", MethodType.methodType(String.class));
+            invokeMethodHandle =
+                    lookup.findVirtual(
+                            methodClass,
+                            "invoke",
+                            MethodType.methodType(Object.class, Object.class, Object[].class));
+            setMethodAccessable =
+                    lookup.findVirtual(
+                            methodClass,
+                            "setAccessible",
+                            MethodType.methodType(Void.TYPE, boolean.class));
+            getModifiersHandle =
+                    lookup.findVirtual(
+                            methodClass, "getModifiers", MethodType.methodType(int.class));
+            getParameterTypesHandle =
+                    lookup.findVirtual(
+                            methodClass, "getParameterTypes", MethodType.methodType(Class[].class));
+            isMethodVarArgsHandle =
+                    lookup.findVirtual(
+                            methodClass, "isVarArgs", MethodType.methodType(boolean.class));
 
-            constructorClass = Class.forName("java.lang.reflect.Constructor", false, Class.class.getClassLoader());
-            getDeclaredConstructorsHandle = lookup.findVirtual(constructorClass, "getParameterTypes", MethodType.methodType(Class[].class));
-            fileclass = Class.forName("java.io.File",false,Class.class.getClassLoader());
-            fileWriterClass = Class.forName("java.io.FileWriter",false,Class.class.getClassLoader());
-            fileReaderClass = Class.forName("java.io.FileReader", false, Class.class.getClassLoader());
-            bufferedReaderClass = Class.forName("java.io.BufferedReader", false, Class.class.getClassLoader());
+            constructorClass =
+                    Class.forName(
+                            "java.lang.reflect.Constructor", false, Class.class.getClassLoader());
+            getDeclaredConstructorsHandle =
+                    lookup.findVirtual(
+                            constructorClass,
+                            "getParameterTypes",
+                            MethodType.methodType(Class[].class));
+            fileclass = Class.forName("java.io.File", false, Class.class.getClassLoader());
+            fileWriterClass =
+                    Class.forName("java.io.FileWriter", false, Class.class.getClassLoader());
+            fileReaderClass =
+                    Class.forName("java.io.FileReader", false, Class.class.getClassLoader());
+            bufferedReaderClass =
+                    Class.forName("java.io.BufferedReader", false, Class.class.getClassLoader());
             readerClass = Class.forName("java.io.Reader", false, Class.class.getClassLoader());
-            fileGetParentFileHandle = lookup.findVirtual(
-                    fileclass, "getParentFile",
-                    MethodType.methodType(fileclass)
-            );
-            fileGetNameHandle = lookup.findVirtual(
-                    fileclass, "getName",
-                    MethodType.methodType(String.class)
-            );
-            fileCtorParentChildHandle = lookup.findConstructor(
-                    fileclass,
-                    MethodType.methodType(Void.TYPE, fileclass, String.class)
-            );
-            fileRenameToHandle = lookup.findVirtual(
-                    fileclass, "renameTo",
-                    MethodType.methodType(boolean.class, fileclass)
-            );
-            fileGetCanonicalPathHandle = lookup.findVirtual(
-                    fileclass, "getCanonicalPath",
-                    MethodType.methodType(String.class)
-            );
+            fileGetParentFileHandle =
+                    lookup.findVirtual(
+                            fileclass, "getParentFile", MethodType.methodType(fileclass));
+            fileGetNameHandle =
+                    lookup.findVirtual(fileclass, "getName", MethodType.methodType(String.class));
+            fileCtorParentChildHandle =
+                    lookup.findConstructor(
+                            fileclass, MethodType.methodType(Void.TYPE, fileclass, String.class));
+            fileRenameToHandle =
+                    lookup.findVirtual(
+                            fileclass, "renameTo", MethodType.methodType(boolean.class, fileclass));
+            fileGetCanonicalPathHandle =
+                    lookup.findVirtual(
+                            fileclass, "getCanonicalPath", MethodType.methodType(String.class));
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
     }
+
     public static Object findFieldWithMethodName(Object instance, String methodName) {
         try {
             Class<?> currentClass = instance.getClass();
@@ -108,7 +141,6 @@ public class ReflectionUtilis {
                 }
             }
 
-
             return null;
         } catch (Throwable e) {
             throw new RuntimeException("Failed to find field with method name: " + methodName, e);
@@ -122,6 +154,7 @@ public class ReflectionUtilis {
             throw new RuntimeException(e);
         }
     }
+
     public static boolean moveFileOneLevelUp(String absolutePath) {
         try {
             // src: /mods/yourMod/graphics/cursors/stuff/foo.png
@@ -147,13 +180,15 @@ public class ReflectionUtilis {
             throw new RuntimeException(e);
         }
     }
+
     public static boolean moveFileOneLevelUpInModGraphics(String modId, String absolutePath) {
         try {
-            String modBase = Global.getSettings()
-                    .getModManager()
-                    .getModSpec(modId)
-                    .getPath(); // e.g. .../mods/YourMod/
-            modBase = modBase.replace("\\","/");
+            String modBase =
+                    Global.getSettings()
+                            .getModManager()
+                            .getModSpec(modId)
+                            .getPath(); // e.g. .../mods/YourMod/
+            modBase = modBase.replace("\\", "/");
             Object modGraphicsFile = ReflectionUtilis.getFile(modBase + "/graphics");
             String modGraphicsCanonical = ReflectionUtilis.getCanonicalPath(modGraphicsFile);
 
@@ -172,7 +207,8 @@ public class ReflectionUtilis {
         }
     }
 
-    public static Object instantiateExact(Class<?> clazz, Class<?>[] parameterTypes, Object... arguments) {
+    public static Object instantiateExact(
+            Class<?> clazz, Class<?>[] parameterTypes, Object... arguments) {
         try {
             // Match constructor exactly with the provided parameter types
             MethodType ctorType = MethodType.methodType(void.class, parameterTypes);
@@ -184,8 +220,9 @@ public class ReflectionUtilis {
             throw new RuntimeException("Failed to instantiate (exact) " + clazz.getName(), e);
         }
     }
-    public static ButtonAPI findButtonWithText(Object instance, String textQuery,
-                                               boolean caseInsensitive, boolean substringMatch) {
+
+    public static ButtonAPI findButtonWithText(
+            Object instance, String textQuery, boolean caseInsensitive, boolean substringMatch) {
         if (instance == null || textQuery == null) return null;
 
         try {
@@ -216,9 +253,11 @@ public class ReflectionUtilis {
             }
             return null;
         } catch (Throwable e) {
-            throw new RuntimeException("Failed to find ButtonAPI with text \"" + textQuery + "\"", e);
+            throw new RuntimeException(
+                    "Failed to find ButtonAPI with text \"" + textQuery + "\"", e);
         }
     }
+
     public static boolean doesHaveConstructorExact(Class<?> clazz, Class<?>... parameterTypes) {
         try {
             if (parameterTypes == null) parameterTypes = new Class<?>[0];
@@ -226,7 +265,8 @@ public class ReflectionUtilis {
             Class<?>[] normalized = new Class<?>[parameterTypes.length];
             for (int i = 0; i < parameterTypes.length; i++) {
                 Class<?> p = parameterTypes[i];
-                normalized[i] = (p != null && getPrimitiveType(p) != null) ? getPrimitiveType(p) : p;
+                normalized[i] =
+                        (p != null && getPrimitiveType(p) != null) ? getPrimitiveType(p) : p;
             }
 
             MethodType ctorType = MethodType.methodType(void.class, normalized);
@@ -260,13 +300,16 @@ public class ReflectionUtilis {
             return false;
         }
     }
+
     @SuppressWarnings("unchecked")
     public static Object instantiateAutoProjected(Class<?> targetClass, Object... arguments) {
         try {
             if (arguments == null) arguments = new Object[0];
 
             // Get ALL declared ctors via indirection (no direct Constructor usage)
-            Object[] ctors = (Object[]) invokeMethodWithAutoProjection("getDeclaredConstructors", targetClass);
+            Object[] ctors =
+                    (Object[])
+                            invokeMethodWithAutoProjection("getDeclaredConstructors", targetClass);
             if (ctors == null || ctors.length == 0) {
                 throw new NoSuchMethodException("No constructors on " + targetClass.getName());
             }
@@ -278,7 +321,8 @@ public class ReflectionUtilis {
                     boolean varArgs = false;
                     try {
                         varArgs = (boolean) invokeMethodWithAutoProjection("isVarArgs", ctor);
-                    } catch (Throwable ignored) {}
+                    } catch (Throwable ignored) {
+                    }
 
                     // Quick arity checks
                     if (!varArgs && paramTypes.length != arguments.length) continue;
@@ -289,7 +333,10 @@ public class ReflectionUtilis {
                     if (projected == null) continue; // couldn't convert for this ctor
 
                     // Be permissive with access like elsewhere
-                    try { invokeMethodWithAutoProjection("setAccessible", ctor, true); } catch (Throwable ignored) {}
+                    try {
+                        invokeMethodWithAutoProjection("setAccessible", ctor, true);
+                    } catch (Throwable ignored) {
+                    }
 
                     // NOTE: Constructor::newInstance takes a single Object[] parameter
                     return invokeMethodWithAutoProjection("newInstance", ctor, (Object) projected);
@@ -299,10 +346,15 @@ public class ReflectionUtilis {
                 }
             }
 
-            throw new NoSuchMethodException("No compatible constructor on " + targetClass.getName() +
-                    " for " + arguments.length + " args after auto-projection");
+            throw new NoSuchMethodException(
+                    "No compatible constructor on "
+                            + targetClass.getName()
+                            + " for "
+                            + arguments.length
+                            + " args after auto-projection");
         } catch (Throwable e) {
-            throw new RuntimeException("Failed to instantiate (auto-projected) " + targetClass.getName(), e);
+            throw new RuntimeException(
+                    "Failed to instantiate (auto-projected) " + targetClass.getName(), e);
         }
     }
 
@@ -331,7 +383,9 @@ public class ReflectionUtilis {
             int varCount = args.length - fixedCount;
 
             // If caller passed the varargs array already (exact type), just use it
-            if (varCount == 1 && args[fixedCount] != null && arrayType.isInstance(args[fixedCount])) {
+            if (varCount == 1
+                    && args[fixedCount] != null
+                    && arrayType.isInstance(args[fixedCount])) {
                 Object[] out = new Object[paramTypes.length];
                 System.arraycopy(fixed, 0, out, 0, fixedCount);
                 out[fixedCount] = args[fixedCount];
@@ -356,12 +410,11 @@ public class ReflectionUtilis {
     }
 
     /**
-     * Wrapper around your convertArgument(...) with a few safe, common widenings:
-     *  - to String / CharSequence via String.valueOf(...)
-     *  - booleans & chars from String
-     *  - enums from String (name, case-insensitive fallback) or Number (ordinal)
-     *  - java.io.File from String (constructed via MethodHandles, not "new")
-     *  - falls back to your convertArgument(...) for primitives/boxing/casts
+     * Wrapper around your convertArgument(...) with a few safe, common widenings: - to String /
+     * CharSequence via String.valueOf(...) - booleans & chars from String - enums from String
+     * (name, case-insensitive fallback) or Number (ordinal) - java.io.File from String (constructed
+     * via MethodHandles, not "new") - falls back to your convertArgument(...) for
+     * primitives/boxing/casts
      */
     public static Object convertArgumentAuto(Object arg, Class<?> targetType) {
         // Null handling
@@ -387,10 +440,13 @@ public class ReflectionUtilis {
 
         // File from String (constructed via our MethodHandles path, no direct "new File")
         try {
-            if (fileclass != null && fileclass.isAssignableFrom(targetType) && arg instanceof CharSequence) {
-                return instantiateExact(fileclass, new Class<?>[]{String.class}, arg.toString());
+            if (fileclass != null
+                    && fileclass.isAssignableFrom(targetType)
+                    && arg instanceof CharSequence) {
+                return instantiateExact(fileclass, new Class<?>[] {String.class}, arg.toString());
             }
-        } catch (Throwable ignored) {}
+        } catch (Throwable ignored) {
+        }
 
         // Booleans/Chars from String
         if (targetType == boolean.class || targetType == Boolean.class) {
@@ -406,30 +462,37 @@ public class ReflectionUtilis {
         // Let your original converter handle numbers, primitives, and normal casts
         return convertArgument(arg, targetType);
     }
-    public static Object getFile(String pathAbsolute){
+
+    public static Object getFile(String pathAbsolute) {
         try {
-            MethodHandle mh = lookup.findConstructor(fileclass, MethodType.methodType(Void.TYPE, String.class));
+            MethodHandle mh =
+                    lookup.findConstructor(
+                            fileclass, MethodType.methodType(Void.TYPE, String.class));
             Object fileObj = mh.invoke(pathAbsolute);
             return fileObj;
         } catch (Throwable e) {
             throw new RuntimeException(e);
         }
-
     }
-    public static Object getFileWriter(String pathAbsolute,boolean append){
+
+    public static Object getFileWriter(String pathAbsolute, boolean append) {
         try {
-            MethodHandle mh = lookup.findConstructor(fileWriterClass, MethodType.methodType(Void.TYPE, String.class, boolean.class));
-            Object fileObj = mh.invoke(pathAbsolute,append);
+            MethodHandle mh =
+                    lookup.findConstructor(
+                            fileWriterClass,
+                            MethodType.methodType(Void.TYPE, String.class, boolean.class));
+            Object fileObj = mh.invoke(pathAbsolute, append);
             return fileObj;
         } catch (Throwable e) {
             throw new RuntimeException(e);
         }
-
     }
+
     public static Object getFileReader(String pathAbsolute) {
         try {
-            MethodHandle ctor = lookup.findConstructor(fileReaderClass,
-                    MethodType.methodType(Void.TYPE, String.class));
+            MethodHandle ctor =
+                    lookup.findConstructor(
+                            fileReaderClass, MethodType.methodType(Void.TYPE, String.class));
             return ctor.invoke(pathAbsolute);
         } catch (Throwable e) {
             throw new RuntimeException(e);
@@ -438,8 +501,9 @@ public class ReflectionUtilis {
 
     public static Object getBufferedReader(Object reader) {
         try {
-            MethodHandle ctor = lookup.findConstructor(bufferedReaderClass,
-                    MethodType.methodType(Void.TYPE, readerClass));
+            MethodHandle ctor =
+                    lookup.findConstructor(
+                            bufferedReaderClass, MethodType.methodType(Void.TYPE, readerClass));
             return ctor.invoke(reader);
         } catch (Throwable e) {
             throw new RuntimeException(e);
@@ -450,7 +514,8 @@ public class ReflectionUtilis {
     public static void closeQuiet(Object closeable) {
         try {
             invokeMethodWithAutoProjection("close", closeable);
-        } catch (Throwable ignored) {}
+        } catch (Throwable ignored) {
+        }
     }
 
     /** Enum coercion helpers – no direct reflection; uses standard Enum APIs. */
@@ -462,34 +527,40 @@ public class ReflectionUtilis {
             try {
                 // exact first
                 return Enum.valueOf((Class) enumType, name);
-            } catch (IllegalArgumentException ignored) {}
+            } catch (IllegalArgumentException ignored) {
+            }
             // case-insensitive fallback
             for (Object e : enumType.getEnumConstants()) {
                 if (((Enum<?>) e).name().equalsIgnoreCase(name)) return e;
             }
-            throw new IllegalArgumentException("No enum constant " + enumType.getName() + "." + name);
+            throw new IllegalArgumentException(
+                    "No enum constant " + enumType.getName() + "." + name);
         }
 
         if (arg instanceof Number) {
             int ord = ((Number) arg).intValue();
             Object[] all = enumType.getEnumConstants();
             if (ord >= 0 && ord < all.length) return all[ord];
-            throw new IllegalArgumentException("Enum ordinal out of range: " + ord + " for " + enumType.getName());
+            throw new IllegalArgumentException(
+                    "Enum ordinal out of range: " + ord + " for " + enumType.getName());
         }
 
-        throw new IllegalArgumentException("Cannot convert " + arg.getClass().getName() + " to enum " + enumType.getName());
+        throw new IllegalArgumentException(
+                "Cannot convert " + arg.getClass().getName() + " to enum " + enumType.getName());
     }
+
     public static Object instantiate(Class<?> clazz, Object... arguments) {
         try {
             // Auto-derive parameter types from arguments
             Class<?>[] parameterTypes = new Class<?>[arguments.length];
             for (int i = 0; i < arguments.length; i++) {
                 Object arg = arguments[i];
-                parameterTypes[i] = (arg != null && arg.getClass().isPrimitive())
-                        ? arg.getClass() // Won't really hit here often — boxing will happen
-                        : (arg != null && getPrimitiveType(arg.getClass()) != null)
-                        ? getPrimitiveType(arg.getClass())
-                        : (arg != null ? arg.getClass() : Object.class);
+                parameterTypes[i] =
+                        (arg != null && arg.getClass().isPrimitive())
+                                ? arg.getClass() // Won't really hit here often — boxing will happen
+                                : (arg != null && getPrimitiveType(arg.getClass()) != null)
+                                        ? getPrimitiveType(arg.getClass())
+                                        : (arg != null ? arg.getClass() : Object.class);
             }
 
             MethodType ctorType = MethodType.methodType(void.class, parameterTypes);
@@ -501,17 +572,27 @@ public class ReflectionUtilis {
         }
     }
 
-
-
-    public static Object enumFromExampleEnum( Class<?>  exampleEnumValue, int ordinal) {
-        if (exampleEnumValue == null) throw new IllegalArgumentException("exampleEnumValue is null");
+    public static Object enumFromExampleEnum(Class<?> exampleEnumValue, int ordinal) {
+        if (exampleEnumValue == null)
+            throw new IllegalArgumentException("exampleEnumValue is null");
         try {
             boolean isEnum = (boolean) invokeMethodWithAutoProjection("isEnum", exampleEnumValue);
-            if (!isEnum) throw new IllegalArgumentException("exampleEnumValue is not an enum: " + exampleEnumValue.getName());
-            Object[] constants = (Object[]) invokeMethodWithAutoProjection("getEnumConstants", exampleEnumValue);
-            if (constants == null) throw new IllegalStateException("Enum constants array is null for: " + exampleEnumValue.getName());
+            if (!isEnum)
+                throw new IllegalArgumentException(
+                        "exampleEnumValue is not an enum: " + exampleEnumValue.getName());
+            Object[] constants =
+                    (Object[]) invokeMethodWithAutoProjection("getEnumConstants", exampleEnumValue);
+            if (constants == null)
+                throw new IllegalStateException(
+                        "Enum constants array is null for: " + exampleEnumValue.getName());
             if (ordinal < 0 || ordinal >= constants.length) {
-                throw new IllegalArgumentException("Ordinal " + ordinal + " out of range 0.." + (constants.length - 1) + " for " + exampleEnumValue.getName());
+                throw new IllegalArgumentException(
+                        "Ordinal "
+                                + ordinal
+                                + " out of range 0.."
+                                + (constants.length - 1)
+                                + " for "
+                                + exampleEnumValue.getName());
             }
             return constants[ordinal];
         } catch (Throwable e) {
@@ -519,8 +600,8 @@ public class ReflectionUtilis {
         }
     }
 
-
-    public static Class<?> findFirstEnumClassWithConstantsCount(Object instance, int expectedCount) {
+    public static Class<?> findFirstEnumClassWithConstantsCount(
+            Object instance, int expectedCount) {
         try {
             Class<?> current = instance.getClass();
             while (current != null) {
@@ -531,10 +612,12 @@ public class ReflectionUtilis {
                         Class<?> fieldType = (Class<?>) getFieldTypeHandle.invoke(field);
 
                         // Must be an enum
-                        boolean isEnum = (boolean) invokeMethodWithAutoProjection("isEnum", fieldType);
+                        boolean isEnum =
+                                (boolean) invokeMethodWithAutoProjection("isEnum", fieldType);
                         if (!isEnum) continue;
 
-                        Object constantsArr = invokeMethodWithAutoProjection("getEnumConstants", fieldType);
+                        Object constantsArr =
+                                invokeMethodWithAutoProjection("getEnumConstants", fieldType);
                         Object[] constants = (Object[]) constantsArr;
                         if (constants != null && constants.length == expectedCount) {
                             return fieldType;
@@ -548,7 +631,8 @@ public class ReflectionUtilis {
             }
             return null;
         } catch (Throwable e) {
-            throw new RuntimeException("Failed to find enum class with " + expectedCount + " ordinals", e);
+            throw new RuntimeException(
+                    "Failed to find enum class with " + expectedCount + " ordinals", e);
         }
     }
 
@@ -590,6 +674,7 @@ public class ReflectionUtilis {
             return null;
         }
     }
+
     public static Object findNestedMarketApiFieldFromOutpostParams(Object instance) {
         try {
             Class<?> outerClass = instance.getClass();
@@ -609,10 +694,12 @@ public class ReflectionUtilis {
                         // Check: inner class must have exactly one field
                         if (innerFields.length == 1) {
                             Object innerField = innerFields[0];
-                            Class<?> innerFieldType = (Class<?>) getFieldTypeHandle.invoke(innerField);
+                            Class<?> innerFieldType =
+                                    (Class<?>) getFieldTypeHandle.invoke(innerField);
 
                             // Check if that single field is a MarketAPI
-                            if (com.fs.starfarer.api.campaign.econ.MarketAPI.class.isAssignableFrom(innerFieldType)) {
+                            if (com.fs.starfarer.api.campaign.econ.MarketAPI.class.isAssignableFrom(
+                                    innerFieldType)) {
                                 setFieldAccessibleHandle.invoke(innerField, true);
                                 return getFieldHandle.invoke(innerField, innerObject);
                             }
@@ -636,10 +723,10 @@ public class ReflectionUtilis {
         Class<?>[] params = ctorType.parameterArray();
 
         // Check first 4 parameters exactly
-        if (params[0] == float.class &&
-                params[1] == float.class &&
-                params[2] == boolean.class &&
-                params[3] == boolean.class) {
+        if (params[0] == float.class
+                && params[1] == float.class
+                && params[2] == boolean.class
+                && params[3] == boolean.class) {
             // We don't check params[4] because it's inaccessible, accept any class
             return true;
         }
@@ -717,7 +804,8 @@ public class ReflectionUtilis {
         return null; // No matching field found
     }
 
-    public static Object getPrivateVariableFromSuperClass(String fieldName, Object instanceToGetFrom) {
+    public static Object getPrivateVariableFromSuperClass(
+            String fieldName, Object instanceToGetFrom) {
         try {
             Class<?> instances = instanceToGetFrom.getClass();
             while (instances != null) {
@@ -743,7 +831,8 @@ public class ReflectionUtilis {
         }
     }
 
-    public static void setPrivateVariableFromSuperclass(String fieldName, Object instanceToModify, Object newValue) {
+    public static void setPrivateVariableFromSuperclass(
+            String fieldName, Object instanceToModify, Object newValue) {
         try {
             Class<?> instances = instanceToModify.getClass();
             while (instances != null) {
@@ -791,14 +880,16 @@ public class ReflectionUtilis {
             throw new RuntimeException(e);
         }
     }
-    public static Object invokeMethodDirectly(Object method,Object instance, Object... arguments) {
+
+    public static Object invokeMethodDirectly(Object method, Object instance, Object... arguments) {
         try {
 
-            return invokeMethodHandle.invoke(method,null, arguments);
+            return invokeMethodHandle.invoke(method, null, arguments);
         } catch (Throwable e) {
             throw new RuntimeException(e);
         }
     }
+
     public static List<UIComponentAPI> getChildrenCopy(UIPanelAPI panel) {
         try {
             return (List<UIComponentAPI>) invokeMethod("getChildrenCopy", panel);
@@ -807,7 +898,8 @@ public class ReflectionUtilis {
         }
     }
 
-    public static Pair<Object, Class<?>[]> getMethodFromSuperclass(String methodName, Object instance) {
+    public static Pair<Object, Class<?>[]> getMethodFromSuperclass(
+            String methodName, Object instance) {
         Class<?> currentClass = instance.getClass();
 
         while (currentClass != null) {
@@ -817,18 +909,21 @@ public class ReflectionUtilis {
             for (Object method : methods) {
                 try {
                     // Retrieve the MethodHandle for the getParameterTypes method
-                    MethodHandle getParameterTypesHandle = ReflectionBetterUtilis.getParameterTypesHandle(method.getClass(), "getParameterTypes");
+                    MethodHandle getParameterTypesHandle =
+                            ReflectionBetterUtilis.getParameterTypesHandle(
+                                    method.getClass(), "getParameterTypes");
                     // Use the MethodHandle to retrieve the method's name
 
                     // Check if the method name matches
                     if (getMethodNameHandle.invoke(method).equals(methodName)) {
                         // Invoke the MethodHandle to get the parameter types
-                        Class<?>[] parameterTypes = (Class<?>[]) getParameterTypesHandle.invoke(method);
+                        Class<?>[] parameterTypes =
+                                (Class<?>[]) getParameterTypesHandle.invoke(method);
                         return new Pair<>(method, parameterTypes);
                     }
                 } catch (Throwable e) {
 
-                    e.printStackTrace();  // Handle any reflection errors
+                    e.printStackTrace(); // Handle any reflection errors
                 }
             }
             // Move to the superclass if no match is found
@@ -838,6 +933,7 @@ public class ReflectionUtilis {
         // Return null if the method was not found in the class hierarchy
         return null;
     }
+
     public static Object findFieldOfClass(Object instance, Class<?> fieldType) {
         try {
             Class<?> currentClass = instance.getClass();
@@ -862,12 +958,19 @@ public class ReflectionUtilis {
         }
     }
 
-    public static Object invokeStaticMethodWithAutoProjection(Class<?> targetClass, String methodName, Object... arguments) {
+    public static Object invokeStaticMethodWithAutoProjection(
+            Class<?> targetClass, String methodName, Object... arguments) {
         try {
             ResolvedMethod resolved = resolveBestMethod(targetClass, methodName, true, arguments);
             if (resolved == null) {
-                throw new NoSuchMethodException("Static method " + methodName + " not found in class hierarchy of " + targetClass.getName() +
-                        " for " + ((arguments == null) ? 0 : arguments.length) + " args");
+                throw new NoSuchMethodException(
+                        "Static method "
+                                + methodName
+                                + " not found in class hierarchy of "
+                                + targetClass.getName()
+                                + " for "
+                                + ((arguments == null) ? 0 : arguments.length)
+                                + " args");
             }
 
             setMethodAccessable.invoke(resolved.method, true);
@@ -875,7 +978,8 @@ public class ReflectionUtilis {
         } catch (Throwable e) {
             if (e instanceof InvocationTargetException) {
                 Throwable cause = ((InvocationTargetException) e).getTargetException();
-                System.err.println("Root cause of InvocationTargetException: " + cause.getClass().getName());
+                System.err.println(
+                        "Root cause of InvocationTargetException: " + cause.getClass().getName());
                 cause.printStackTrace();
             } else {
                 e.printStackTrace();
@@ -883,6 +987,7 @@ public class ReflectionUtilis {
             throw new RuntimeException(e);
         }
     }
+
     public static String findFieldWithMatchingCtor(Object instance) {
         try {
             Class<?> currentClass = instance.getClass();
@@ -897,16 +1002,20 @@ public class ReflectionUtilis {
                         if (fieldValue == null) continue;
 
                         Class<?> fieldType = (Class<?>) getFieldTypeHandle.invoke(field);
-                        if(fieldType.getConstructors().length!=0){
-                            Object[] constructors = (Object[]) invokeMethod("getConstructors",fieldType);
-                            Class<?>[] classes = (Class<?>[]) invokeMethod("getParameterTypes",constructors[0]);
-                            if(classes.length==5){
-                                if(classes[0]==float.class&&classes[1]==float.class&&classes[2]==boolean.class&&classes[3]==boolean.class){
+                        if (fieldType.getConstructors().length != 0) {
+                            Object[] constructors =
+                                    (Object[]) invokeMethod("getConstructors", fieldType);
+                            Class<?>[] classes =
+                                    (Class<?>[]) invokeMethod("getParameterTypes", constructors[0]);
+                            if (classes.length == 5) {
+                                if (classes[0] == float.class
+                                        && classes[1] == float.class
+                                        && classes[2] == boolean.class
+                                        && classes[3] == boolean.class) {
                                     return (String) getFieldNameHandle.invoke(field);
                                 }
                             }
                         }
-
 
                     } catch (Throwable inner) {
                         inner.printStackTrace();
@@ -923,8 +1032,6 @@ public class ReflectionUtilis {
         return null;
     }
 
-
-
     private static final int MODIFIER_STATIC = 0x0008;
     private static final int METHOD_SCORE_IMPOSSIBLE = Integer.MAX_VALUE / 4;
 
@@ -934,7 +1041,8 @@ public class ReflectionUtilis {
         final Object[] projectedArguments;
         final int score;
 
-        private ResolvedMethod(Object method, Class<?>[] parameterTypes, Object[] projectedArguments, int score) {
+        private ResolvedMethod(
+                Object method, Class<?>[] parameterTypes, Object[] projectedArguments, int score) {
             this.method = method;
             this.parameterTypes = parameterTypes;
             this.projectedArguments = projectedArguments;
@@ -943,15 +1051,12 @@ public class ReflectionUtilis {
     }
 
     /**
-     * Finds the best overload instead of returning the first method that has this name.
-     * Lower score wins:
-     *  - exact type / primitive-box match
-     *  - widening numeric conversion
-     *  - assignable reference type
-     *  - safe auto conversions from convertArgumentAuto(...)
-     *  - varargs as fallback
+     * Finds the best overload instead of returning the first method that has this name. Lower score
+     * wins: - exact type / primitive-box match - widening numeric conversion - assignable reference
+     * type - safe auto conversions from convertArgumentAuto(...) - varargs as fallback
      */
-    private static ResolvedMethod resolveBestMethod(Class<?> startClass, String methodName, boolean requireStatic, Object... arguments) {
+    private static ResolvedMethod resolveBestMethod(
+            Class<?> startClass, String methodName, boolean requireStatic, Object... arguments) {
         if (arguments == null) arguments = new Object[0];
 
         ResolvedMethod best = null;
@@ -979,7 +1084,8 @@ public class ReflectionUtilis {
                     int score = scoreMethodArguments(arguments, parameterTypes, varArgs);
                     if (score >= METHOD_SCORE_IMPOSSIBLE) continue;
 
-                    // Prefer methods declared lower in the inheritance tree. Prefer fixed arity over varargs.
+                    // Prefer methods declared lower in the inheritance tree. Prefer fixed arity
+                    // over varargs.
                     score += classDepth * 10;
                     if (varArgs) score += 25;
 
@@ -998,7 +1104,8 @@ public class ReflectionUtilis {
         return best;
     }
 
-    private static Object[] projectMethodArgs(Object[] arguments, Class<?>[] parameterTypes, boolean varArgs) {
+    private static Object[] projectMethodArgs(
+            Object[] arguments, Class<?>[] parameterTypes, boolean varArgs) {
         try {
             if (arguments == null) arguments = new Object[0];
 
@@ -1031,7 +1138,9 @@ public class ReflectionUtilis {
             int varCount = arguments.length - fixedCount;
 
             // Caller already supplied the whole vararg array.
-            if (varCount == 1 && arguments[fixedCount] != null && varArrayType.isInstance(arguments[fixedCount])) {
+            if (varCount == 1
+                    && arguments[fixedCount] != null
+                    && varArrayType.isInstance(arguments[fixedCount])) {
                 projected[fixedCount] = arguments[fixedCount];
                 return projected;
             }
@@ -1048,7 +1157,8 @@ public class ReflectionUtilis {
         }
     }
 
-    private static int scoreMethodArguments(Object[] arguments, Class<?>[] parameterTypes, boolean varArgs) {
+    private static int scoreMethodArguments(
+            Object[] arguments, Class<?>[] parameterTypes, boolean varArgs) {
         if (arguments == null) arguments = new Object[0];
 
         if (!varArgs) {
@@ -1080,7 +1190,9 @@ public class ReflectionUtilis {
         if (varComponentType == null) return METHOD_SCORE_IMPOSSIBLE;
 
         int varCount = arguments.length - fixedCount;
-        if (varCount == 1 && arguments[fixedCount] != null && varArrayType.isInstance(arguments[fixedCount])) {
+        if (varCount == 1
+                && arguments[fixedCount] != null
+                && varArrayType.isInstance(arguments[fixedCount])) {
             return score + scoreSingleArgument(arguments[fixedCount], varArrayType);
         }
 
@@ -1103,7 +1215,8 @@ public class ReflectionUtilis {
         Class<?> boxedTarget = boxType(targetType);
 
         if (boxedTarget == argType) return 0;
-        if (targetType.isAssignableFrom(argType)) return 10 + inheritanceDistance(argType, targetType);
+        if (targetType.isAssignableFrom(argType))
+            return 10 + inheritanceDistance(argType, targetType);
 
         if (isNumericType(boxedTarget) && arg instanceof Number) {
             int argRank = numericRank(argType);
@@ -1115,12 +1228,13 @@ public class ReflectionUtilis {
             return 45;
         }
 
-        if ((boxedTarget == Boolean.class && arg instanceof Boolean) ||
-                (boxedTarget == Character.class && arg instanceof Character)) {
+        if ((boxedTarget == Boolean.class && arg instanceof Boolean)
+                || (boxedTarget == Character.class && arg instanceof Character)) {
             return 0;
         }
 
-        if ((boxedTarget == Boolean.class || boxedTarget == Character.class) && arg instanceof CharSequence) {
+        if ((boxedTarget == Boolean.class || boxedTarget == Character.class)
+                && arg instanceof CharSequence) {
             return 70;
         }
 
@@ -1132,7 +1246,9 @@ public class ReflectionUtilis {
             return 75;
         }
 
-        if (fileclass != null && fileclass.isAssignableFrom(targetType) && arg instanceof CharSequence) {
+        if (fileclass != null
+                && fileclass.isAssignableFrom(targetType)
+                && arg instanceof CharSequence) {
             return 80;
         }
 
@@ -1165,7 +1281,8 @@ public class ReflectionUtilis {
     private static boolean implementsInterface(Class<?> source, Class<?> targetInterface) {
         if (source == null || targetInterface == null) return false;
         for (Class<?> iface : source.getInterfaces()) {
-            if (iface.equals(targetInterface) || implementsInterface(iface, targetInterface)) return true;
+            if (iface.equals(targetInterface) || implementsInterface(iface, targetInterface))
+                return true;
         }
         return implementsInterface(source.getSuperclass(), targetInterface);
     }
@@ -1185,8 +1302,12 @@ public class ReflectionUtilis {
     }
 
     private static boolean isNumericType(Class<?> type) {
-        return type == Byte.class || type == Short.class || type == Integer.class || type == Long.class ||
-                type == Float.class || type == Double.class;
+        return type == Byte.class
+                || type == Short.class
+                || type == Integer.class
+                || type == Long.class
+                || type == Float.class
+                || type == Double.class;
     }
 
     private static int numericRank(Class<?> type) {
@@ -1200,24 +1321,35 @@ public class ReflectionUtilis {
         return -1;
     }
 
-    public static Object invokeMethodWithAutoProjection(String methodName, Object instance, Object... arguments) {
+    public static Object invokeMethodWithAutoProjection(
+            String methodName, Object instance, Object... arguments) {
         if (instance == null) {
-            throw new IllegalArgumentException("Cannot invoke method " + methodName + " on null instance");
+            throw new IllegalArgumentException(
+                    "Cannot invoke method " + methodName + " on null instance");
         }
 
         try {
-            ResolvedMethod resolved = resolveBestMethod(instance.getClass(), methodName, false, arguments);
+            ResolvedMethod resolved =
+                    resolveBestMethod(instance.getClass(), methodName, false, arguments);
             if (resolved == null) {
-                throw new NoSuchMethodException("Method " + methodName + " not found in class hierarchy of " + instance.getClass().getName() +
-                        " for " + ((arguments == null) ? 0 : arguments.length) + " args");
+                throw new NoSuchMethodException(
+                        "Method "
+                                + methodName
+                                + " not found in class hierarchy of "
+                                + instance.getClass().getName()
+                                + " for "
+                                + ((arguments == null) ? 0 : arguments.length)
+                                + " args");
             }
 
             setMethodAccessable.invoke(resolved.method, true);
-            return invokeMethodHandle.invoke(resolved.method, instance, resolved.projectedArguments);
+            return invokeMethodHandle.invoke(
+                    resolved.method, instance, resolved.projectedArguments);
         } catch (Throwable e) {
             if (e instanceof InvocationTargetException) {
                 Throwable cause = ((InvocationTargetException) e).getTargetException();
-                System.err.println("Root cause of InvocationTargetException: " + cause.getClass().getName());
+                System.err.println(
+                        "Root cause of InvocationTargetException: " + cause.getClass().getName());
                 cause.printStackTrace();
             } else {
                 e.printStackTrace();
@@ -1230,7 +1362,8 @@ public class ReflectionUtilis {
     public static Object convertArgument(Object arg, Class<?> targetType) {
         if (arg == null) {
             if (targetType.isPrimitive()) {
-                throw new IllegalArgumentException("null cannot be converted to primitive " + targetType.getName());
+                throw new IllegalArgumentException(
+                        "null cannot be converted to primitive " + targetType.getName());
             }
             return null;
         }
@@ -1255,15 +1388,19 @@ public class ReflectionUtilis {
             return ((Number) arg).byteValue();
         } else if (boxedTarget == Boolean.class) {
             if (arg instanceof Boolean) return arg;
-            throw new IllegalArgumentException("Cannot convert " + arg.getClass().getName() + " to boolean");
+            throw new IllegalArgumentException(
+                    "Cannot convert " + arg.getClass().getName() + " to boolean");
         } else if (boxedTarget == Character.class) {
             if (arg instanceof Character) return arg;
-            throw new IllegalArgumentException("Cannot convert " + arg.getClass().getName() + " to char");
+            throw new IllegalArgumentException(
+                    "Cannot convert " + arg.getClass().getName() + " to char");
         }
 
         return targetType.cast(arg);
     }
-    public static Object invokeStaticMethod(Class<?> targetClass, String methodName, Object... arguments) {
+
+    public static Object invokeStaticMethod(
+            Class<?> targetClass, String methodName, Object... arguments) {
         try {
             // Retrieve the parameter types of the arguments
             Class<?>[] parameterTypes = new Class[arguments.length];
@@ -1274,7 +1411,11 @@ public class ReflectionUtilis {
             // Find the method by its name and parameter types
             Object method = findStaticMethodByParameterTypes(targetClass, parameterTypes);
             if (method == null) {
-                throw new NoSuchMethodException("Static method " + methodName + " not found in class " + targetClass.getName());
+                throw new NoSuchMethodException(
+                        "Static method "
+                                + methodName
+                                + " not found in class "
+                                + targetClass.getName());
             }
 
             // Invoke the method (static methods do not need an instance)
@@ -1283,6 +1424,7 @@ public class ReflectionUtilis {
             throw new RuntimeException(e);
         }
     }
+
     public static Object findFieldByType(Object targetObject, Class<?> fieldType) {
         try {
             Class<?> currentClass = targetObject.getClass();
@@ -1294,12 +1436,13 @@ public class ReflectionUtilis {
                 for (Object field : fields) {
                     try {
                         // Retrieve field type dynamically
-                        Class<?> fieldClass = (Class<?>) invokeMethodWithAutoProjection("getType",field);
+                        Class<?> fieldClass =
+                                (Class<?>) invokeMethodWithAutoProjection("getType", field);
 
                         // Check if the field type matches or is assignable
                         if (fieldType.isAssignableFrom(fieldClass)) {
                             setFieldAccessibleHandle.invoke(field, true);
-                            return  getFieldHandle.invoke(field, targetObject);
+                            return getFieldHandle.invoke(field, targetObject);
                         }
                     } catch (Throwable e) {
                         // Handle exceptions gracefully during field inspection
@@ -1317,7 +1460,9 @@ public class ReflectionUtilis {
             throw new RuntimeException(e);
         }
     }
-    public static Object findStaticMethodByParameterTypes(Class<?> targetClass, Class<?>... parameterTypes) {
+
+    public static Object findStaticMethodByParameterTypes(
+            Class<?> targetClass, Class<?>... parameterTypes) {
         try {
             Class<?> currentClass = targetClass;
 
@@ -1333,7 +1478,8 @@ public class ReflectionUtilis {
                         // Check if the method is static
                         if ((modifiers & 0x0008) != 0) { // 0x0008 is the `static` modifier bit
                             // Retrieve parameter types dynamically
-                            Class<?>[] methodParamTypes = (Class<?>[]) getParameterTypesHandle.invoke(method);
+                            Class<?>[] methodParamTypes =
+                                    (Class<?>[]) getParameterTypesHandle.invoke(method);
 
                             // Compare parameter types
                             if (areParameterTypesMatching(methodParamTypes, parameterTypes)) {
@@ -1356,7 +1502,9 @@ public class ReflectionUtilis {
             throw new RuntimeException(e);
         }
     }
-    public static boolean replaceFirstStringFieldWithValue(Object instance, String targetValue, String newValue, boolean matchNulls) {
+
+    public static boolean replaceFirstStringFieldWithValue(
+            Object instance, String targetValue, String newValue, boolean matchNulls) {
         if (instance == null) return false;
 
         try {
@@ -1396,11 +1544,9 @@ public class ReflectionUtilis {
         }
     }
 
-
-
-
     // Helper function to compare parameter types
-    private static boolean areParameterTypesMatching(Class<?>[] methodParamTypes, Class<?>[] targetParamTypes) {
+    private static boolean areParameterTypesMatching(
+            Class<?>[] methodParamTypes, Class<?>[] targetParamTypes) {
         if (methodParamTypes.length != targetParamTypes.length) {
             return false;
         }
@@ -1413,7 +1559,6 @@ public class ReflectionUtilis {
 
         return true;
     }
-
 
     public static List<UIComponentAPI> getChildren(UIPanelAPI panelAPI) {
         return ReflectionUtilis.getChildrenCopy(panelAPI);

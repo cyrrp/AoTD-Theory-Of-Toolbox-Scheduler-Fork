@@ -12,27 +12,27 @@ public class ProductionUtil {
         CampaignUIAPI campaignUI;
         campaignUI = Global.getSector().getCampaignUI();
         Object dialog = campaignUI.getCurrentInteractionDialog();
-        if(AppDriver.getInstance().getCurrentState() instanceof CampaignState){
-            dialog = ReflectionUtilis.invokeMethod("getEncounterDialog", AppDriver.getInstance().getCurrentState());
+        if (AppDriver.getInstance().getCurrentState() instanceof CampaignState) {
+            dialog =
+                    ReflectionUtilis.invokeMethod(
+                            "getEncounterDialog", AppDriver.getInstance().getCurrentState());
         }
 
         CoreUIAPI core;
         if (dialog == null) {
-            core = (CoreUIAPI) ReflectionUtilis.invokeMethod("getCore",campaignUI);
-        }
-        else {
-            core = (CoreUIAPI) ReflectionUtilis.invokeMethod( "getCoreUI",dialog);
+            core = (CoreUIAPI) ReflectionUtilis.invokeMethod("getCore", campaignUI);
+        } else {
+            core = (CoreUIAPI) ReflectionUtilis.invokeMethod("getCoreUI", dialog);
         }
         return core == null ? null : (UIPanelAPI) core;
     }
+
     public static UIPanelAPI getCurrentTab() {
         UIPanelAPI coreUltimate = getCoreUI();
-        if(getCoreUI()==null) {
+        if (getCoreUI() == null) {
             return null;
         }
-        UIPanelAPI core = (UIPanelAPI) ReflectionUtilis.invokeMethod("getCurrentTab",coreUltimate);
+        UIPanelAPI core = (UIPanelAPI) ReflectionUtilis.invokeMethod("getCurrentTab", coreUltimate);
         return core == null ? null : (UIPanelAPI) core;
     }
-
-
 }

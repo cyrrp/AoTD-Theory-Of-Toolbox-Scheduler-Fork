@@ -9,7 +9,6 @@ import com.fs.starfarer.campaign.econ.reach.FinishEconomyUpdateTask;
 import data.kaysaar.aotd.tot.scripts.trade.manager.AoTDTradeManager;
 import data.kaysaar.aotd.tot.scripts.trade.models.AoTDFactionTradeData;
 import data.kaysaar.aotd.tot.scripts.trade.models.AoTDInternalTradeBatch;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Future;
@@ -53,10 +52,13 @@ public class AoTDFinishEconomyUpdateTask extends FinishEconomyUpdateTask {
         }
         if (!submitted) {
             if (AoTdMainWorkTask2.ENABLE_MULTITHREADED_VERSION && batch.size() > 0) {
-                futures.addAll(AoTDWorkerManager.submitDynamicBatch(
-                        "AoTD pure internal trade", epochStamp,
-                        batch.size(), CHUNK_SIZE,
-                        batch::computeFaction));
+                futures.addAll(
+                        AoTDWorkerManager.submitDynamicBatch(
+                                "AoTD pure internal trade",
+                                epochStamp,
+                                batch.size(),
+                                CHUNK_SIZE,
+                                batch::computeFaction));
             }
             submitted = true;
             if (batch.size() == 0) computed = true;
@@ -78,9 +80,9 @@ public class AoTDFinishEconomyUpdateTask extends FinishEconomyUpdateTask {
     }
 
     private void openCut() {
-        boundary = AoTDGlobalEconomyCoordinator.beginCommittedCut(
-                AoTDGlobalEconomyCoordinator.BOUNDARY_INTERNAL_TRADE,
-                false, epochStamp);
+        boundary =
+                AoTDGlobalEconomyCoordinator.beginCommittedCut(
+                        AoTDGlobalEconomyCoordinator.BOUNDARY_INTERNAL_TRADE, false, epochStamp);
         batch = boundary.cut.internalTradeBatch;
         AoTDEconomySemanticBaseline.operation("global-cut.open", 1L);
     }
@@ -94,9 +96,10 @@ public class AoTDFinishEconomyUpdateTask extends FinishEconomyUpdateTask {
                 future.get();
             } catch (Exception failure) {
                 infrastructureFailure = true;
-                Global.getLogger(AoTDFinishEconomyUpdateTask.class).warn(
-                        "AoTD internal-trade worker infrastructure failed; retrying pure DTO work sequentially.",
-                        failure);
+                Global.getLogger(AoTDFinishEconomyUpdateTask.class)
+                        .warn(
+                                "AoTD internal-trade worker infrastructure failed; retrying pure DTO work sequentially.",
+                                failure);
             }
         }
         if (infrastructureFailure && AoTDRuntimeEpoch.isCurrent(epochStamp)) {
@@ -117,15 +120,18 @@ public class AoTDFinishEconomyUpdateTask extends FinishEconomyUpdateTask {
             if (result == null || result.failure != null) {
                 modelFailure = true;
                 if (result != null && result.failure != null) {
-                    Global.getLogger(AoTDFinishEconomyUpdateTask.class).error(
-                            "AoTD pure internal-trade model failed for faction "
-                                    + result.factionId + "; keeping the previous committed settlement.",
-                            result.failure);
+                    Global.getLogger(AoTDFinishEconomyUpdateTask.class)
+                            .error(
+                                    "AoTD pure internal-trade model failed for faction "
+                                            + result.factionId
+                                            + "; keeping the previous committed settlement.",
+                                    result.failure);
                 }
             }
         }
-        boolean committed = !modelFailure
-                && AoTDTradeManager.getInstance().commitInternalTrade(boundary.cut, batch);
+        boolean committed =
+                !modelFailure
+                        && AoTDTradeManager.getInstance().commitInternalTrade(boundary.cut, batch);
         if (committed) {
             refreshPlayerContractPredictionsOnMainThread();
             notifyEconomyListeners();
@@ -180,15 +186,15 @@ public class AoTDFinishEconomyUpdateTask extends FinishEconomyUpdateTask {
     }
 
     /**
-     * Publishes the vanilla Economy.nextStep listener boundary without opening a
-     * new global internal-trade cut. UI-local refreshes use the last complete
-     * committed global cut and notify listeners exactly once.
+     * Publishes the vanilla Economy.nextStep listener boundary without opening a new global
+     * internal-trade cut. UI-local refreshes use the last complete committed global cut and notify
+     * listeners exactly once.
      */
     public static void notifyEconomyListenersOnly(Economy economy, String context) {
         if (economy == null) return;
         try (AoTDEconomySemanticBaseline.Scope ignored =
-                     AoTDEconomySemanticBaseline.begin(
-                             "finish-economy.notify-listeners", null, context)) {
+                AoTDEconomySemanticBaseline.begin(
+                        "finish-economy.notify-listeners", null, context)) {
             List<EconomyAPI.EconomyUpdateListener> listeners =
                     new ArrayList<>(economy.getUpdateListeners());
             int notified = 0;
@@ -206,5 +212,7 @@ public class AoTDFinishEconomyUpdateTask extends FinishEconomyUpdateTask {
     }
 
     @Override
-    public boolean isDone() { return done; }
+    public boolean isDone() {
+        return done;
+    }
 }

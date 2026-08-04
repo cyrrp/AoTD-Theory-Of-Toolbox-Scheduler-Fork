@@ -6,7 +6,8 @@ import com.fs.starfarer.api.ui.UIPanelAPI;
 public class CargoPanelContextUI {
     public final UIPanelAPI tradePanel;
     public final MarketAPI market;
-    public CargoPanelContextUI(UIPanelAPI tradePanel,MarketAPI market) {
+
+    public CargoPanelContextUI(UIPanelAPI tradePanel, MarketAPI market) {
         this.tradePanel = tradePanel;
         this.market = market;
     }

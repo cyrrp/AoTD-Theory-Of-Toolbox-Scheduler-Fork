@@ -1,5 +1,7 @@
 package data.kaysaar.aotd.tot.misc;
 
+import static data.kaysaar.aotd.tot.scripts.economy.AoTDSectorProductionDemandDataUtils.getPriceForAmount;
+
 import com.fs.starfarer.api.Global;
 import com.fs.starfarer.api.campaign.FactionAPI;
 import com.fs.starfarer.api.campaign.PlanetAPI;
@@ -16,15 +18,12 @@ import data.kaysaar.aotd.tot.scripts.commoditydata.AoTDCommodityOnMarket;
 import data.kaysaar.aotd.tot.scripts.economy.AoTDSectorProductionDemandDataUtils;
 import data.kaysaar.aotd.tot.scripts.trade.contracts.AoTDTradeContract;
 import data.kaysaar.aotd.tot.scripts.trade.contracts.AoTDTradeContractManager;
-import data.kaysaar.aotd.tot.scripts.trade.models.AoTDMarketData;
 import data.kaysaar.aotd.tot.scripts.trade.manager.AoTDTradeManager;
-
+import data.kaysaar.aotd.tot.scripts.trade.models.AoTDMarketData;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-
-import static data.kaysaar.aotd.tot.scripts.economy.AoTDSectorProductionDemandDataUtils.getPriceForAmount;
 
 public class AoTDToolboxMisc {
     public static String getDGSStringWithSign(int number) {
@@ -35,7 +34,16 @@ public class AoTDToolboxMisc {
         }
         return plus + Misc.getWithDGS(number);
     }
-    public static void setIndustryOnPlanet(String SystemName, String Planetname, String industryId, String removeIndustry, String potentialSwitch, boolean toImprove, String aiCore, String itemToInsert) {
+
+    public static void setIndustryOnPlanet(
+            String SystemName,
+            String Planetname,
+            String industryId,
+            String removeIndustry,
+            String potentialSwitch,
+            boolean toImprove,
+            String aiCore,
+            String itemToInsert) {
         if (Global.getSector().getStarSystem(SystemName) == null) return;
         List<PlanetAPI> planets = Global.getSector().getStarSystem(SystemName).getPlanets();
         for (PlanetAPI planet : planets) {
@@ -43,11 +51,13 @@ public class AoTDToolboxMisc {
 
                 if (planet.getMarket() == null) continue;
                 MarketAPI mutationMarket = planet.getMarket();
-                long token = SchedulerBridge.beforeMarketMutation(
-                        mutationMarket, SchedulerBridge.MUTATION_INDUSTRY_STRUCTURE);
+                long token =
+                        SchedulerBridge.beforeMarketMutation(
+                                mutationMarket, SchedulerBridge.MUTATION_INDUSTRY_STRUCTURE);
                 try {
                     SpecialItemData data = null;
-                    if (removeIndustry != null && mutationMarket.getIndustry(removeIndustry) != null) {
+                    if (removeIndustry != null
+                            && mutationMarket.getIndustry(removeIndustry) != null) {
                         data = mutationMarket.getIndustry(removeIndustry).getSpecialItem();
                         mutationMarket.removeIndustry(removeIndustry, null, false);
                     }
@@ -64,19 +74,29 @@ public class AoTDToolboxMisc {
                         }
                     }
                 } finally {
-                    SchedulerBridge.afterMarketMutation(token, mutationMarket,
+                    SchedulerBridge.afterMarketMutation(
+                            token,
+                            mutationMarket,
                             SchedulerBridge.DIRTY_STRUCTURE
                                     | SchedulerBridge.DIRTY_INDUSTRIES
-                                    | SchedulerBridge.DIRTY_DERIVED_ECONOMY, 0L);
+                                    | SchedulerBridge.DIRTY_DERIVED_ECONOMY,
+                            0L);
                 }
-
-
             }
         }
     }
-    public static int getAmountOfMarketsGreaterAccThanTargetedMarket(List<MarketAPI>markets, MarketAPI market){
-        return markets.stream().filter(x->x.getAccessibilityMod().computeEffective(0f)>market.getAccessibilityMod().computeEffective(0f)).toList().size();
+
+    public static int getAmountOfMarketsGreaterAccThanTargetedMarket(
+            List<MarketAPI> markets, MarketAPI market) {
+        return markets.stream()
+                .filter(
+                        x ->
+                                x.getAccessibilityMod().computeEffective(0f)
+                                        > market.getAccessibilityMod().computeEffective(0f))
+                .toList()
+                .size();
     }
+
     public static String capitalizeFirst(String input) {
         if (input == null || input.isEmpty()) {
             return input;
@@ -87,7 +107,8 @@ public class AoTDToolboxMisc {
 
     public static int getAmountOfContractsOfSameType(String typeId) {
         int am = 0;
-        for (AoTDTradeContract activeContract : AoTDTradeContractManager.getInstance().getActiveContracts().values()) {
+        for (AoTDTradeContract activeContract :
+                AoTDTradeContractManager.getInstance().getActiveContracts().values()) {
             if (activeContract.getContractTypeId().equals(typeId)) {
                 am++;
             }
@@ -114,8 +135,12 @@ public class AoTDToolboxMisc {
 
     public static boolean isContractMetFully(AoTDTradeContract contract) {
         for (AoTDTradeContract.TradeContractData value : contract.getContractData().values()) {
-            int prod = AoTDSectorProductionDemandDataUtils.getTotalProductionFromFaction(value.getCommodityId(), Factions.PLAYER);
-            int dem = AoTDSectorProductionDemandDataUtils.getTotalDemandFromFactionTillContract(value.getCommodityId(), Factions.PLAYER, contract.getId());
+            int prod =
+                    AoTDSectorProductionDemandDataUtils.getTotalProductionFromFaction(
+                            value.getCommodityId(), Factions.PLAYER);
+            int dem =
+                    AoTDSectorProductionDemandDataUtils.getTotalDemandFromFactionTillContract(
+                            value.getCommodityId(), Factions.PLAYER, contract.getId());
             if (dem > prod) {
                 return false;
             }
@@ -125,7 +150,8 @@ public class AoTDToolboxMisc {
 
     public static float getDeficitCountered(AoTDCommodityOnMarket commodity) {
         float countered = 0;
-        for (Map.Entry<String, MutableStat.StatMod> entry : commodity.getExcDefData().deficit.getFlatMods().entrySet()) {
+        for (Map.Entry<String, MutableStat.StatMod> entry :
+                commodity.getExcDefData().deficit.getFlatMods().entrySet()) {
             if (entry.getKey().contains("aotd_shortage_counter")) {
                 countered += Math.abs(entry.getValue().value);
             }
@@ -134,7 +160,8 @@ public class AoTDToolboxMisc {
     }
 
     public static float getStockpileCost(MarketAPI market) {
-        List<CommodityOnMarketAPI> all = new ArrayList<CommodityOnMarketAPI>(market.getAllCommodities());
+        List<CommodityOnMarketAPI> all =
+                new ArrayList<CommodityOnMarketAPI>(market.getAllCommodities());
 
         float totalCost = 0f;
 
@@ -142,7 +169,9 @@ public class AoTDToolboxMisc {
             if (commodity instanceof AoTDCommodityOnMarket com) {
                 float units = getDeficitCountered(com);
                 if (units > 0) {
-                    float per = LocalResourcesSubmarketPlugin.getStockpilingUnitPrice(com.getSpec(), true);
+                    float per =
+                            LocalResourcesSubmarketPlugin.getStockpilingUnitPrice(
+                                    com.getSpec(), true);
                     totalCost += units * per;
                 }
             }
@@ -168,18 +197,12 @@ public class AoTDToolboxMisc {
         double shortageCost = 0.0;
         shortageCost = market.getShortageCounteringCost();
 
-
         double immigrationCost = 0.0;
         if (market.isImmigrationIncentivesOn()) {
             immigrationCost = market.getImmigrationIncentivesCost();
         }
 
-        double net =
-                industryIncome
-                        + totalExportIncome
-                        - upkeep
-                        - shortageCost
-                        - immigrationCost;
+        double net = industryIncome + totalExportIncome - upkeep - shortageCost - immigrationCost;
 
         return (float) net;
     }
@@ -193,7 +216,6 @@ public class AoTDToolboxMisc {
 
         float basePrice = com.getSpec().getBasePrice();
 
-
         // only internal shipments (guaranteed by your internal solver)
         int internalUnits = Math.max(0, md.getInternalExported(com.getId()));
         int supply = com.getSupplyDemandData().getTotalRawUnitsFromSupply();
@@ -201,9 +223,17 @@ public class AoTDToolboxMisc {
         int suppliedLocally = Math.min(supply, demand);
         double localIncome = 0.0;
         if (suppliedLocally > 0) {
-            localIncome = suppliedLocally * basePrice * AoTDCommodityEconSpecManager.getCutForCommodity(com.getSpec().getId(), true);
+            localIncome =
+                    suppliedLocally
+                            * basePrice
+                            * AoTDCommodityEconSpecManager.getCutForCommodity(
+                                    com.getSpec().getId(), true);
         }
-        double income = internalUnits * basePrice * AoTDCommodityEconSpecManager.getCutForCommodity(com.getSpec().getId(), true);
+        double income =
+                internalUnits
+                        * basePrice
+                        * AoTDCommodityEconSpecManager.getCutForCommodity(
+                                com.getSpec().getId(), true);
         return (int) Math.floor(income + localIncome);
     }
 
@@ -215,11 +245,13 @@ public class AoTDToolboxMisc {
         int extraExported = md.getExtraSoldOutside(com.getSpec().getId());
         float cut = AoTDCommodityEconSpecManager.getCutForCommodity(com.getSpec().getId(), false);
 
-        int extraIncome = Math.round(getPriceForAmount(com.getId(), extraExported) * AoTDTradeManager.multFromSellingExcess);
+        int extraIncome =
+                Math.round(
+                        getPriceForAmount(com.getId(), extraExported)
+                                * AoTDTradeManager.multFromSellingExcess);
 
         int income = Math.round((exported * cut * com.getSpec().getBasePrice()));
-        return income + guaranteed+extraIncome;
-
+        return income + guaranteed + extraIncome;
     }
 
     public static int getSpeculatedExportIncome(AoTDCommodityOnMarket com) {
@@ -244,7 +276,8 @@ public class AoTDToolboxMisc {
         AoTDTradeContractManager.getInstance().ensurePredictionsUpToDate();
 
         int predictedContractUnits = 0;
-        Map<String, AoTDTradeContract> active = AoTDTradeContractManager.getInstance().getActiveContracts();
+        Map<String, AoTDTradeContract> active =
+                AoTDTradeContractManager.getInstance().getActiveContracts();
         if (active != null && !active.isEmpty()) {
             for (AoTDTradeContract c : active.values()) {
                 if (c == null) continue;
@@ -260,19 +293,27 @@ public class AoTDToolboxMisc {
         // remaining export pool that could go to external markets (speculated)
         int externalPool = export - internalUnits - predictedContractUnits;
         if (externalPool < 0) externalPool = 0;
-        int producitonOutside = AoTDSectorProductionDemandDataUtils.getTotalEffectiveDemandFromSectorOutsideFromFactionIgnoreContracts(com.getSpec().getId(), market.getFactionId());
+        int producitonOutside =
+                AoTDSectorProductionDemandDataUtils
+                        .getTotalEffectiveDemandFromSectorOutsideFromFactionIgnoreContracts(
+                                com.getSpec().getId(), market.getFactionId());
         externalPool = Math.min(externalPool, producitonOutside);
         // external only pays if there is demand outside faction
-        boolean hasOutsideDemand = producitonOutside>0;
+        boolean hasOutsideDemand = producitonOutside > 0;
 
         double externalIncome = 0.0;
         if (hasOutsideDemand && externalPool > 0) {
-            externalIncome = externalPool * basePrice * AoTDCommodityEconSpecManager.getCutForCommodity(com.getSpec().getId(), false);
+            externalIncome =
+                    externalPool
+                            * basePrice
+                            * AoTDCommodityEconSpecManager.getCutForCommodity(
+                                    com.getSpec().getId(), false);
         }
 
         double total = externalIncome;
         return (int) Math.floor(total);
     }
+
     public static int getSpeculatedExportIncomeFromContractsForUI(AoTDCommodityOnMarket com) {
         if (com == null || com.getMarket() == null) return 0;
 
@@ -284,7 +325,8 @@ public class AoTDToolboxMisc {
 
         AoTDTradeContractManager.getInstance().ensurePredictionsUpToDate();
 
-        Map<String, AoTDTradeContract> active = AoTDTradeContractManager.getInstance().getActiveContracts();
+        Map<String, AoTDTradeContract> active =
+                AoTDTradeContractManager.getInstance().getActiveContracts();
         if (active == null || active.isEmpty()) return 0;
 
         double predicted = 0.0;
@@ -315,7 +357,8 @@ public class AoTDToolboxMisc {
 
         AoTDTradeContractManager.getInstance().ensurePredictionsUpToDate();
 
-        Map<String, AoTDTradeContract> active = AoTDTradeContractManager.getInstance().getActiveContracts();
+        Map<String, AoTDTradeContract> active =
+                AoTDTradeContractManager.getInstance().getActiveContracts();
         if (active == null || active.isEmpty()) return 0;
 
         double predicted = 0.0;
@@ -338,7 +381,9 @@ public class AoTDToolboxMisc {
 
     public static int getExpectedMonthlyIncomeFromCommodity(AoTDCommodityOnMarket commodity) {
         if (commodity == null) return 0;
-        return getGuaranteedExportIncome(commodity) + getSpeculatedExportIncome(commodity) + getSpeculatedExportIncomeFromContracts(commodity);
+        return getGuaranteedExportIncome(commodity)
+                + getSpeculatedExportIncome(commodity)
+                + getSpeculatedExportIncomeFromContracts(commodity);
     }
 
     public static LinkedHashSet<FactionAPI> getFactionsInEconomy() {
@@ -350,26 +395,32 @@ public class AoTDToolboxMisc {
     }
 
     public static int getMaxShipped(MarketAPI marketFrom, MarketAPI towards, String commodityId) {
-        AoTDCommodityOnMarket com = AoTDCommodityOnMarket.getComMarketInstanceSave(marketFrom,commodityId);
+        AoTDCommodityOnMarket com =
+                AoTDCommodityOnMarket.getComMarketInstanceSave(marketFrom, commodityId);
         if (marketFrom.getFaction().equals(towards.getFaction())) {
             AoTDMarketData data = AoTDTradeManager.getInstance().getMarketData(marketFrom);
             int exportedToFaction = 0;
             if (data != null) {
                 data.getInternalExported(commodityId);
             }
-            return Math.max(exportedToFaction, com.getSupplyDemandData().getExportExcludingDeficit() - exportedToFaction);
+            return Math.max(
+                    exportedToFaction,
+                    com.getSupplyDemandData().getExportExcludingDeficit() - exportedToFaction);
         } else {
             AoTDMarketData data = AoTDTradeManager.getInstance().getMarketData(marketFrom);
             int exportedToFaction = 0;
             if (data != null) {
                 data.getInternalExported(commodityId);
             }
-            return Math.max(0, com.getSupplyDemandData().getExportExcludingDeficit() - exportedToFaction);
+            return Math.max(
+                    0, com.getSupplyDemandData().getExportExcludingDeficit() - exportedToFaction);
         }
     }
 
     public static int getMaxImported(MarketAPI marketFrom, MarketAPI towards, String commodityId) {
-        AoTDCommodityOnMarket com = (AoTDCommodityOnMarket) marketFrom.getCommodityData(commodityId);
-        return com.getSupplyDemandData().getTotalRawUnitsFromDemand() - com.getSupplyDemandData().getTotalRawUnitsFromSupply();
+        AoTDCommodityOnMarket com =
+                (AoTDCommodityOnMarket) marketFrom.getCommodityData(commodityId);
+        return com.getSupplyDemandData().getTotalRawUnitsFromDemand()
+                - com.getSupplyDemandData().getTotalRawUnitsFromSupply();
     }
 }

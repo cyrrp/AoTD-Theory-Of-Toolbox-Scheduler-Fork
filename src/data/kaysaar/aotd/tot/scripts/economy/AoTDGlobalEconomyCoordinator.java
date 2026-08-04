@@ -15,9 +15,9 @@ public final class AoTDGlobalEconomyCoordinator {
     private AoTDGlobalEconomyCoordinator() {}
 
     /**
-     * Delivers pending Prepatcher market time without opening a trade cut.
-     * The resulting delivery generations are marked dirty and must be locally
-     * recomputed before a hard global settlement is opened.
+     * Delivers pending Prepatcher market time without opening a trade cut. The resulting delivery
+     * generations are marked dirty and must be locally recomputed before a hard global settlement
+     * is opened.
      */
     public static void flushDeliveredTimeForBoundary(int reasonMask) {
         long runtimeToken = SchedulerBridge.beforeGlobalBoundary(reasonMask, true);
@@ -29,14 +29,15 @@ public final class AoTDGlobalEconomyCoordinator {
     }
 
     public static Boundary beginCommittedCut(int reasonMask, boolean hardFlush) {
-        return beginCommittedCut(reasonMask, hardFlush,
-                AoTDRuntimeEpoch.captureBatch("global-boundary"));
+        return beginCommittedCut(
+                reasonMask, hardFlush, AoTDRuntimeEpoch.captureBatch("global-boundary"));
     }
 
     public static Boundary beginCommittedCut(
             int reasonMask, boolean hardFlush, AoTDRuntimeEpoch.Stamp epochStamp) {
         if (!AoTDRuntimeEpoch.isCurrent(epochStamp)) {
-            throw new IllegalStateException("Cannot open stale AoTD global boundary: " + epochStamp);
+            throw new IllegalStateException(
+                    "Cannot open stale AoTD global boundary: " + epochStamp);
         }
         long runtimeToken = SchedulerBridge.beforeGlobalBoundary(reasonMask, hardFlush);
         try {
@@ -64,9 +65,11 @@ public final class AoTDGlobalEconomyCoordinator {
         public final AoTDRuntimeEpoch.Stamp epochStamp;
         private boolean closed;
 
-        private Boundary(long runtimeToken, long revision,
-                         AoTDTradeManager.CommittedCut cut,
-                         AoTDRuntimeEpoch.Stamp epochStamp) {
+        private Boundary(
+                long runtimeToken,
+                long revision,
+                AoTDTradeManager.CommittedCut cut,
+                AoTDRuntimeEpoch.Stamp epochStamp) {
             this.runtimeToken = runtimeToken;
             this.revision = revision;
             this.cut = cut;

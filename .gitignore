@@ -2,8 +2,11 @@
 .idea/
 *.iml
 out/
+.vscode/*
+!.vscode/settings.json
 
 # Build and compiler output
+.build/
 build/
 target/
 *.class

@@ -8,7 +8,6 @@ import com.fs.starfarer.api.ui.CustomPanelAPI;
 import com.fs.starfarer.api.ui.PositionAPI;
 import com.fs.starfarer.api.ui.TooltipMakerAPI;
 import com.fs.starfarer.api.util.Misc;
-
 import java.util.*;
 
 public class ChooseSizePanel implements ExtendedUIPanelPlugin {
@@ -25,7 +24,6 @@ public class ChooseSizePanel implements ExtendedUIPanelPlugin {
         allMode = true;
         this.sizes = sizes;
         createUI();
-
     }
 
     @Override
@@ -39,46 +37,56 @@ public class ChooseSizePanel implements ExtendedUIPanelPlugin {
         if (componentPanel != null) {
             mainPanel.removeComponent(componentPanel);
         }
-        componentPanel = Global.getSettings().createCustom(mainPanel.getPosition().getWidth(), mainPanel.getPosition().getHeight(), null);
-        TooltipMakerAPI tooltip = componentPanel.createUIElement(componentPanel.getPosition().getWidth(), componentPanel.getPosition().getHeight(), false);
+        componentPanel =
+                Global.getSettings()
+                        .createCustom(
+                                mainPanel.getPosition().getWidth(),
+                                mainPanel.getPosition().getHeight(),
+                                null);
+        TooltipMakerAPI tooltip =
+                componentPanel.createUIElement(
+                        componentPanel.getPosition().getWidth(),
+                        componentPanel.getPosition().getHeight(),
+                        false);
         float padding = 5f;
         float currentX = 0;
         float widthOfButton = 150;
 
         for (Map.Entry<String, Integer> category : sizes.entrySet()) {
-            ButtonAPI button = tooltip.addAreaCheckbox(category.getKey() + "(" + category.getValue() + ")", category.getKey(), Misc.getBasePlayerColor(), Misc.getDarkPlayerColor(), Misc.getBrightPlayerColor(), widthOfButton, 30, 0f);
+            ButtonAPI button =
+                    tooltip.addAreaCheckbox(
+                            category.getKey() + "(" + category.getValue() + ")",
+                            category.getKey(),
+                            Misc.getBasePlayerColor(),
+                            Misc.getDarkPlayerColor(),
+                            Misc.getBrightPlayerColor(),
+                            widthOfButton,
+                            30,
+                            0f);
             button.getPosition().inTL(currentX, 0);
             currentX += widthOfButton + padding;
             buttons.add(button);
         }
         componentPanel.addUIElement(tooltip).inTL(0, 0);
         mainPanel.addComponent(componentPanel).inTL(0, 0);
-
     }
 
     @Override
-    public void clearUI() {
-
-    }
+    public void clearUI() {}
 
     @Override
-    public void positionChanged(PositionAPI position) {
-
-    }
+    public void positionChanged(PositionAPI position) {}
 
     @Override
-    public void renderBelow(float alphaMult) {
-
-    }
+    public void renderBelow(float alphaMult) {}
 
     @Override
-    public void render(float alphaMult) {
-
-    }
+    public void render(float alphaMult) {}
 
     public boolean isSizeChosen(String manu) {
         return currChosenSizes.contains(manu) || allMode;
     }
+
     public void setNeedsUpdate(boolean needsUpdate) {
         this.needsUpdate = needsUpdate;
     }
@@ -86,36 +94,34 @@ public class ChooseSizePanel implements ExtendedUIPanelPlugin {
     public boolean isNeedsUpdate() {
         return needsUpdate;
     }
+
     @Override
     public void advance(float amount) {
         for (ButtonAPI button : buttons) {
             String manu = (String) button.getCustomData();
             if (button.isChecked()) {
                 button.setChecked(false);
-                if(manu.equalsIgnoreCase("all sizes")){
-                    if(!allMode){
-                        needsUpdate  = true;
+                if (manu.equalsIgnoreCase("all sizes")) {
+                    if (!allMode) {
+                        needsUpdate = true;
                     }
                     allMode = true;
                     currChosenSizes.clear();
-                }
-                else{
+                } else {
                     if (allMode) {
                         allMode = false;
                     }
-                    if(currChosenSizes.contains(button.getCustomData())){
+                    if (currChosenSizes.contains(button.getCustomData())) {
                         currChosenSizes.remove((String) button.getCustomData());
-                        if(currChosenSizes.isEmpty()){
+                        if (currChosenSizes.isEmpty()) {
                             allMode = true;
                         }
-                        needsUpdate  = true;
-                    }
-                    else{
+                        needsUpdate = true;
+                    } else {
                         currChosenSizes.add((String) button.getCustomData());
-                        needsUpdate  = true;
+                        needsUpdate = true;
                     }
                 }
-
             }
             if (isSizeChosen((String) button.getCustomData())) {
                 button.highlight();
@@ -123,16 +129,11 @@ public class ChooseSizePanel implements ExtendedUIPanelPlugin {
                 button.unhighlight();
             }
         }
-
     }
 
     @Override
-    public void processInput(List<InputEventAPI> events) {
-
-    }
+    public void processInput(List<InputEventAPI> events) {}
 
     @Override
-    public void buttonPressed(Object buttonId) {
-
-    }
+    public void buttonPressed(Object buttonId) {}
 }

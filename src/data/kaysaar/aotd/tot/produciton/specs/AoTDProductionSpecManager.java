@@ -15,21 +15,20 @@ import data.kaysaar.aotd.tot.produciton.AoTDProducitonSpecListener;
 import data.kaysaar.aotd.tot.produciton.models.AoTDProductionManData;
 import data.kaysaar.aotd.vok.Ids.AoTDCommodities;
 import data.kaysaar.aotd.vok.Ids.AoTDItems;
-import data.kaysaar.aotd.vok.scripts.specialprojects.BlackSiteProjectManager;
-import data.kaysaar.aotd.vok.scripts.specialprojects.models.ProjectReward;
-import org.json.JSONArray;
-import org.json.JSONException;
-
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import org.json.JSONArray;
+import org.json.JSONException;
 
 public class AoTDProductionSpecManager {
     public static LinkedHashSet<WeaponAPI.WeaponType> blackListedTypes = new LinkedHashSet<>();
     public static boolean loaded = false;
 
-    public static LinkedHashMap<String, AoTDProducitonSpecListener>listeners = new LinkedHashMap<>();
+    public static LinkedHashMap<String, AoTDProducitonSpecListener> listeners =
+            new LinkedHashMap<>();
+
     public static void makeSureBlackListInitialized() {
         blackListedTypes.add(WeaponAPI.WeaponType.LAUNCH_BAY);
         blackListedTypes.add(WeaponAPI.WeaponType.BUILT_IN);
@@ -37,33 +36,36 @@ public class AoTDProductionSpecManager {
         blackListedTypes.add(WeaponAPI.WeaponType.SYSTEM);
         blackListedTypes.add(WeaponAPI.WeaponType.STATION_MODULE);
     }
-    public static void addListener(String id,AoTDProducitonSpecListener listener) {
+
+    public static void addListener(String id, AoTDProducitonSpecListener listener) {
         listeners.put(id, listener);
     }
+
     public static LinkedHashMap<String, AoTDProductionSpec> shipProdSpecs = new LinkedHashMap<>();
     public static LinkedHashMap<String, AoTDProductionSpec> weaponProdSpecs = new LinkedHashMap<>();
 
-    public static LinkedHashMap<String, AoTDProductionSpec> fighterProdSpecs = new LinkedHashMap<>();
+    public static LinkedHashMap<String, AoTDProductionSpec> fighterProdSpecs =
+            new LinkedHashMap<>();
 
-    public static LinkedHashMap<String, AoTDProductionSpec> specialItemProdSpecs = new LinkedHashMap<>();
-    public static ArrayList<AoTDProductionManData>manData = new ArrayList<>();
+    public static LinkedHashMap<String, AoTDProductionSpec> specialItemProdSpecs =
+            new LinkedHashMap<>();
+    public static ArrayList<AoTDProductionManData> manData = new ArrayList<>();
     public static LinkedHashSet<String> orderedItemsForUI = new LinkedHashSet<>();
+
     static {
         orderedItemsForUI.add(Commodities.SHIPS);
         orderedItemsForUI.add(Commodities.HAND_WEAPONS);
-        if(Global.getSettings().getModManager().isModEnabled("aotd_vok")){
+        if (Global.getSettings().getModManager().isModEnabled("aotd_vok")) {
             orderedItemsForUI.add(AoTDCommodities.ADVANCED_COMPONENTS);
             orderedItemsForUI.add(AoTDCommodities.REFINED_METAL);
             orderedItemsForUI.add(AoTDCommodities.PURIFIED_TRANSPLUTONICS);
             orderedItemsForUI.add(AoTDCommodities.DOMAIN_GRADE_MACHINERY);
             orderedItemsForUI.add(AoTDItems.TENEBRIUM_CELL);
         }
-
-
-
-
     }
-    public static LinkedHashMap<String,AoTDProductionSpec>getSpecsBasedOnType(AoTDProductionSpec.AoTDProductionSpecType type) {
+
+    public static LinkedHashMap<String, AoTDProductionSpec> getSpecsBasedOnType(
+            AoTDProductionSpec.AoTDProductionSpecType type) {
         return switch (type) {
             case SHIP -> shipProdSpecs;
             case WEAPON -> weaponProdSpecs;
@@ -82,68 +84,85 @@ public class AoTDProductionSpecManager {
         fighterProdSpecs.clear();
         specialItemProdSpecs.clear();
         manData.clear();
-        if(Global.getSettings().getModManager().isModEnabled("aotd_vok")){
+        if (Global.getSettings().getModManager().isModEnabled("aotd_vok")) {
             manData.addAll(AoTDProductionManData.getManufacturerDataFromCSV());
         }
         for (ShipHullSpecAPI allShipHullSpec : Global.getSettings().getAllShipHullSpecs()) {
-            if (allShipHullSpec.getHints().contains(ShipHullSpecAPI.ShipTypeHints.STATION)) continue;
+            if (allShipHullSpec.getHints().contains(ShipHullSpecAPI.ShipTypeHints.STATION))
+                continue;
             if (allShipHullSpec.getHints().contains(ShipHullSpecAPI.ShipTypeHints.MODULE)) continue;
-            if (allShipHullSpec.getHints().contains(ShipHullSpecAPI.ShipTypeHints.UNBOARDABLE)) continue;
-            if (allShipHullSpec.getHints().contains(ShipHullSpecAPI.ShipTypeHints.UNDER_PARENT)) continue;
+            if (allShipHullSpec.getHints().contains(ShipHullSpecAPI.ShipTypeHints.UNBOARDABLE))
+                continue;
+            if (allShipHullSpec.getHints().contains(ShipHullSpecAPI.ShipTypeHints.UNDER_PARENT))
+                continue;
             if (allShipHullSpec.getHullSize().equals(ShipAPI.HullSize.FIGHTER)) continue;
             if (allShipHullSpec.hasTag(Tags.MODULE_HULL_BAR_ONLY)) continue;
-            if (Global.getSettings().getHullIdToVariantListMap().get(allShipHullSpec.getHullId()).isEmpty()) {
+            if (Global.getSettings()
+                    .getHullIdToVariantListMap()
+                    .get(allShipHullSpec.getHullId())
+                    .isEmpty()) {
                 boolean found = false;
                 for (String allVariantId : Global.getSettings().getAllVariantIds()) {
                     if (allVariantId.contains(allShipHullSpec.getHullId())) {
                         found = true;
                         break;
                     }
-
                 }
                 if (!found) continue;
             }
 
-            shipProdSpecs.put(allShipHullSpec.getHullId(), new AoTDProductionSpec(allShipHullSpec.getHullId(), allShipHullSpec));
-
+            shipProdSpecs.put(
+                    allShipHullSpec.getHullId(),
+                    new AoTDProductionSpec(allShipHullSpec.getHullId(), allShipHullSpec));
         }
         for (WeaponSpecAPI weaponSpecAPI : Global.getSettings().getAllWeaponSpecs()) {
             if (blackListedTypes.contains(weaponSpecAPI.getType())) continue;
 
-            weaponProdSpecs.put(weaponSpecAPI.getWeaponId(), new AoTDProductionSpec(weaponSpecAPI.getWeaponId(), weaponSpecAPI));
+            weaponProdSpecs.put(
+                    weaponSpecAPI.getWeaponId(),
+                    new AoTDProductionSpec(weaponSpecAPI.getWeaponId(), weaponSpecAPI));
         }
-        for (FighterWingSpecAPI allFighterWingSpec : Global.getSettings().getAllFighterWingSpecs()) {
+        for (FighterWingSpecAPI allFighterWingSpec :
+                Global.getSettings().getAllFighterWingSpecs()) {
 
-            fighterProdSpecs.put(allFighterWingSpec.getId(), new AoTDProductionSpec(allFighterWingSpec.getId(), allFighterWingSpec));
+            fighterProdSpecs.put(
+                    allFighterWingSpec.getId(),
+                    new AoTDProductionSpec(allFighterWingSpec.getId(), allFighterWingSpec));
         }
-        ArrayList<String>allowedItems =    new ArrayList<>();
+        ArrayList<String> allowedItems = new ArrayList<>();
         try {
             JSONArray array = Global.getSettings().getJSONArray("aotd_item_prod");
             for (int i = 0; i < array.length(); i++) {
                 String obj = array.getString(i);
                 allowedItems.add(obj);
-
             }
         } catch (JSONException e) {
 
         }
-        for (SpecialItemSpecAPI allSpecialItemSpec : Global.getSettings().getAllSpecialItemSpecs()) {
-            if(!allowedItems.contains(allSpecialItemSpec.getId()))continue;
+        for (SpecialItemSpecAPI allSpecialItemSpec :
+                Global.getSettings().getAllSpecialItemSpecs()) {
+            if (!allowedItems.contains(allSpecialItemSpec.getId())) continue;
 
-            specialItemProdSpecs.put(allSpecialItemSpec.getId(), new AoTDProductionSpec(allSpecialItemSpec.getId(), allSpecialItemSpec));
+            specialItemProdSpecs.put(
+                    allSpecialItemSpec.getId(),
+                    new AoTDProductionSpec(allSpecialItemSpec.getId(), allSpecialItemSpec));
         }
         for (CommoditySpecAPI s : Global.getSettings().getAllCommoditySpecs()) {
-            if(!allowedItems.contains(s.getId()))continue;
-            if (s.hasTag("ai_core") && !s.hasTag("no_drop") && !s.getId().equals("ai_cores") && s.hasTag("aotd_ai_core")) {
+            if (!allowedItems.contains(s.getId())) continue;
+            if (s.hasTag("ai_core")
+                    && !s.hasTag("no_drop")
+                    && !s.getId().equals("ai_cores")
+                    && s.hasTag("aotd_ai_core")) {
                 specialItemProdSpecs.put(s.getId(), new AoTDProductionSpec(s.getId(), s));
             }
         }
         listeners.values().forEach(AoTDProducitonSpecListener::specsCreated);
         loaded = true;
     }
-    public static AoTDProductionManData getManDataIfPresent(String manufacturer){
+
+    public static AoTDProductionManData getManDataIfPresent(String manufacturer) {
         for (AoTDProductionManData manDatum : manData) {
-            if(manDatum.getManufacturerId().equalsIgnoreCase(manufacturer)){
+            if (manDatum.getManufacturerId().equalsIgnoreCase(manufacturer)) {
                 return manDatum;
             }
         }
@@ -161,7 +180,9 @@ public class AoTDProductionSpecManager {
     public static AoTDProductionSpec getFighterSpec(String id) {
         return fighterProdSpecs.get(id);
     }
-    public static AoTDProductionSpec getSpec(String id, AoTDProductionSpec.AoTDProductionSpecType type) {
+
+    public static AoTDProductionSpec getSpec(
+            String id, AoTDProductionSpec.AoTDProductionSpecType type) {
         if (id == null || type == null) return null;
 
         return switch (type) {
@@ -171,6 +192,7 @@ public class AoTDProductionSpecManager {
             case SPECIAL_ITEM, COMMODITY_ITEM -> specialItemProdSpecs.get(id);
         };
     }
+
     public static AoTDProductionSpec getSpecialItemSpec(String id) {
         return specialItemProdSpecs.get(id);
     }
@@ -178,8 +200,11 @@ public class AoTDProductionSpecManager {
     public static AoTDProductionSpec getNormalItemSpec(String id) {
         return specialItemProdSpecs.get(id);
     }
-    public static List<AoTDProductionSpec> getLearnedSpecsForFaction(AoTDProductionSpec.AoTDProductionSpecType type, FactionAPI faction) {
-        return getSpecsBasedOnType(type).values().stream().filter(x->x.isLearnedByFaction(faction)).toList();
-    }
 
+    public static List<AoTDProductionSpec> getLearnedSpecsForFaction(
+            AoTDProductionSpec.AoTDProductionSpecType type, FactionAPI faction) {
+        return getSpecsBasedOnType(type).values().stream()
+                .filter(x -> x.isLearnedByFaction(faction))
+                .toList();
+    }
 }

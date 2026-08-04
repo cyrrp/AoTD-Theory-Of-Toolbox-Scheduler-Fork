@@ -10,8 +10,6 @@ import com.fs.starfarer.api.input.InputEventAPI;
 import com.fs.starfarer.api.ui.CustomPanelAPI;
 import com.fs.starfarer.api.ui.PositionAPI;
 import com.fs.starfarer.api.ui.TooltipMakerAPI;
-import com.fs.starfarer.api.util.Misc;
-
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -81,26 +79,28 @@ public class EntityRowComponent implements ExtendedUIPanelPlugin {
 
             EntityRenderer renderer = new EntityRenderer(entity, iconSize);
 
-            tooltip.addCustom(renderer.getMainPanel(), 0f)
-                    .getPosition()
-                    .inTL(startingX, startingY);
-            //TODO - Market Info on hover
-            tooltip.addTooltipToPrevious(new TooltipMakerAPI.TooltipCreator() {
-                @Override
-                public boolean isTooltipExpandable(Object tooltipParam) {
-                    return false;
-                }
+            tooltip.addCustom(renderer.getMainPanel(), 0f).getPosition().inTL(startingX, startingY);
+            // TODO - Market Info on hover
+            tooltip.addTooltipToPrevious(
+                    new TooltipMakerAPI.TooltipCreator() {
+                        @Override
+                        public boolean isTooltipExpandable(Object tooltipParam) {
+                            return false;
+                        }
 
-                @Override
-                public float getTooltipWidth(Object tooltipParam) {
-                    return 350f;
-                }
+                        @Override
+                        public float getTooltipWidth(Object tooltipParam) {
+                            return 350f;
+                        }
 
-                @Override
-                public void createTooltip(TooltipMakerAPI tooltip, boolean expanded, Object tooltipParam) {
-                    tooltip.addTitle(market.getName());
-                }
-            }, TooltipMakerAPI.TooltipLocation.BELOW, false);
+                        @Override
+                        public void createTooltip(
+                                TooltipMakerAPI tooltip, boolean expanded, Object tooltipParam) {
+                            tooltip.addTitle(market.getName());
+                        }
+                    },
+                    TooltipMakerAPI.TooltipLocation.BELOW,
+                    false);
 
             startingX += iconSize + separator;
         }
@@ -124,17 +124,18 @@ public class EntityRowComponent implements ExtendedUIPanelPlugin {
             markets.add(market);
         }
 
-        markets.sort(new Comparator<MarketAPI>() {
-            @Override
-            public int compare(MarketAPI o1, MarketAPI o2) {
-                int sizeCompare = Integer.compare(o2.getSize(), o1.getSize());
-                if (sizeCompare != 0) {
-                    return sizeCompare;
-                }
+        markets.sort(
+                new Comparator<MarketAPI>() {
+                    @Override
+                    public int compare(MarketAPI o1, MarketAPI o2) {
+                        int sizeCompare = Integer.compare(o2.getSize(), o1.getSize());
+                        if (sizeCompare != 0) {
+                            return sizeCompare;
+                        }
 
-                return o1.getName().compareToIgnoreCase(o2.getName());
-            }
-        });
+                        return o1.getName().compareToIgnoreCase(o2.getName());
+                    }
+                });
 
         return markets;
     }
@@ -148,32 +149,20 @@ public class EntityRowComponent implements ExtendedUIPanelPlugin {
     }
 
     @Override
-    public void positionChanged(PositionAPI position) {
-
-    }
+    public void positionChanged(PositionAPI position) {}
 
     @Override
-    public void renderBelow(float alphaMult) {
-
-    }
+    public void renderBelow(float alphaMult) {}
 
     @Override
-    public void render(float alphaMult) {
-
-    }
+    public void render(float alphaMult) {}
 
     @Override
-    public void advance(float amount) {
-
-    }
+    public void advance(float amount) {}
 
     @Override
-    public void processInput(List<InputEventAPI> events) {
-
-    }
+    public void processInput(List<InputEventAPI> events) {}
 
     @Override
-    public void buttonPressed(Object buttonId) {
-
-    }
+    public void buttonPressed(Object buttonId) {}
 }

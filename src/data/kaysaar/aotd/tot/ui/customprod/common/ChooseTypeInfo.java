@@ -8,7 +8,6 @@ import com.fs.starfarer.api.ui.CustomPanelAPI;
 import com.fs.starfarer.api.ui.PositionAPI;
 import com.fs.starfarer.api.ui.TooltipMakerAPI;
 import com.fs.starfarer.api.util.Misc;
-
 import java.util.*;
 
 public class ChooseTypeInfo implements ExtendedUIPanelPlugin {
@@ -19,12 +18,12 @@ public class ChooseTypeInfo implements ExtendedUIPanelPlugin {
     boolean allMode = false;
     LinkedHashSet<String> currChosenSizes = new LinkedHashSet<>();
     boolean needsUpdate = false;
+
     public ChooseTypeInfo(float width, LinkedHashMap<String, Integer> typeInfo) {
         this.mainPanel = Global.getSettings().createCustom(width, 30, this);
         allMode = true;
         this.typeInfo = typeInfo;
         createUI();
-
     }
 
     @Override
@@ -40,17 +39,18 @@ public class ChooseTypeInfo implements ExtendedUIPanelPlugin {
             mainPanel.removeComponent(componentPanel);
         }
 
-        componentPanel = Global.getSettings().createCustom(
-                mainPanel.getPosition().getWidth(),
-                mainPanel.getPosition().getHeight(),
-                null
-        );
+        componentPanel =
+                Global.getSettings()
+                        .createCustom(
+                                mainPanel.getPosition().getWidth(),
+                                mainPanel.getPosition().getHeight(),
+                                null);
 
-        TooltipMakerAPI tooltip = componentPanel.createUIElement(
-                componentPanel.getPosition().getWidth(),
-                componentPanel.getPosition().getHeight()+8,
-                true
-        );
+        TooltipMakerAPI tooltip =
+                componentPanel.createUIElement(
+                        componentPanel.getPosition().getWidth(),
+                        componentPanel.getPosition().getHeight() + 8,
+                        true);
 
         float paddingX = 5f;
         float paddingY = 5f;
@@ -69,19 +69,19 @@ public class ChooseTypeInfo implements ExtendedUIPanelPlugin {
             if (currentX > 0 && currentX + widthOfButton > availableWidth) {
                 currentX = 0f;
                 currentY += rowHeight + paddingY;
-                heightSoFar = currentY + rowHeight+5;
+                heightSoFar = currentY + rowHeight + 5;
             }
 
-            ButtonAPI button = tooltip.addAreaCheckbox(
-                    text,
-                    category.getKey(),
-                    Misc.getBasePlayerColor(),
-                    Misc.getDarkPlayerColor(),
-                    Misc.getBrightPlayerColor(),
-                    widthOfButton,
-                    rowHeight,
-                    0f
-            );
+            ButtonAPI button =
+                    tooltip.addAreaCheckbox(
+                            text,
+                            category.getKey(),
+                            Misc.getBasePlayerColor(),
+                            Misc.getDarkPlayerColor(),
+                            Misc.getBrightPlayerColor(),
+                            widthOfButton,
+                            rowHeight,
+                            0f);
 
             button.getPosition().inTL(currentX, currentY);
             buttons.add(button);
@@ -91,35 +91,26 @@ public class ChooseTypeInfo implements ExtendedUIPanelPlugin {
         tooltip.setHeightSoFar(heightSoFar);
         componentPanel.addUIElement(tooltip).inTL(0, 0);
 
-
-
         mainPanel.addComponent(componentPanel).inTL(0, 0);
     }
 
     @Override
-    public void clearUI() {
-
-    }
+    public void clearUI() {}
 
     @Override
-    public void positionChanged(PositionAPI position) {
-
-    }
+    public void positionChanged(PositionAPI position) {}
 
     @Override
-    public void renderBelow(float alphaMult) {
-
-    }
+    public void renderBelow(float alphaMult) {}
 
     @Override
-    public void render(float alphaMult) {
-
-    }
+    public void render(float alphaMult) {}
 
     public boolean isTypeChosen(String manu) {
-        if(manu==null)return false;
+        if (manu == null) return false;
         return currChosenSizes.contains(manu) || allMode;
     }
+
     public void setNeedsUpdate(boolean needsUpdate) {
         this.needsUpdate = needsUpdate;
     }
@@ -127,6 +118,7 @@ public class ChooseTypeInfo implements ExtendedUIPanelPlugin {
     public boolean isNeedsUpdate() {
         return needsUpdate;
     }
+
     @Override
     public void advance(float amount) {
         for (ButtonAPI button : buttons) {
@@ -134,31 +126,27 @@ public class ChooseTypeInfo implements ExtendedUIPanelPlugin {
             if (button.isChecked()) {
                 button.setChecked(false);
 
-                if(manu.equalsIgnoreCase("all types")){
-                    if(!allMode){
-                        needsUpdate  = true;
+                if (manu.equalsIgnoreCase("all types")) {
+                    if (!allMode) {
+                        needsUpdate = true;
                     }
                     allMode = true;
                     currChosenSizes.clear();
-                }
-                else{
+                } else {
                     if (allMode) {
                         allMode = false;
                     }
-                    if(currChosenSizes.contains(button.getCustomData())){
+                    if (currChosenSizes.contains(button.getCustomData())) {
                         currChosenSizes.remove((String) button.getCustomData());
-                        if(currChosenSizes.isEmpty()){
+                        if (currChosenSizes.isEmpty()) {
                             allMode = true;
                         }
-                        needsUpdate  = true;
-                    }
-                    else{
+                        needsUpdate = true;
+                    } else {
                         currChosenSizes.add((String) button.getCustomData());
-                        needsUpdate  = true;
+                        needsUpdate = true;
                     }
-
                 }
-
             }
             if (isTypeChosen((String) button.getCustomData())) {
                 button.highlight();
@@ -166,16 +154,11 @@ public class ChooseTypeInfo implements ExtendedUIPanelPlugin {
                 button.unhighlight();
             }
         }
-
     }
 
     @Override
-    public void processInput(List<InputEventAPI> events) {
-
-    }
+    public void processInput(List<InputEventAPI> events) {}
 
     @Override
-    public void buttonPressed(Object buttonId) {
-
-    }
+    public void buttonPressed(Object buttonId) {}
 }

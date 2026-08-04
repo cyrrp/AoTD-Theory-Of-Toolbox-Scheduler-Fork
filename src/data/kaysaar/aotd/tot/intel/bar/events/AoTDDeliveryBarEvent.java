@@ -6,13 +6,11 @@ import com.fs.starfarer.api.campaign.econ.CommodityOnMarketAPI;
 import com.fs.starfarer.api.campaign.econ.MarketAPI;
 import com.fs.starfarer.api.impl.campaign.ids.Factions;
 import com.fs.starfarer.api.impl.campaign.intel.bar.events.DeliveryBarEvent;
-import com.fs.starfarer.api.impl.campaign.intel.bar.events.DeliveryMissionIntel;
 import com.fs.starfarer.api.util.WeightedRandomPicker;
 import com.fs.starfarer.campaign.econ.Market;
 import data.kaysaar.aotd.tot.intel.AoTDDeliveryMissionIntel;
 import data.kaysaar.aotd.tot.scripts.commoditydata.AoTDCommodityOnMarket;
 import data.kaysaar.aotd.tot.scripts.economy.AoTDEconomy;
-
 import java.util.ArrayList;
 import java.util.List;
 
@@ -49,15 +47,19 @@ public class AoTDDeliveryBarEvent extends DeliveryBarEvent {
             if (other.isInvalidMissionTarget()) continue;
 
             if (other.getEconGroup() == null && market.getEconGroup() != null) continue;
-            if (other.getEconGroup() != null && !other.getEconGroup().equals(market.getEconGroup())) continue;
+            if (other.getEconGroup() != null && !other.getEconGroup().equals(market.getEconGroup()))
+                continue;
 
             if (other.getStarSystem() == null) continue;
             AoTDEconomy.pruneCommoditiesThatMightAppear((Market) other);
-            //WeightedRandomPicker<T>
+            // WeightedRandomPicker<T>
             for (CommodityOnMarketAPI com : commodities) {
-                //CommodityOnMarketAPI otherCom = other.getCommodityData(com.getId());
-                AoTDCommodityOnMarket otherCom = (AoTDCommodityOnMarket) other.getCommodityData(com.getDemandClass());
-                if (otherCom.getSupplyDemandData().getTotalRawUnitsFromDemand()-otherCom.getSupplyDemandData().getTotalRawUnitsFromSupply() <= 0) continue;
+                // CommodityOnMarketAPI otherCom = other.getCommodityData(com.getId());
+                AoTDCommodityOnMarket otherCom =
+                        (AoTDCommodityOnMarket) other.getCommodityData(com.getDemandClass());
+                if (otherCom.getSupplyDemandData().getTotalRawUnitsFromDemand()
+                                - otherCom.getSupplyDemandData().getTotalRawUnitsFromSupply()
+                        <= 0) continue;
 
                 DestinationData data = new DestinationData(market, other, com, otherCom);
                 if (data.illegal) continue;
@@ -71,7 +73,8 @@ public class AoTDDeliveryBarEvent extends DeliveryBarEvent {
             }
         }
         if (maxDist > 10) maxDist = 10;
-        WeightedRandomPicker<DestinationData> picker = new WeightedRandomPicker<DestinationData>(random);
+        WeightedRandomPicker<DestinationData> picker =
+                new WeightedRandomPicker<DestinationData>(random);
         for (int i = 0; i < potential.size(); i++) {
             DestinationData d = potential.get(i);
             if (d.score > maxScore * 0.5f && d.distLY > maxDist * 0.5f) {
@@ -83,7 +86,7 @@ public class AoTDDeliveryBarEvent extends DeliveryBarEvent {
         if (pick == null) return;
         destination = pick.dest;
         duration = pick.distLY * 5 + 50;
-        duration = (int)duration / 10 * 10;
+        duration = (int) duration / 10 * 10;
         CargoAPI cargo = Global.getSector().getPlayerFleet().getCargo();
         quantity = (int) cargo.getMaxCapacity();
         if (pick.com.isFuel()) {
@@ -115,16 +118,15 @@ public class AoTDDeliveryBarEvent extends DeliveryBarEvent {
         AoTDCommodityOnMarket comFrom = (AoTDCommodityOnMarket) pick.comFrom;
         int limit = (int) (comFrom.getSupplyDemandData().getTotalRawUnitsFromSupply());
         limit *= 0.75f + 0.5f * random.nextFloat();
-        //if (quantity > 5000) quantity = 5000;
+        // if (quantity > 5000) quantity = 5000;
         if (quantity > limit) quantity = limit;
-
 
         if (quantity > 10000) quantity = quantity / 1000 * 1000;
         else if (quantity > 100) quantity = quantity / 10 * 10;
         else if (quantity > 10) quantity = quantity / 10 * 10;
 
         if (quantity < 10) quantity = 10;
-        //float base = pick.com.getMarket().getSupplyPrice(pick.com.getId(), 1, true);
+        // float base = pick.com.getMarket().getSupplyPrice(pick.com.getId(), 1, true);
         float base = pick.comFrom.getMarket().getSupplyPrice(pick.comFrom.getId(), 1, true);
 
         if (quantity * base < 4000) {
@@ -135,20 +137,20 @@ public class AoTDDeliveryBarEvent extends DeliveryBarEvent {
 
         if (base < minBase) base = minBase;
 
-        //float extra = 2000;
+        // float extra = 2000;
 
         float mult = pick.score / 30f;
-        //if (market.isPlayerOwned() && mult > 2f) mult = 2f;
-        //if (market.isPlayerOwned()) mult *= 0.75f;
+        // if (market.isPlayerOwned() && mult > 2f) mult = 2f;
+        // if (market.isPlayerOwned()) mult *= 0.75f;
 
         if (mult < 0.75f) mult = 0.75f;
-        //if (mult > 2) mult = 2;
+        // if (mult > 2) mult = 2;
         reward = (int) (base * mult * quantity);
 
-//		float minPerUnit = 50;
-//		if (reward / quantity < minPerUnit) {
-//			reward = (int) (minPerUnit * quantity);
-//		}
+        //		float minPerUnit = 50;
+        //		if (reward / quantity < minPerUnit) {
+        //			reward = (int) (minPerUnit * quantity);
+        //		}
 
         reward = reward / 1000 * 1000;
         if (reward < 4000) reward = 4000;
@@ -170,7 +172,10 @@ public class AoTDDeliveryBarEvent extends DeliveryBarEvent {
     protected void createIntel() {
         AoTDDeliveryMissionIntel intel = new AoTDDeliveryMissionIntel(this, dialog);
 
-        market.getMemoryWithoutUpdate().set(KEY_ACCEPTED_AT_THIS_MARKET_RECENTLY, true,
-                ACCEPTED_AT_THIS_MARKET_DURATION * (0.75f + random.nextFloat() * 0.5f));
+        market.getMemoryWithoutUpdate()
+                .set(
+                        KEY_ACCEPTED_AT_THIS_MARKET_RECENTLY,
+                        true,
+                        ACCEPTED_AT_THIS_MARKET_DURATION * (0.75f + random.nextFloat() * 0.5f));
     }
 }

@@ -6,7 +6,6 @@ import com.fs.starfarer.api.ui.TooltipMakerAPI;
 import com.fs.starfarer.api.util.Misc;
 import data.kaysaar.aotd.tot.scripts.trade.contracts.AoTDTradeContract;
 import data.kaysaar.aotd.tot.scripts.trade.contracts.rewards.monthly.MonthlyDefenceBoost;
-
 import java.awt.*;
 import java.util.LinkedHashSet;
 
@@ -22,7 +21,8 @@ public class StrategicArmamentSupply extends DirectedTradeInitiativeBaseContract
     @Override
     public void onContractCreated(AoTDTradeContract generatedContract) {
         super.onContractCreated(generatedContract);
-        generatedContract.addReward("aotd_military_complex",new MonthlyDefenceBoost(generatedContract));
+        generatedContract.addReward(
+                "aotd_military_complex", new MonthlyDefenceBoost(generatedContract));
     }
 
     @Override
@@ -44,41 +44,31 @@ public class StrategicArmamentSupply extends DirectedTradeInitiativeBaseContract
 
         tooltip.addPara(
                 "This contract establishes a directed internal procurement program for military goods. Your faction creates additional subsidized demand for domestically produced ships and weapons.",
-                5f
-        );
+                5f);
 
         tooltip.addPara(
                 "While these sales generate only a very small amount of tax revenue, they strengthen naval readiness and defensive coordination across your empire.",
-                3f
-        );
+                3f);
 
         tooltip.addPara(
                 "For every %s %s sold through this contract, fleet size is increased by %s across your colonies.",
-                3f,
-                Color.ORANGE,
-                Misc.getWithDGS((int) shipsPerFleetSize),"Ship Hulls",
-                "1%"
-        );
+                3f, Color.ORANGE, Misc.getWithDGS((int) shipsPerFleetSize), "Ship Hulls", "1%");
 
         tooltip.addPara(
                 "For every %s %s sold through this contract, defensive capabilities are multiplied by %s across your colonies.",
                 3f,
                 Color.ORANGE,
-                Misc.getWithDGS((int) gunsPerDefense),"Heavy Armaments ",
-                "1 + 0.01"
-        );
+                Misc.getWithDGS((int) gunsPerDefense),
+                "Heavy Armaments ",
+                "1 + 0.01");
     }
 
-
-
     @Override
-    public void createProcTooltipSection(TooltipMakerAPI tooltip, float width, float price, int amount, String commodity) {
+    public void createProcTooltipSection(
+            TooltipMakerAPI tooltip, float width, float price, int amount, String commodity) {
         tooltip.addPara(
                 "This will generate %s in tax revenue.",
-                3f,
-                Color.ORANGE,
-                Misc.getDGSCredits(price)
-        );
+                3f, Color.ORANGE, Misc.getDGSCredits(price));
 
         if (Commodities.SHIPS.equals(commodity)) {
             float fleetSizeBonus = amount / shipsPerFleetSize;
@@ -86,22 +76,16 @@ public class StrategicArmamentSupply extends DirectedTradeInitiativeBaseContract
 
             tooltip.addPara(
                     "It will also increase fleet size by %s across all colonies.",
-                    3f,
-                    Color.ORANGE,
-                    percentage + "%"
-            );
+                    3f, Color.ORANGE, percentage + "%");
         }
 
         if (Commodities.HAND_WEAPONS.equals(commodity)) {
-            float defenseBonus = 1+((amount / gunsPerDefense)*0.01f);
+            float defenseBonus = 1 + ((amount / gunsPerDefense) * 0.01f);
             String percentage = String.format("%.2f", defenseBonus);
 
             tooltip.addPara(
                     "It will also increase defensive capabilities multiplier by %s across all colonies.",
-                    3f,
-                    Color.ORANGE,
-                    percentage
-            );
+                    3f, Color.ORANGE, percentage);
         }
     }
 

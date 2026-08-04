@@ -38,6 +38,8 @@ foreach ($document in @('README.md', 'CHANGELOG.md')) {
     }
 }
 
+& (Join-Path $repositoryRoot 'build-jar.ps1')
+
 function Get-RepositoryPayload {
     $tracked = @(& git -C $repositoryRoot ls-files)
     if ($LASTEXITCODE -ne 0) {

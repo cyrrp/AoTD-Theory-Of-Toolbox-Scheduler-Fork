@@ -14,26 +14,64 @@ import com.fs.starfarer.ui.impl.CargoTooltipFactory;
 import com.fs.starfarer.ui.impl.StandardTooltipV2;
 import com.fs.starfarer.ui.impl.StandardTooltipV2Expandable;
 import data.kaysaar.aotd.tot.plugins.ReflectionUtilis;
-
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
 public class UIData {
-    public static void createFighterTooltip(final FleetMemberAPI fleetMember, final FighterWingSpecAPI spec, final UIComponentAPI componentAPI) {
-        final Object standardTooltipV2 = ReflectionUtilis.invokeMethodDirectly(ReflectionUtilis.findStaticMethodByParameterTypes(CargoTooltipFactory.class, FleetMember.class, FighterWingSpec.class,int.class, CharacterStats.class,boolean.class),null ,fleetMember,  spec, 0, null, false);
-        ReflectionUtilis.invokeStaticMethod(StandardTooltipV2Expandable.class,"addTooltipBelow", componentAPI,standardTooltipV2);
+    public static void createFighterTooltip(
+            final FleetMemberAPI fleetMember,
+            final FighterWingSpecAPI spec,
+            final UIComponentAPI componentAPI) {
+        final Object standardTooltipV2 =
+                ReflectionUtilis.invokeMethodDirectly(
+                        ReflectionUtilis.findStaticMethodByParameterTypes(
+                                CargoTooltipFactory.class,
+                                FleetMember.class,
+                                FighterWingSpec.class,
+                                int.class,
+                                CharacterStats.class,
+                                boolean.class),
+                        null,
+                        fleetMember,
+                        spec,
+                        0,
+                        null,
+                        false);
+        ReflectionUtilis.invokeStaticMethod(
+                StandardTooltipV2Expandable.class,
+                "addTooltipBelow",
+                componentAPI,
+                standardTooltipV2);
     }
 
-    public static void createWeaponTooltip(final WeaponSpecAPI spec, final  UIComponentAPI componentAPI) {
-        final Object standardTooltipV2 =ReflectionUtilis.invokeStaticMethodWithAutoProjection(StandardTooltipV2.class,"createWeaponTooltip", spec,null,null);
-        ReflectionUtilis.invokeStaticMethod(StandardTooltipV2Expandable.class,"addTooltipBelow", componentAPI,standardTooltipV2);
+    public static void createWeaponTooltip(
+            final WeaponSpecAPI spec, final UIComponentAPI componentAPI) {
+        final Object standardTooltipV2 =
+                ReflectionUtilis.invokeStaticMethodWithAutoProjection(
+                        StandardTooltipV2.class, "createWeaponTooltip", spec, null, null);
+        ReflectionUtilis.invokeStaticMethod(
+                StandardTooltipV2Expandable.class,
+                "addTooltipBelow",
+                componentAPI,
+                standardTooltipV2);
     }
 
-    public static void createTooltipForShip(final FleetMemberAPI fleetMemberAPI, final UIComponentAPI componentAPI) {
-        final Object standardTooltipV2 =ReflectionUtilis.invokeStaticMethodWithAutoProjection(StandardTooltipV2.class,"createFleetMemberExpandedTooltip", fleetMemberAPI,null);
-        ReflectionUtilis.invokeStaticMethod(StandardTooltipV2Expandable.class,"addTooltipBelow", componentAPI,standardTooltipV2);
+    public static void createTooltipForShip(
+            final FleetMemberAPI fleetMemberAPI, final UIComponentAPI componentAPI) {
+        final Object standardTooltipV2 =
+                ReflectionUtilis.invokeStaticMethodWithAutoProjection(
+                        StandardTooltipV2.class,
+                        "createFleetMemberExpandedTooltip",
+                        fleetMemberAPI,
+                        null);
+        ReflectionUtilis.invokeStaticMethod(
+                StandardTooltipV2Expandable.class,
+                "addTooltipBelow",
+                componentAPI,
+                standardTooltipV2);
     }
+
     private static float getCenter(float beginX, float width) {
         ;
         float endX = beginX + width;
@@ -41,7 +79,9 @@ public class UIData {
         float center = beginX + widthOfSection / 2;
         return center;
     }
-    public static ArrayList<RowData> calculateAmountOfRows(float widthOfRow, LinkedHashMap<String, Integer> designs, float xPadding) {
+
+    public static ArrayList<RowData> calculateAmountOfRows(
+            float widthOfRow, LinkedHashMap<String, Integer> designs, float xPadding) {
         ArrayList<RowData> data = new ArrayList<>();
         float currentX = 0;
         float rows = 0;

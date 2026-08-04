@@ -7,7 +7,6 @@ import com.fs.starfarer.api.ui.*;
 import com.fs.starfarer.api.util.Misc;
 import data.kaysaar.aotd.tot.produciton.specs.AoTDProductionSpec;
 import data.kaysaar.aotd.tot.produciton.specs.AoTDProductionSpecManager;
-
 import java.awt.*;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -21,7 +20,7 @@ public class ProductionCustomButton extends CustomButton {
     /**
      * Instance-owned column layout passed by ProductionBrowserSection.
      *
-     * This lets each custom button use whatever columns the current browser section declared,
+     * <p>This lets each custom button use whatever columns the current browser section declared,
      * without depending on static widths or static helper methods.
      */
     protected ProductionBrowserSection.ColumnLayout columnLayout;
@@ -30,7 +29,8 @@ public class ProductionCustomButton extends CustomButton {
         this(width, height, buttonData, false, null);
     }
 
-    public ProductionCustomButton(float width, float height, AoTDProductionSpec buttonData, boolean isOrderMode) {
+    public ProductionCustomButton(
+            float width, float height, AoTDProductionSpec buttonData, boolean isOrderMode) {
         this(width, height, buttonData, isOrderMode, null);
     }
 
@@ -38,8 +38,7 @@ public class ProductionCustomButton extends CustomButton {
             float width,
             float height,
             AoTDProductionSpec buttonData,
-            ProductionBrowserSection.ColumnLayout columnLayout
-    ) {
+            ProductionBrowserSection.ColumnLayout columnLayout) {
         this(width, height, buttonData, false, columnLayout);
     }
 
@@ -48,8 +47,7 @@ public class ProductionCustomButton extends CustomButton {
             float height,
             AoTDProductionSpec buttonData,
             boolean isOrderMode,
-            ProductionBrowserSection.ColumnLayout columnLayout
-    ) {
+            ProductionBrowserSection.ColumnLayout columnLayout) {
         super(
                 width,
                 height,
@@ -57,8 +55,7 @@ public class ProductionCustomButton extends CustomButton {
                 0f,
                 Misc.getBasePlayerColor(),
                 Misc.getDarkPlayerColor(),
-                Misc.getBrightPlayerColor()
-        );
+                Misc.getBrightPlayerColor());
 
         this.isOrderMode = isOrderMode;
         this.columnLayout = columnLayout;
@@ -122,7 +119,9 @@ public class ProductionCustomButton extends CustomButton {
             if (hasColumn("name")) {
                 tooltip.addCustom(panelIndicator, 0f)
                         .getPosition()
-                        .inTL(getColumnStartX("name") + getColumnWidth("name") * 0.75f, centerY - 7f);
+                        .inTL(
+                                getColumnStartX("name") + getColumnWidth("name") * 0.75f,
+                                centerY - 7f);
             }
         }
     }
@@ -130,13 +129,9 @@ public class ProductionCustomButton extends CustomButton {
     /**
      * Override in concrete buttons.
      *
-     * Example:
-     * add name panel at getColumnStartX("name")
-     * add FP panel at getColumnStartX("fp")
+     * <p>Example: add name panel at getColumnStartX("name") add FP panel at getColumnStartX("fp")
      */
-    public void createContainerContent(CustomPanelAPI container) {
-
-    }
+    public void createContainerContent(CustomPanelAPI container) {}
 
     public CustomPanelAPI createCostSection(float width, float height) {
         CustomPanelAPI mainPanel = Global.getSettings().createCustom(width, height, null);
@@ -145,11 +140,11 @@ public class ProductionCustomButton extends CustomButton {
         float separatorX = 3f;
         float y = 5f;
 
-        LinkedHashMap<String, Integer> orderedResources = getOrderedResourceMap(getSpec().getMapOfResourcesNeeded());
+        LinkedHashMap<String, Integer> orderedResources =
+                getOrderedResourceMap(getSpec().getMapOfResourcesNeeded());
 
-        orderedResources.forEach((commodityId, amount) ->
-                panels.add(createRowForItem(15, commodityId, amount))
-        );
+        orderedResources.forEach(
+                (commodityId, amount) -> panels.add(createRowForItem(15, commodityId, amount)));
 
         if (panels.isEmpty()) {
             return mainPanel;
@@ -172,15 +167,16 @@ public class ProductionCustomButton extends CustomButton {
             currX += panel.getPosition().getWidth() + separatorX;
         }
 
-        LabelAPI labelAPI = Global.getSettings().createLabel(
-                Misc.getDGSCredits(getSpec().getProductionCost()),
-                Fonts.DEFAULT_SMALL
-        );
+        LabelAPI labelAPI =
+                Global.getSettings()
+                        .createLabel(
+                                Misc.getDGSCredits(getSpec().getProductionCost()),
+                                Fonts.DEFAULT_SMALL);
         labelAPI.setColor(Color.ORANGE);
-        labelAPI.getPosition().setSize(
-                labelAPI.computeTextWidth(labelAPI.getText()),
-                labelAPI.computeTextHeight(labelAPI.getText())
-        );
+        labelAPI.getPosition()
+                .setSize(
+                        labelAPI.computeTextWidth(labelAPI.getText()),
+                        labelAPI.computeTextHeight(labelAPI.getText()));
 
         mainPanel.addComponent((UIComponentAPI) labelAPI).belowMid(centralized, 20);
 
@@ -192,11 +188,11 @@ public class ProductionCustomButton extends CustomButton {
 
         if (Global.getSettings().getCommoditySpec(commodityId) != null) {
             CustomPanelAPI main = Global.getSettings().createCustom(iconSize * 3, iconSize, null);
-            ImageViewer viewer = new ImageViewer(
-                    iconSize,
-                    iconSize,
-                    Global.getSettings().getCommoditySpec(commodityId).getIconName()
-            );
+            ImageViewer viewer =
+                    new ImageViewer(
+                            iconSize,
+                            iconSize,
+                            Global.getSettings().getCommoditySpec(commodityId).getIconName());
 
             main.addComponent(viewer.getComponentPanel()).inTL(0, 0);
 
@@ -204,10 +200,10 @@ public class ProductionCustomButton extends CustomButton {
             LabelAPI label = Global.getSettings().createLabel(toHighlight, Fonts.DEFAULT_SMALL);
             label.setHighlight(toHighlight);
             label.setHighlightColor(Color.ORANGE);
-            label.getPosition().setSize(
-                    label.computeTextWidth(label.getText()),
-                    label.computeTextHeight(label.getText())
-            );
+            label.getPosition()
+                    .setSize(
+                            label.computeTextWidth(label.getText()),
+                            label.computeTextHeight(label.getText()));
 
             float newWidth = iconSize + 2 + label.getPosition().getWidth();
             main.getPosition().setSize(newWidth, main.getPosition().getHeight());
@@ -216,24 +212,26 @@ public class ProductionCustomButton extends CustomButton {
             return main;
         } else {
             CustomPanelAPI main = Global.getSettings().createCustom(iconSize * 3, iconSize, null);
-            ImageViewer viewer = new ImageViewer(
-                    iconSize,
-                    iconSize,
-                    Global.getSettings().getSpecialItemSpec(commodityId).getIconName()
-            );
+            ImageViewer viewer =
+                    new ImageViewer(
+                            iconSize,
+                            iconSize,
+                            Global.getSettings().getSpecialItemSpec(commodityId).getIconName());
 
             main.addComponent(viewer.getComponentPanel()).inTL(0, 0);
 
             String toHighlight = displayAmount;
             LabelAPI label = Global.getSettings().createLabel(toHighlight, Fonts.DEFAULT_SMALL);
             label.setHighlight(toHighlight);
-            label.setHighlightColor(Misc.getDesignTypeColor(
-                    Global.getSettings().getSpecialItemSpec(commodityId).getManufacturer()
-            ));
-            label.getPosition().setSize(
-                    label.computeTextWidth(label.getText()),
-                    label.computeTextHeight(label.getText())
-            );
+            label.setHighlightColor(
+                    Misc.getDesignTypeColor(
+                            Global.getSettings()
+                                    .getSpecialItemSpec(commodityId)
+                                    .getManufacturer()));
+            label.getPosition()
+                    .setSize(
+                            label.computeTextWidth(label.getText()),
+                            label.computeTextHeight(label.getText()));
 
             float newWidth = iconSize + 2 + label.getPosition().getWidth();
             main.getPosition().setSize(newWidth, main.getPosition().getHeight());
@@ -257,11 +255,12 @@ public class ProductionCustomButton extends CustomButton {
         input.entrySet().stream()
                 .filter(e -> e.getValue() != null && e.getValue() > 0)
                 .filter(e -> !ordered.containsKey(e.getKey()))
-                .sorted((a, b) -> {
-                    String nameA = getDisplayNameForResource(a.getKey());
-                    String nameB = getDisplayNameForResource(b.getKey());
-                    return nameA.compareToIgnoreCase(nameB);
-                })
+                .sorted(
+                        (a, b) -> {
+                            String nameA = getDisplayNameForResource(a.getKey());
+                            String nameB = getDisplayNameForResource(b.getKey());
+                            return nameA.compareToIgnoreCase(nameB);
+                        })
                 .forEach(e -> ordered.put(e.getKey(), e.getValue()));
 
         return ordered;
