@@ -21,7 +21,6 @@ public class EconomyTradeDealsData implements ExtendedUIPanelPlugin {
 
     public EconomyTradeDealsData(float width, float height) {
         mainPanel = Global.getSettings().createCustom(width, height, this);
-        createUI();
     }
 
     @Override

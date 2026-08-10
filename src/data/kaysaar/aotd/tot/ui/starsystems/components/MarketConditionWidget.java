@@ -10,10 +10,22 @@ import com.fs.starfarer.api.input.InputEventAPI;
 import com.fs.starfarer.api.ui.CustomPanelAPI;
 import com.fs.starfarer.api.ui.PositionAPI;
 import com.fs.starfarer.api.ui.TooltipMakerAPI;
+import data.kaysaar.aotd.tot.ui.SafeSpriteLoader;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 
 public class MarketConditionWidget implements ExtendedUIPanelPlugin {
+    private static final class ConditionIcon {
+        final MarketConditionAPI condition;
+        final SpriteAPI sprite;
+
+        ConditionIcon(MarketConditionAPI condition, SpriteAPI sprite) {
+            this.condition = condition;
+            this.sprite = sprite;
+        }
+    }
+
     CustomPanelAPI mainPanel, contentPanel;
     MarketAPI market;
 
@@ -31,7 +43,7 @@ public class MarketConditionWidget implements ExtendedUIPanelPlugin {
     @Override
     public void createUI() {
         if (contentPanel != null) {
-            contentPanel.removeComponent(mainPanel);
+            mainPanel.removeComponent(contentPanel);
         }
         contentPanel =
                 Global.getSettings()
@@ -47,6 +59,7 @@ public class MarketConditionWidget implements ExtendedUIPanelPlugin {
         float seperator = 3f;
         List<MarketConditionAPI> marketConditions =
                 market.getConditions().stream()
+                        .filter(condition -> condition != null && condition.getSpec() != null)
                         .filter(MarketConditionAPI::isPlanetary)
                         .sorted(
                                 new Comparator<MarketConditionAPI>() {
@@ -64,12 +77,18 @@ public class MarketConditionWidget implements ExtendedUIPanelPlugin {
         float width = contentPanel.getPosition().getWidth();
         float separator = 3f;
         float iconWidthTotal = 0f;
+        List<ConditionIcon> visibleConditions = new ArrayList<>();
         for (MarketConditionAPI marketCondition : marketConditions) {
-            SpriteAPI sprite = Global.getSettings().getSprite(marketCondition.getSpec().getIcon());
+            SpriteAPI sprite =
+                    SafeSpriteLoader.getSpriteOrNull(
+                            marketCondition.getSpec().getIcon(),
+                            "Domain market condition " + marketCondition.getId());
+            if (sprite == null || sprite.getHeight() <= 0f) continue;
+            visibleConditions.add(new ConditionIcon(marketCondition, sprite));
             float ratio = sprite.getWidth() / sprite.getHeight();
             iconWidthTotal += defaultWidth * ratio;
         }
-        float separatorTotal = separator * Math.max(0, marketConditions.size() - 1);
+        float separatorTotal = separator * Math.max(0, visibleConditions.size() - 1);
         float availableIconWidth = width - separatorTotal;
         if (iconWidthTotal > availableIconWidth && availableIconWidth > 0f) {
             float scale = availableIconWidth / iconWidthTotal;
@@ -77,8 +96,9 @@ public class MarketConditionWidget implements ExtendedUIPanelPlugin {
             defaultHeight *= scale;
         }
         float startingX = 0;
-        for (MarketConditionAPI marketCondition : marketConditions) {
-            SpriteAPI sprite = Global.getSettings().getSprite(marketCondition.getSpec().getIcon());
+        for (ConditionIcon conditionIcon : visibleConditions) {
+            MarketConditionAPI marketCondition = conditionIcon.condition;
+            SpriteAPI sprite = conditionIcon.sprite;
             float ratio = sprite.getWidth() / sprite.getHeight();
             ButtonWithImageComponent panel =
                     new ButtonWithImageComponent(

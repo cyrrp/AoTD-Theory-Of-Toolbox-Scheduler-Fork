@@ -23,12 +23,12 @@ import java.util.Map;
 import org.lwjgl.input.Keyboard;
 
 public class DomainUIPanel extends CommandUIPlugin {
-    StarSystemHoldingsUI starSystemAndPlanetUI;
+    LazyUIPanel starSystemAndPlanetUI;
     Object original;
-    EconomyCommodityData economyCommodityData;
-    EconomyTradeDealsData economyTradeDealsData;
-    EconomyFactionIncome factionIncome;
-    WarehouseSectionUI warehouseSectionUI;
+    LazyUIPanel economyCommodityData;
+    LazyUIPanel economyTradeDealsData;
+    LazyUIPanel factionIncome;
+    LazyUIPanel warehouseSectionUI;
     public static boolean sentSignalForUpdate = false;
 
     public DomainUIPanel(float width, float height) {
@@ -64,11 +64,20 @@ public class DomainUIPanel extends CommandUIPlugin {
         if (!AshMisc.isStringValid(panelToShowcase)) {
             panelToShowcase = "star systems & colonies";
         }
+        currentlyChosen = null;
         createButtonsAndMainPanels();
         for (Map.Entry<ButtonAPI, CustomPanelAPI> buttons : panelMap.entrySet()) {
             if (buttons.getKey().getText().toLowerCase().contains(panelToShowcase)) {
                 currentlyChosen = buttons.getKey();
                 break;
+            }
+        }
+        if (currentlyChosen == null) {
+            for (ButtonAPI button : panelMap.keySet()) {
+                if (button.getText().equalsIgnoreCase("Star Systems & Colonies")) {
+                    currentlyChosen = button;
+                    break;
+                }
             }
         }
         for (CustomPanelAPI value : panelMap.values()) {
@@ -91,9 +100,14 @@ public class DomainUIPanel extends CommandUIPlugin {
     }
 
     public void clearUI(boolean clearMusic) {
-        ;
         panelMap.clear();
         mainPanel.removeComponent(panelForPlugins);
+        starSystemAndPlanetUI = null;
+        economyCommodityData = null;
+        economyTradeDealsData = null;
+        factionIncome = null;
+        warehouseSectionUI = null;
+        currentlyChosen = null;
     }
 
     @Override
@@ -119,6 +133,12 @@ public class DomainUIPanel extends CommandUIPlugin {
 
     @Override
     public void buttonPressed(Object buttonId) {}
+
+    @Override
+    public void advance(float amount) {
+        createPanelContentIfNeeded(currentlyChosen);
+        super.advance(amount);
+    }
 
     @Override
     public void playSound(Object data) {}
@@ -194,10 +214,18 @@ public class DomainUIPanel extends CommandUIPlugin {
         CommandTabMemoryManager.getInstance()
                 .getTabStates()
                 .put(getTabStateId(), newButton.getText().toLowerCase());
-        if (panelMap.get(newButton).getPlugin() instanceof ExtendedUIPanelPlugin plugin) {
+        CustomPanelAPI selectedPanel = panelMap.get(newButton);
+        if (selectedPanel == null) {
+            return;
+        }
+        if (selectedPanel.getPlugin() instanceof LazyUIPanel lazyPanel) {
+            if (!lazyPanel.isInitialized()) {
+                lazyPanel.createUI();
+                return;
+            }
+            ExtendedUIPanelPlugin plugin = lazyPanel.getDelegate();
 
-            if (panelMap.get(newButton).getPlugin() instanceof StarSystemHoldingsUI holdingsUI) {
-
+            if (plugin instanceof StarSystemHoldingsUI holdingsUI) {
                 holdingsUI.table.dropDownButtons.forEach(
                         x -> {
                             x.resetUI();
@@ -209,13 +237,22 @@ public class DomainUIPanel extends CommandUIPlugin {
         }
     }
 
+    private void createPanelContentIfNeeded(ButtonAPI button) {
+        CustomPanelAPI selectedPanel = panelMap.get(button);
+        if (selectedPanel != null && selectedPanel.getPlugin() instanceof LazyUIPanel lazyPanel) {
+            if (!lazyPanel.isInitialized()) {
+                lazyPanel.createUI();
+            }
+        }
+    }
+
     private void insertStarSystemPanel(ButtonAPI tiedButton) {
         if (starSystemAndPlanetUI == null) {
+            float width = panelForPlugins.getPosition().getWidth() - 5;
+            float height = panelForPlugins.getPosition().getHeight();
             starSystemAndPlanetUI =
-                    new StarSystemHoldingsUI(
-                            panelForPlugins.getPosition().getWidth() - 5,
-                            panelForPlugins.getPosition().getHeight(),
-                            original);
+                    new LazyUIPanel(
+                            width, height, () -> new StarSystemHoldingsUI(width, height, original));
         }
 
         panelMap.put(tiedButton, starSystemAndPlanetUI.getMainPanel());
@@ -223,10 +260,10 @@ public class DomainUIPanel extends CommandUIPlugin {
 
     private void insertWarehouseUI(ButtonAPI tiedButton) {
         if (warehouseSectionUI == null) {
+            float width = panelForPlugins.getPosition().getWidth() - 5;
+            float height = panelForPlugins.getPosition().getHeight();
             warehouseSectionUI =
-                    new WarehouseSectionUI(
-                            panelForPlugins.getPosition().getWidth() - 5,
-                            panelForPlugins.getPosition().getHeight());
+                    new LazyUIPanel(width, height, () -> new WarehouseSectionUI(width, height));
         }
 
         panelMap.put(tiedButton, warehouseSectionUI.getMainPanel());
@@ -234,8 +271,10 @@ public class DomainUIPanel extends CommandUIPlugin {
 
     private void insertCommDataPanel(ButtonAPI tiedButton) {
         if (economyCommodityData == null) {
+            float width = EconomyTabListener.WIDTH;
+            float height = EconomyTabListener.HEIGHT;
             economyCommodityData =
-                    new EconomyCommodityData(EconomyTabListener.WIDTH, EconomyTabListener.HEIGHT);
+                    new LazyUIPanel(width, height, () -> new EconomyCommodityData(width, height));
         }
 
         panelMap.put(tiedButton, economyCommodityData.getMainPanel());
@@ -243,8 +282,10 @@ public class DomainUIPanel extends CommandUIPlugin {
 
     private void insertTradeDataPanel(ButtonAPI tiedButton) {
         if (economyTradeDealsData == null) {
+            float width = EconomyTabListener.WIDTH;
+            float height = EconomyTabListener.HEIGHT;
             economyTradeDealsData =
-                    new EconomyTradeDealsData(EconomyTabListener.WIDTH, EconomyTabListener.HEIGHT);
+                    new LazyUIPanel(width, height, () -> new EconomyTradeDealsData(width, height));
         }
 
         panelMap.put(tiedButton, economyTradeDealsData.getMainPanel());
@@ -252,8 +293,10 @@ public class DomainUIPanel extends CommandUIPlugin {
 
     private void insertFactionIncome(ButtonAPI tiedButton) {
         if (factionIncome == null) {
+            float width = EconomyTabListener.WIDTH;
+            float height = EconomyTabListener.HEIGHT;
             factionIncome =
-                    new EconomyFactionIncome(EconomyTabListener.WIDTH, EconomyTabListener.HEIGHT);
+                    new LazyUIPanel(width, height, () -> new EconomyFactionIncome(width, height));
         }
 
         panelMap.put(tiedButton, factionIncome.getMainPanel());

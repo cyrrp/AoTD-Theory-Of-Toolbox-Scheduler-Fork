@@ -97,7 +97,10 @@ $requiredEntries = @(
     'data/kaysaar/aotd/tot/compat/PrepatcherContract.class',
     'data/kaysaar/aotd/tot/compat/SchedulerBridge.class',
     'data/kaysaar/aotd/tot/scripts/economy/AoTDEconomy.class',
-    'data/kaysaar/aotd/tot/ui/core/DomainTabListener.class'
+    'data/kaysaar/aotd/tot/ui/core/DomainTabListener.class',
+    'data/kaysaar/aotd/tot/ui/LazyUIPanel.class',
+    'data/kaysaar/aotd/tot/ui/SafeSpriteLoader.class',
+    'data/kaysaar/aotd/tot/ui/warehouses/components/WarehouseCustomButton.class'
 )
 $jarEntries = @(& $jar.Source --list --file $pendingJar)
 if ($LASTEXITCODE -ne 0) {

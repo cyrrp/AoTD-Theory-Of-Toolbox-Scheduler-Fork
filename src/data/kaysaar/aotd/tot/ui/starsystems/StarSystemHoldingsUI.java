@@ -29,14 +29,12 @@ public class StarSystemHoldingsUI implements ExtendedUIPanelPlugin {
     public StarSystemHoldingsUI(float width, float height, Object originalPanel) {
         this.originalPanel = originalPanel;
         this.mainPanel = Global.getSettings().createCustom(width, height, this);
-
-        createUI();
     }
 
     @Override
     public void createUI() {
         if (contentPanel != null) {
-            contentPanel.removeComponent(mainPanel);
+            mainPanel.removeComponent(contentPanel);
         }
         contentPanel =
                 Global.getSettings()

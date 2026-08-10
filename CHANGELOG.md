@@ -2,6 +2,20 @@
 
 All notable changes to the Scheduler Fork are documented here.
 
+## Unreleased
+
+- Corrected the warehouse LPC icon lookup to use Starsector's
+  `misc.cargoFighterChip` sprite instead of the nonexistent `ui.fighter_lpc` key.
+- Made Domain and Economy subsections truly lazy. Hidden warehouses, commodity tables, star-system
+  holdings and trade contracts are no longer constructed while another Command tab or subsection
+  is active; the selected subsection is created on first display and refreshed normally afterward.
+- Made data-driven Domain icons fail locally: missing item specs and broken storage, condition or
+  custom-entity sprites are skipped and logged once instead of aborting the whole Command UI.
+- Corrected reversed parent/child removal in star-system holdings and market-condition refreshes,
+  and added safe fallback selection for stale remembered subsection names.
+- Kept Scheduler Bridge schema V9, capability masks and the exact `1.0.14-spp9` compatibility
+  contract unchanged; these UI-only changes add no protocol capability.
+
 ## 1.0.14-spp9 - 2026-08-04
 
 - Requires StarsectorPrepatcher 0.17.2 and continues to require AshLib 2.2.3.

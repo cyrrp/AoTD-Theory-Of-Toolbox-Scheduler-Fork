@@ -77,6 +77,9 @@ required_entries=(
     'data/kaysaar/aotd/tot/compat/SchedulerBridge.class'
     'data/kaysaar/aotd/tot/scripts/economy/AoTDEconomy.class'
     'data/kaysaar/aotd/tot/ui/core/DomainTabListener.class'
+    'data/kaysaar/aotd/tot/ui/LazyUIPanel.class'
+    'data/kaysaar/aotd/tot/ui/SafeSpriteLoader.class'
+    'data/kaysaar/aotd/tot/ui/warehouses/components/WarehouseCustomButton.class'
 )
 jar_entries=$(jar --list --file "$pending_jar")
 for entry in "${required_entries[@]}"; do

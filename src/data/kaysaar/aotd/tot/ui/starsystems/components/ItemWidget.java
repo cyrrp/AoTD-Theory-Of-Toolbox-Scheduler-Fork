@@ -16,6 +16,7 @@ import com.fs.starfarer.api.loading.Description;
 import com.fs.starfarer.api.ui.CustomPanelAPI;
 import com.fs.starfarer.api.ui.PositionAPI;
 import com.fs.starfarer.api.ui.TooltipMakerAPI;
+import data.kaysaar.aotd.tot.ui.SafeSpriteLoader;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -39,16 +40,12 @@ public class ItemWidget implements ExtendedUIPanelPlugin {
     private static final class IconEntry {
         final String id;
         final boolean isCommodity; // true = AI core commodity, false = special item
+        final String iconName;
 
-        IconEntry(String id, boolean isCommodity) {
+        IconEntry(String id, boolean isCommodity, String iconName) {
             this.id = id;
             this.isCommodity = isCommodity;
-        }
-
-        String getIconName() {
-            return isCommodity
-                    ? Global.getSettings().getCommoditySpec(id).getIconName()
-                    : Global.getSettings().getSpecialItemSpec(id).getIconName();
+            this.iconName = iconName;
         }
     }
 
@@ -119,8 +116,20 @@ public class ItemWidget implements ExtendedUIPanelPlugin {
             int count = (e.getValue() == null) ? 0 : e.getValue();
             if (count <= 0) continue;
 
+            String iconName;
+            if (isCommodity) {
+                CommoditySpecAPI spec = Global.getSettings().getCommoditySpec(e.getKey());
+                if (spec == null) continue;
+                iconName = spec.getIconName();
+            } else {
+                SpecialItemSpecAPI spec = Global.getSettings().getSpecialItemSpec(e.getKey());
+                if (spec == null) continue;
+                iconName = spec.getIconName();
+            }
+            if (!AshMisc.isStringValid(iconName)) continue;
+
             for (int i = 0; i < count; i++) {
-                out.add(new IconEntry(e.getKey(), isCommodity));
+                out.add(new IconEntry(e.getKey(), isCommodity, iconName));
             }
         }
     }
@@ -328,7 +337,12 @@ public class ItemWidget implements ExtendedUIPanelPlugin {
                 float gap = computeGap(rowX, prevId, icon.id, layout.gapDifferent, layout.gapSame);
 
                 ImageViewer viewer =
-                        new ImageViewer(layout.iconSize, layout.iconSize, icon.getIconName());
+                        SafeSpriteLoader.createImageViewerOrNull(
+                                layout.iconSize,
+                                layout.iconSize,
+                                icon.iconName,
+                                "Domain colony item list");
+                if (viewer == null) continue;
                 if (!icon.isCommodity) {
                     CargoStackAPI stackAPI =
                             Global.getFactory()

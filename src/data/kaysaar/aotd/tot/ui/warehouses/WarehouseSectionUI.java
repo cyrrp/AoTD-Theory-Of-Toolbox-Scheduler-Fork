@@ -16,7 +16,6 @@ public class WarehouseSectionUI implements ExtendedUIPanelPlugin {
 
     public WarehouseSectionUI(float width, float height) {
         mainPanel = Global.getSettings().createCustom(width, height, this);
-        createUI();
     }
 
     @Override

@@ -15,6 +15,7 @@ import com.fs.starfarer.api.ui.CustomPanelAPI;
 import com.fs.starfarer.api.ui.PositionAPI;
 import com.fs.starfarer.api.ui.TooltipMakerAPI;
 import com.fs.starfarer.api.util.Misc;
+import data.kaysaar.aotd.tot.ui.SafeSpriteLoader;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -244,7 +245,13 @@ public class StorageItemsWidget implements ExtendedUIPanelPlugin {
             float x = startX + column * (layout.iconSize + layout.separator);
             float y = startY + row * (layout.iconSize + layout.separator);
 
-            ImageViewer viewer = new ImageViewer(layout.iconSize, layout.iconSize, entry.iconName);
+            ImageViewer viewer =
+                    SafeSpriteLoader.createImageViewerOrNull(
+                            layout.iconSize,
+                            layout.iconSize,
+                            entry.iconName,
+                            "Domain warehouse contents");
+            if (viewer == null) continue;
             CustomPanelAPI iconPanel = viewer.getComponentPanel();
 
             tooltip.addCustom(iconPanel, 0f).getPosition().inTL(x, y);

@@ -21,11 +21,6 @@ public class EconomyCommodityData implements ExtendedUIPanelPlugin {
 
     public EconomyCommodityData(float width, float height) {
         mainPanel = Global.getSettings().createCustom(width, height, this);
-        if (AshMisc.getMarketsUnderPlayer().isEmpty()) {
-            currFactionId = Factions.NEUTRAL;
-        }
-
-        createUI();
     }
 
     AoTDCommodityProductionDataTable table;
@@ -35,6 +30,7 @@ public class EconomyCommodityData implements ExtendedUIPanelPlugin {
     FactionChooserButton bt;
     GraphPeriodChosenButton btGraph;
     String currFactionId = Factions.PLAYER;
+    boolean initialFactionResolved = false;
     int months = 1;
     boolean needsReplacement = false;
 
@@ -42,7 +38,7 @@ public class EconomyCommodityData implements ExtendedUIPanelPlugin {
 
         boolean recreate = months != this.months;
         this.months = months;
-        if (recreate) {
+        if (recreate && table != null) {
             table.clearTable();
             table.clearUI();
             table = null;
@@ -54,7 +50,8 @@ public class EconomyCommodityData implements ExtendedUIPanelPlugin {
     public void setCurrFactionId(String currFactionId) {
         boolean recreate = !currFactionId.equals(this.currFactionId);
         this.currFactionId = currFactionId;
-        if (recreate) {
+        initialFactionResolved = true;
+        if (recreate && table != null) {
             table.clearTable();
             table.clearUI();
             table = null;
@@ -72,6 +69,12 @@ public class EconomyCommodityData implements ExtendedUIPanelPlugin {
 
     @Override
     public void createUI() {
+        if (!initialFactionResolved) {
+            if (AshMisc.getMarketsUnderPlayer().isEmpty()) {
+                currFactionId = Factions.NEUTRAL;
+            }
+            initialFactionResolved = true;
+        }
         if (contentPanel != null) {
             mainPanel.removeComponent(contentPanel);
         }

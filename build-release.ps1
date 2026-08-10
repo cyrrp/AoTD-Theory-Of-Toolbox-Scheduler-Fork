@@ -89,7 +89,11 @@ $forbiddenJarEntries = @(
 $requiredJarEntries = @(
     'data/kaysaar/aotd/tot/ui/core/DomainTabListener.class',
     'data/kaysaar/aotd/tot/ui/core/DomainTabListener$1.class',
-    'data/kaysaar/aotd/tot/ui/DomainUIPanel.class'
+    'data/kaysaar/aotd/tot/ui/DomainUIPanel.class',
+    'data/kaysaar/aotd/tot/ui/LazyUIPanel.class',
+    'data/kaysaar/aotd/tot/ui/SafeSpriteLoader.class',
+    'data/kaysaar/aotd/tot/ui/warehouses/WarehouseSectionUI.class',
+    'data/kaysaar/aotd/tot/ui/warehouses/components/WarehouseCustomButton.class'
 )
 $requiredJarSymbols = @{
     'data/kaysaar/aotd/tot/compat/PrepatcherContract.class' = @(
@@ -100,6 +104,14 @@ $requiredJarSymbols = @{
     )
     'data/kaysaar/aotd/tot/scripts/economy/AoTDEconomy.class' = @(
         'dispatchPrepatcherUiEconomyStep'
+    )
+    'data/kaysaar/aotd/tot/ui/LazyUIPanel.class' = @(
+        'java/util/function/Supplier',
+        'factory returned null'
+    )
+    'data/kaysaar/aotd/tot/ui/warehouses/components/WarehouseCustomButton.class' = @(
+        'misc',
+        'cargoFighterChip'
     )
 }
 $forbiddenJarSymbols = @{
@@ -112,6 +124,9 @@ $forbiddenJarSymbols = @{
         'consumeDetachedCargoOpen',
         'consumeUiMarketMutation',
         'consumeUiMarketMutationPayload'
+    )
+    'data/kaysaar/aotd/tot/ui/warehouses/components/WarehouseCustomButton.class' = @(
+        'fighter_lpc'
     )
 }
 Add-Type -AssemblyName System.IO.Compression
@@ -126,7 +141,7 @@ try {
         $jarEntries = @($jar.Entries | ForEach-Object FullName)
         foreach ($entry in $requiredJarEntries) {
             if ($jarEntries -notcontains $entry) {
-                throw "AoTD JAR is missing required Domain UI class: $entry"
+                throw "AoTD JAR is missing required UI class: $entry"
             }
         }
         foreach ($entry in $forbiddenJarEntries) {
@@ -170,6 +185,36 @@ try {
     }
 } finally {
     $jarStream.Dispose()
+}
+
+$javap = Get-Command javap -CommandType Application -ErrorAction Stop | Select-Object -First 1
+$warehouseBytecode = @(& $javap.Source -classpath $jarPath -c -p `
+    'data.kaysaar.aotd.tot.ui.warehouses.WarehouseSectionUI' 2>&1)
+if ($LASTEXITCODE -ne 0) {
+    throw "Could not inspect WarehouseSectionUI bytecode:`n$($warehouseBytecode -join "`n")"
+}
+$warehouseBytecodeText = $warehouseBytecode -join "`n"
+$warehouseConstructor = [regex]::Match(
+    $warehouseBytecodeText,
+    '(?s)public data\.kaysaar\.aotd\.tot\.ui\.warehouses\.WarehouseSectionUI\(float, float\);(.*?)public com\.fs\.starfarer\.api\.ui\.CustomPanelAPI getMainPanel')
+if (-not $warehouseConstructor.Success -or
+    $warehouseConstructor.Groups[1].Value -match 'createUI') {
+    throw 'WarehouseSectionUI constructor is not lazy in the compiled JAR.'
+}
+
+$domainBytecode = @(& $javap.Source -classpath $jarPath -c -p `
+    'data.kaysaar.aotd.tot.ui.DomainUIPanel' 2>&1)
+if ($LASTEXITCODE -ne 0) {
+    throw "Could not inspect DomainUIPanel bytecode:`n$($domainBytecode -join "`n")"
+}
+$domainBytecodeText = $domainBytecode -join "`n"
+$domainAdvance = [regex]::Match(
+    $domainBytecodeText,
+    '(?s)public void advance\(float\);(.*?)public void playSound')
+if (-not $domainAdvance.Success -or
+    $domainAdvance.Groups[1].Value -notmatch 'createPanelContentIfNeeded' -or
+    $domainAdvance.Groups[1].Value -notmatch 'CommandUIPlugin\.advance') {
+    throw 'DomainUIPanel does not initialize lazy content from its active advance path.'
 }
 
 $checksumLines = foreach ($relativePath in $payload) {

@@ -14,6 +14,7 @@ import com.fs.starfarer.api.impl.campaign.ids.Tags;
 import com.fs.starfarer.api.input.InputEventAPI;
 import com.fs.starfarer.api.ui.*;
 import com.fs.starfarer.api.util.Misc;
+import data.kaysaar.aotd.tot.ui.SafeSpriteLoader;
 import java.awt.*;
 import java.util.ArrayList;
 
@@ -86,31 +87,11 @@ public class StarSystemHoldingButton extends CustomButton {
             float startingX = StarSystemHoldingTable.getStartingX("data");
             float iconsize = 25;
             for (SectorEntityToken token : system.getEntitiesWithTag(Tags.OBJECTIVE)) {
-                ImageViewer viewer =
-                        new ImageViewer(
-                                iconsize, iconsize, token.getCustomEntitySpec().getIconName());
-                if (token.getFaction() != null
-                        && !token.getFaction().getId().equals(Factions.NEUTRAL)) {
-                    viewer.setColorOverlay(token.getFaction().getBaseUIColor());
-                }
-                container
-                        .addComponent(viewer.getComponentPanel())
-                        .inTL(startingX, height / 2 - (iconsize / 2));
-                startingX += iconsize + 5;
+                startingX = addEntityIcon(container, token, startingX, iconsize);
             }
 
             for (SectorEntityToken token : system.getEntitiesWithTag(Tags.STABLE_LOCATION)) {
-                ImageViewer viewer =
-                        new ImageViewer(
-                                iconsize, iconsize, token.getCustomEntitySpec().getIconName());
-                if (token.getFaction() != null
-                        && !token.getFaction().getId().equals(Factions.NEUTRAL)) {
-                    viewer.setColorOverlay(token.getFaction().getBaseUIColor());
-                }
-                container
-                        .addComponent(viewer.getComponentPanel())
-                        .inTL(startingX, height / 2 - (iconsize / 2));
-                startingX += iconsize + 5;
+                startingX = addEntityIcon(container, token, startingX, iconsize);
             }
             startingX += 15;
             float endX = StarSystemHoldingTable.getStartingX("income");
@@ -240,5 +221,28 @@ public class StarSystemHoldingButton extends CustomButton {
             buttonWithImageComponent.setEnableRightClick(true);
             container.addComponent(buttonWithImageComponent.getPanelOfButton()).inTL(startingX, 2);
         }
+    }
+
+    private float addEntityIcon(
+            CustomPanelAPI container, SectorEntityToken token, float startingX, float iconSize) {
+        if (token == null || token.getCustomEntitySpec() == null) {
+            return startingX;
+        }
+        ImageViewer viewer =
+                SafeSpriteLoader.createImageViewerOrNull(
+                        iconSize,
+                        iconSize,
+                        token.getCustomEntitySpec().getIconName(),
+                        "Domain star-system entity " + token.getId());
+        if (viewer == null) {
+            return startingX;
+        }
+        if (token.getFaction() != null && !token.getFaction().getId().equals(Factions.NEUTRAL)) {
+            viewer.setColorOverlay(token.getFaction().getBaseUIColor());
+        }
+        container
+                .addComponent(viewer.getComponentPanel())
+                .inTL(startingX, height / 2 - (iconSize / 2));
+        return startingX + iconSize + 5;
     }
 }

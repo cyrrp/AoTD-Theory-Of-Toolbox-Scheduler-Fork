@@ -2,12 +2,12 @@ package data.kaysaar.aotd.tot.ui.economy;
 
 import ashlib.data.plugins.coreui.CommandTabMemoryManager;
 import ashlib.data.plugins.coreui.CommandUIPlugin;
-import ashlib.data.plugins.ui.models.ExtendedUIPanelPlugin;
 import ashlib.data.plugins.ui.plugins.UILinesRenderer;
 import com.fs.graphics.util.Fader;
 import com.fs.starfarer.api.Global;
 import com.fs.starfarer.api.ui.*;
 import data.kaysaar.aotd.tot.plugins.ReflectionUtilis;
+import data.kaysaar.aotd.tot.ui.LazyUIPanel;
 import data.kaysaar.aotd.tot.ui.core.EconomyTabListener;
 import java.awt.*;
 import java.util.HashMap;
@@ -19,9 +19,9 @@ public class EconomyUIPanel extends CommandUIPlugin {
         return mainPanel;
     }
 
-    EconomyCommodityData economyCommodityData;
-    EconomyTradeDealsData economyTradeDealsData;
-    EconomyFactionIncome factionIncome;
+    LazyUIPanel economyCommodityData;
+    LazyUIPanel economyTradeDealsData;
+    LazyUIPanel factionIncome;
 
     public EconomyUIPanel(float width, float height) {
         super(width, height);
@@ -39,13 +39,22 @@ public class EconomyUIPanel extends CommandUIPlugin {
                         mainPanel.getPosition().getHeight() - 45,
                         null);
         createButtonsAndMainPanels();
-        if (panelToShowcase == null) {
+        if (panelToShowcase == null || panelToShowcase.isBlank()) {
             panelToShowcase = "commodity data";
         }
+        currentlyChosen = null;
         for (Map.Entry<ButtonAPI, CustomPanelAPI> buttons : panelMap.entrySet()) {
             if (buttons.getKey().getText().toLowerCase().contains(panelToShowcase)) {
                 currentlyChosen = buttons.getKey();
                 break;
+            }
+        }
+        if (currentlyChosen == null) {
+            for (ButtonAPI button : panelMap.keySet()) {
+                if (button.getText().equalsIgnoreCase("Commodity Data")) {
+                    currentlyChosen = button;
+                    break;
+                }
             }
         }
         for (CustomPanelAPI value : panelMap.values()) {
@@ -69,6 +78,7 @@ public class EconomyUIPanel extends CommandUIPlugin {
 
     @Override
     public void advance(float amount) {
+        createPanelContentIfNeeded(currentlyChosen);
 
         for (Map.Entry<ButtonAPI, CustomPanelAPI> entry : panelMap.entrySet()) {
             entry.getKey().unhighlight();
@@ -92,8 +102,18 @@ public class EconomyUIPanel extends CommandUIPlugin {
     @Override
     public void resetCurrentPlugin(ButtonAPI newButton) {
         super.resetCurrentPlugin(newButton);
-        if (panelMap.get(newButton).getPlugin() instanceof ExtendedUIPanelPlugin plugin) {
-            plugin.createUI();
+        CustomPanelAPI selectedPanel = panelMap.get(newButton);
+        if (selectedPanel != null && selectedPanel.getPlugin() instanceof LazyUIPanel lazyPanel) {
+            lazyPanel.createUI();
+        }
+    }
+
+    private void createPanelContentIfNeeded(ButtonAPI button) {
+        CustomPanelAPI selectedPanel = panelMap.get(button);
+        if (selectedPanel != null && selectedPanel.getPlugin() instanceof LazyUIPanel lazyPanel) {
+            if (!lazyPanel.isInitialized()) {
+                lazyPanel.createUI();
+            }
         }
     }
 
@@ -138,8 +158,10 @@ public class EconomyUIPanel extends CommandUIPlugin {
 
     private void insertCommDataPanel(ButtonAPI tiedButton) {
         if (economyCommodityData == null) {
+            float width = EconomyTabListener.WIDTH;
+            float height = EconomyTabListener.HEIGHT;
             economyCommodityData =
-                    new EconomyCommodityData(EconomyTabListener.WIDTH, EconomyTabListener.HEIGHT);
+                    new LazyUIPanel(width, height, () -> new EconomyCommodityData(width, height));
         }
 
         panelMap.put(tiedButton, economyCommodityData.getMainPanel());
@@ -147,8 +169,10 @@ public class EconomyUIPanel extends CommandUIPlugin {
 
     private void insertTradeDataPanel(ButtonAPI tiedButton) {
         if (economyTradeDealsData == null) {
+            float width = EconomyTabListener.WIDTH;
+            float height = EconomyTabListener.HEIGHT;
             economyTradeDealsData =
-                    new EconomyTradeDealsData(EconomyTabListener.WIDTH, EconomyTabListener.HEIGHT);
+                    new LazyUIPanel(width, height, () -> new EconomyTradeDealsData(width, height));
         }
 
         panelMap.put(tiedButton, economyTradeDealsData.getMainPanel());
@@ -156,8 +180,10 @@ public class EconomyUIPanel extends CommandUIPlugin {
 
     private void insertFactionIncome(ButtonAPI tiedButton) {
         if (factionIncome == null) {
+            float width = EconomyTabListener.WIDTH;
+            float height = EconomyTabListener.HEIGHT;
             factionIncome =
-                    new EconomyFactionIncome(EconomyTabListener.WIDTH, EconomyTabListener.HEIGHT);
+                    new LazyUIPanel(width, height, () -> new EconomyFactionIncome(width, height));
         }
 
         panelMap.put(tiedButton, factionIncome.getMainPanel());

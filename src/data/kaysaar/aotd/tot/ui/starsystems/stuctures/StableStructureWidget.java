@@ -9,6 +9,7 @@ import com.fs.starfarer.api.ui.CustomPanelAPI;
 import com.fs.starfarer.api.ui.PositionAPI;
 import com.fs.starfarer.api.ui.TooltipMakerAPI;
 import com.fs.starfarer.api.util.Misc;
+import data.kaysaar.aotd.tot.ui.SafeSpriteLoader;
 import data.kaysaar.aotd.tot.ui.starsystems.components.ButtonWithImageComponent;
 import java.awt.*;
 import java.util.List;
@@ -17,6 +18,7 @@ public class StableStructureWidget implements ExtendedUIPanelPlugin {
     CustomPanelAPI mainPanel, contentPanel;
     SectorEntityToken token;
     UILinesRenderer renderer;
+    boolean hasRenderableImage;
     public static float width = 225;
     public static float height = 150;
 
@@ -43,17 +45,11 @@ public class StableStructureWidget implements ExtendedUIPanelPlugin {
                                 mainPanel.getPosition().getWidth(),
                                 mainPanel.getPosition().getHeight(),
                                 null);
-        ButtonWithImageComponent viewer =
-                new ButtonWithImageComponent(
-                        contentPanel.getPosition().getWidth(),
-                        125,
-                        token.getCustomInteractionDialogImageVisual().getSpriteName()) {
-                    @Override
-                    public void performActionOnClick(boolean isRightClick) {
-                        super.performActionOnClick(isRightClick);
-                    }
-                };
-        viewer.setEnableRightClick(false);
+        hasRenderableImage = false;
+        String spriteName = null;
+        if (token.getCustomInteractionDialogImageVisual() != null) {
+            spriteName = token.getCustomInteractionDialogImageVisual().getSpriteName();
+        }
         TooltipMakerAPI tooltip =
                 contentPanel.createUIElement(
                         contentPanel.getPosition().getWidth(),
@@ -64,9 +60,22 @@ public class StableStructureWidget implements ExtendedUIPanelPlugin {
             c = token.getFaction().getBaseUIColor();
         }
         tooltip.addPara(token.getName(), c, 0f);
-        tooltip.addCustom(viewer.getComponentPanel(), 2f);
         renderer.setBoxColor(c);
-        renderer.setPanel(viewer.getComponentPanel());
+        if (SafeSpriteLoader.getSpriteOrNull(spriteName, "Domain stable structure " + token.getId())
+                != null) {
+            ButtonWithImageComponent viewer =
+                    new ButtonWithImageComponent(
+                            contentPanel.getPosition().getWidth(), 125, spriteName) {
+                        @Override
+                        public void performActionOnClick(boolean isRightClick) {
+                            super.performActionOnClick(isRightClick);
+                        }
+                    };
+            viewer.setEnableRightClick(false);
+            tooltip.addCustom(viewer.getComponentPanel(), 2f);
+            renderer.setPanel(viewer.getComponentPanel());
+            hasRenderableImage = true;
+        }
         contentPanel.addUIElement(tooltip).inTL(0, 0);
         mainPanel.addComponent(contentPanel).inTL(0, 0);
     }
@@ -82,7 +91,9 @@ public class StableStructureWidget implements ExtendedUIPanelPlugin {
 
     @Override
     public void render(float alphaMult) {
-        renderer.render(alphaMult);
+        if (hasRenderableImage) {
+            renderer.render(alphaMult);
+        }
     }
 
     @Override
