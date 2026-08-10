@@ -4,6 +4,34 @@ All notable changes to the Scheduler Fork are documented here.
 
 ## Unreleased
 
+## 1.0.14-spp12 - 2026-08-11
+
+- Requires StarsectorPrepatcher 0.18.2 and continues to require AshLib 2.2.3.
+- Reverted the scheduler, trade-publication and runtime-task redesign introduced in
+  `1.0.14-spp11` after a same-save gameplay comparison showed the rollback restoring the campaign
+  frame rate from roughly 50 FPS to as much as 90 FPS.
+- Restored the proven `1.0.14-spp10` economy pipeline: post-immigration trade inputs are calculated
+  once per market using the original budgeted path, without materialized checkpoints, trade-input
+  proofs, stale-proof recapture or restart-checkpoint machinery.
+- Retained the restore-time supply/demand safety from `1.0.14-spp10`: temporarily unavailable
+  industry demand or supply is treated as not ready, while genuine calculation failures remain
+  visible and the previous committed market state is preserved.
+- Retained the lazy Domain UI and safe sprite fixes introduced before the reverted economy work.
+
+## 1.0.14-spp11 - 2026-08-10
+
+- Requires StarsectorPrepatcher 0.18.1 and continues to require AshLib 2.2.3. Scheduler Bridge V10
+  and its required/declared capability masks remain `0xbff`/`0xfff`.
+- Introduced persistent semantic checkpoints for interrupted economy work, materialized-input
+  generations and proof-gated post-immigration trade publication.
+- Added stale-proof recapture, whole-batch publication/rollback, empty-registry deferral and a
+  downstream-only industry-traversal skip.
+- Added canonical commodity-map restore and sprite blacklist recovery, plus registry lock timing
+  diagnostics.
+- This release was withdrawn after the new scheduler/trade machinery caused a severe in-game
+  performance regression on a large campaign. `1.0.14-spp12` removes that machinery instead of
+  attempting another incremental repair.
+
 ## 1.0.14-spp10 - 2026-08-10
 
 - Requires StarsectorPrepatcher 0.18.0 and continues to require AshLib 2.2.3.
