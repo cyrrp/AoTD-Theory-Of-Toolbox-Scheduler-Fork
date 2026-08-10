@@ -7,11 +7,14 @@ import com.fs.starfarer.api.campaign.econ.MarketAPI;
 import com.fs.starfarer.api.combat.MutableStat;
 import com.fs.starfarer.api.combat.MutableStatWithTempMods;
 import data.kaysaar.aotd.tot.compat.MarketRegistry;
+import data.kaysaar.aotd.tot.plugins.AoTDBaseDemSupCalc;
 import data.kaysaar.aotd.tot.plugins.AoTDCommodityEconSpec;
 import data.kaysaar.aotd.tot.plugins.AoTDCommodityEconSpecManager;
 import data.kaysaar.aotd.tot.scripts.economy.AoTDEconomySemanticBaseline;
 import data.kaysaar.aotd.tot.scripts.economy.AoTDIndustryData;
 import data.kaysaar.aotd.tot.scripts.trade.manager.AoTDTradeManager;
+import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 
 /**
@@ -45,6 +48,8 @@ public class AoTDSupplyDemandData {
             new LinkedHashMap<>();
     private transient LinkedHashMap<String, MutableStat> stagingSupplyUnitsFromIndustries =
             new LinkedHashMap<>();
+    private transient ArrayList<Industry> stagingIndustries = new ArrayList<>();
+    private transient boolean serializationProxy;
 
     public AoTDCommodityEconSpec getEconSpec() {
         if (ecSpec == null) {
@@ -113,38 +118,64 @@ public class AoTDSupplyDemandData {
             return PreparedRefresh.skipped(this, targetGeneration);
         }
 
-        ensureStagingMaps();
-        stagingDemandUnitsFromIndustries.clear();
-        stagingSupplyUnitsFromIndustries.clear();
+        ensureStagingState();
+        clearStagingState();
 
         int nextSupply = 0;
         int nextDemand = 0;
-        int pairs = 0;
         try (AoTDEconomySemanticBaseline.Scope scope =
                 AoTDEconomySemanticBaseline.begin("supply-demand.prepare", market, commodityID)) {
+            // Preserve upstream's lifecycle semantics: first obtain a complete set of live
+            // industry stats. During CoreLifecyclePluginImpl.econPostSaveRestore() a later
+            // industry's BaseIndustry maps may still be null. That is a temporary NOT_READY
+            // result, not a calculation failure.
+            for (Industry industry : market.getIndustries()) {
+                MutableStat demandStat;
+                MutableStat supplyStat;
+                try {
+                    demandStat = industry.getDemand(commodityID).getQuantity();
+                    supplyStat = industry.getSupply(commodityID).getQuantity();
+                } catch (NullPointerException notReady) {
+                    clearStagingState();
+                    return PreparedRefresh.notReady(this, market, targetGeneration);
+                }
+
+                if (demandStat == null || supplyStat == null) {
+                    clearStagingState();
+                    return PreparedRefresh.notReady(this, market, targetGeneration);
+                }
+
+                String industryId = industry.getId();
+                stagingDemandUnitsFromIndustries.put(industryId, demandStat);
+                stagingSupplyUnitsFromIndustries.put(industryId, supplyStat);
+                stagingIndustries.add(industry);
+            }
+
+            // Calculation failures are genuine model failures. Keep them visible and distinct
+            // from the temporary snapshot lifecycle above.
             try {
-                for (Industry industry : market.getIndustries()) {
-                    String industryId = industry.getId();
-                    MutableStat demandStat = industry.getDemand(commodityID).getQuantity();
-                    MutableStat supplyStat = industry.getSupply(commodityID).getQuantity();
+                AoTDBaseDemSupCalc calculationScript = getEconSpec().getCalculationScript();
+                if (stagingDemandUnitsFromIndustries.size() != stagingIndustries.size()
+                        || stagingSupplyUnitsFromIndustries.size() != stagingIndustries.size()) {
+                    throw new IllegalStateException(
+                            "Market contains duplicate or missing industry ids during AoTD snapshot");
+                }
 
-                    stagingDemandUnitsFromIndustries.put(industryId, demandStat);
-                    stagingSupplyUnitsFromIndustries.put(industryId, supplyStat);
-
+                Iterator<MutableStat> demandStats =
+                        stagingDemandUnitsFromIndustries.values().iterator();
+                Iterator<MutableStat> supplyStats =
+                        stagingSupplyUnitsFromIndustries.values().iterator();
+                for (Industry industry : stagingIndustries) {
                     nextSupply +=
-                            getEconSpec()
-                                    .getCalculationScript()
-                                    .getRawUnitsFromSupply(supplyStat, null, commodityID, industry);
+                            calculationScript.getRawUnitsFromSupply(
+                                    supplyStats.next(), null, commodityID, industry);
                     nextDemand +=
-                            getEconSpec()
-                                    .getCalculationScript()
-                                    .getRawUnitsFromDemand(demandStat, null, commodityID, industry);
-                    pairs++;
+                            calculationScript.getRawUnitsFromDemand(
+                                    demandStats.next(), null, commodityID, industry);
                 }
             } catch (RuntimeException failure) {
                 scope.failed();
-                stagingDemandUnitsFromIndustries.clear();
-                stagingSupplyUnitsFromIndustries.clear();
+                clearStagingState();
                 throw new SupplyDemandRefreshException(market.getId(), commodityID, failure);
             }
         }
@@ -155,10 +186,11 @@ public class AoTDSupplyDemandData {
                 targetGeneration,
                 nextSupply,
                 nextDemand,
-                pairs,
+                stagingIndustries.size(),
+                stagingIndustries,
                 stagingDemandUnitsFromIndustries,
                 stagingSupplyUnitsFromIndustries,
-                false);
+                PreparedRefresh.Status.READY);
     }
 
     /**
@@ -169,8 +201,9 @@ public class AoTDSupplyDemandData {
         if (prepared == null || prepared.owner != this) {
             throw new IllegalArgumentException("prepared refresh belongs to another owner");
         }
-        if (prepared.skipped) return false;
-        if (prepared.demandUnits != stagingDemandUnitsFromIndustries
+        if (prepared.status != PreparedRefresh.Status.READY) return false;
+        if (prepared.industries != stagingIndustries
+                || prepared.demandUnits != stagingDemandUnitsFromIndustries
                 || prepared.supplyUnits != stagingSupplyUnitsFromIndustries) {
             throw new IllegalStateException("prepared refresh is no longer current");
         }
@@ -191,6 +224,7 @@ public class AoTDSupplyDemandData {
                 oldDemand == null ? new LinkedHashMap<String, MutableStat>() : oldDemand;
         stagingSupplyUnitsFromIndustries =
                 oldSupply == null ? new LinkedHashMap<String, MutableStat>() : oldSupply;
+        stagingIndustries.clear();
 
         AoTDEconomySemanticBaseline.operation("supply-demand.atomic-commit", prepared.market);
         return true;
@@ -202,7 +236,9 @@ public class AoTDSupplyDemandData {
      * every commodity before any callback.
      */
     public void finishPreparedRefresh(PreparedRefresh prepared) {
-        if (prepared == null || prepared.owner != this || prepared.skipped) return;
+        if (prepared == null
+                || prepared.owner != this
+                || prepared.status != PreparedRefresh.Status.READY) return;
         AoTDEconomySemanticBaseline.operation(
                 "supply-demand.industry-pairs", prepared.industryPairs);
         if (supply != 0 || demand != 0) {
@@ -219,16 +255,19 @@ public class AoTDSupplyDemandData {
 
     /** Releases prepared staging data without changing authoritative state. */
     public synchronized void discardPreparedRefresh(PreparedRefresh prepared) {
-        if (prepared == null || prepared.owner != this || prepared.skipped) return;
+        if (prepared == null
+                || prepared.owner != this
+                || prepared.status != PreparedRefresh.Status.READY) return;
         if (prepared.demandUnits == stagingDemandUnitsFromIndustries) {
             stagingDemandUnitsFromIndustries.clear();
         }
         if (prepared.supplyUnits == stagingSupplyUnitsFromIndustries) {
             stagingSupplyUnitsFromIndustries.clear();
         }
+        if (prepared.industries == stagingIndustries) stagingIndustries.clear();
     }
 
-    private void ensureStagingMaps() {
+    private void ensureStagingState() {
         if (stagingDemandUnitsFromIndustries == null) {
             stagingDemandUnitsFromIndustries = new LinkedHashMap<>();
         }
@@ -241,6 +280,62 @@ public class AoTDSupplyDemandData {
         if (supplyUnitsFromIndustries == null) {
             supplyUnitsFromIndustries = new LinkedHashMap<>();
         }
+        if (stagingIndustries == null) stagingIndustries = new ArrayList<>();
+    }
+
+    private void clearStagingState() {
+        if (stagingDemandUnitsFromIndustries != null) stagingDemandUnitsFromIndustries.clear();
+        if (stagingSupplyUnitsFromIndustries != null) stagingSupplyUnitsFromIndustries.clear();
+        if (stagingIndustries != null) stagingIndustries.clear();
+    }
+
+    /**
+     * Drops references into BaseIndustry's replace-on-restore maps while retaining the last
+     * complete aggregate values for UI continuity.
+     */
+    public synchronized void discardDerivedIndustrySnapshot() {
+        ensureStagingState();
+        demandUnitsFromIndustries.clear();
+        supplyUnitsFromIndustries.clear();
+        clearStagingState();
+        authoritativeDirtyGeneration = Long.MIN_VALUE;
+    }
+
+    /**
+     * Serializes a same-class compatibility object without the rebuildable per-industry graph. The
+     * guard prevents serializers that recursively inspect replacements from replacing twice.
+     */
+    private Object writeReplace() {
+        if (serializationProxy) return this;
+
+        AoTDSupplyDemandData proxy = new AoTDSupplyDemandData(commodityID);
+        proxy.serializationProxy = true;
+        proxy.supply = supply;
+        proxy.demand = demand;
+        proxy.available = available;
+        proxy.additionalProduction = additionalProduction;
+        proxy.additionalDemand = additionalDemand;
+        proxy.additionalImport = additionalImport;
+        proxy.additionalExport = additionalExport;
+        return proxy;
+    }
+
+    /**
+     * Accepts spp9 objects, discards their detached stat references, and restores runtime buffers.
+     */
+    private Object readResolve() {
+        serializationProxy = false;
+        demandUnitsFromIndustries = new LinkedHashMap<>();
+        supplyUnitsFromIndustries = new LinkedHashMap<>();
+        stagingDemandUnitsFromIndustries = new LinkedHashMap<>();
+        stagingSupplyUnitsFromIndustries = new LinkedHashMap<>();
+        stagingIndustries = new ArrayList<>();
+        if (additionalProduction == null) additionalProduction = new MutableStatWithTempMods(0f);
+        if (additionalDemand == null) additionalDemand = new MutableStatWithTempMods(0f);
+        if (additionalImport == null) additionalImport = new MutableStatWithTempMods(0f);
+        if (additionalExport == null) additionalExport = new MutableStatWithTempMods(0f);
+        authoritativeDirtyGeneration = Long.MIN_VALUE;
+        return this;
     }
 
     public int getDemandExceptPendingIndustries(MarketAPI market) {
@@ -398,15 +493,22 @@ public class AoTDSupplyDemandData {
     }
 
     public static final class PreparedRefresh {
+        public enum Status {
+            READY,
+            SKIPPED,
+            NOT_READY
+        }
+
         private final AoTDSupplyDemandData owner;
         private final MarketAPI market;
         private final long targetGeneration;
         private final int nextSupply;
         private final int nextDemand;
         private final int industryPairs;
+        private final ArrayList<Industry> industries;
         private final LinkedHashMap<String, MutableStat> demandUnits;
         private final LinkedHashMap<String, MutableStat> supplyUnits;
-        private final boolean skipped;
+        private final Status status;
 
         private PreparedRefresh(
                 AoTDSupplyDemandData owner,
@@ -415,27 +517,61 @@ public class AoTDSupplyDemandData {
                 int nextSupply,
                 int nextDemand,
                 int industryPairs,
+                ArrayList<Industry> industries,
                 LinkedHashMap<String, MutableStat> demandUnits,
                 LinkedHashMap<String, MutableStat> supplyUnits,
-                boolean skipped) {
+                Status status) {
             this.owner = owner;
             this.market = market;
             this.targetGeneration = targetGeneration;
             this.nextSupply = nextSupply;
             this.nextDemand = nextDemand;
             this.industryPairs = industryPairs;
+            this.industries = industries;
             this.demandUnits = demandUnits;
             this.supplyUnits = supplyUnits;
-            this.skipped = skipped;
+            this.status = status;
         }
 
         private static PreparedRefresh skipped(AoTDSupplyDemandData owner, long generation) {
             return new PreparedRefresh(
-                    owner, null, generation, owner.supply, owner.demand, 0, null, null, true);
+                    owner,
+                    null,
+                    generation,
+                    owner.supply,
+                    owner.demand,
+                    0,
+                    null,
+                    null,
+                    null,
+                    Status.SKIPPED);
+        }
+
+        private static PreparedRefresh notReady(
+                AoTDSupplyDemandData owner, MarketAPI market, long generation) {
+            return new PreparedRefresh(
+                    owner,
+                    market,
+                    generation,
+                    owner.supply,
+                    owner.demand,
+                    0,
+                    null,
+                    null,
+                    null,
+                    Status.NOT_READY);
         }
 
         public boolean isSkipped() {
-            return skipped;
+            return status == Status.SKIPPED;
+        }
+
+        public boolean isNotReady() {
+            return status == Status.NOT_READY;
+        }
+
+        public Status getStatus() {
+            return status;
         }
     }
 

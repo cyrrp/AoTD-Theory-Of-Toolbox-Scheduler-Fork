@@ -1,9 +1,9 @@
 # Ashes of The Domain — Theory of Toolbox: Scheduler Fork
 
 Scheduler-focused fork of **AoTD — Theory of Toolbox** for Starsector
-`0.98a-RC8`. The current Scheduler Fork release is `1.0.14-spp9`.
+`0.98a-RC8`. The current Scheduler Fork release is `1.0.14-spp10`.
 The mod metadata, release archive, bridge contract, and update manifest all use
-the canonical `1.0.14-spp9` fork release identifier.
+the canonical `1.0.14-spp10` fork release identifier.
 
 The fork keeps the original game `starfarer.api.jar`; it does not require or
 ship an AoTD replacement for any Starsector core JAR.
@@ -22,6 +22,8 @@ setups where AoTD is absent.
 - rejects stale results across campaign or economy replacement with runtime
   epochs;
 - restarts workers safely around load, reset, save and shutdown boundaries;
+- defers industry-derived supply/demand rebuilding until Starsector has fully restored and reapplied
+  every market, then coalesces the work into the normal atomic scheduler pass;
 - refreshes Prepatcher capabilities at runtime and resynchronizes market
   generations before falling back when native delivery events become
   unavailable;
@@ -38,7 +40,7 @@ The runtime dependencies declared by `mod_info.json` are:
 
 | Mod | Minimum version |
 | --- | --- |
-| StarsectorPrepatcher | 0.17.2 |
+| StarsectorPrepatcher | 0.18.0 |
 | LazyLib | 3.0 |
 | AshLib | 2.2.3 |
 | Building Menu Overhaul | 2.1.0 |
@@ -55,8 +57,8 @@ mods are present, but neither is declared as a required dependency.
 4. Place this directory under `Starsector/mods/` and enable the mod.
 
 At startup the fork requires an active, compatible Prepatcher javaagent and the
-required production capability mask `0x3ff`. Scheduler Bridge V9 additionally negotiates the
-atomic UI market-mutation refresh capability (`0x7ff`) when both sides support it. Merely having
+required production capability mask `0xbff`. Scheduler Bridge V10 additionally negotiates the
+atomic UI market-mutation refresh capability (`0xfff`) when both sides support it. Merely having
 the Prepatcher mod directory installed is not
 sufficient. If the native delivery callback is lost later at
 runtime, the fork performs a one-time generation resynchronization and switches
@@ -157,6 +159,20 @@ provides GNU coreutils, verify the payload with:
 sha256sum -c SHA256SUMS.txt
 ```
 
+## Save/restore behavior
+
+Starsector temporarily removes every industry's supply and demand maps while saving, then restores
+and reapplies the economy in several passes. The fork does not calculate commodity state inside
+those partial passes. Prepatcher signals the successful end of the complete restore, after which the
+fork reconciles missing commodity objects without reading industry data, marks each market once,
+and leaves the actual calculation to the normal atomic scheduler pass.
+
+If an industry snapshot is still temporarily unavailable, the attempt is treated as `NOT_READY`:
+the last committed values remain visible and the dirty market is retried without an exception or
+quarantine. Exceptions raised later by commodity calculation scripts remain real logged failures.
+New saves retain aggregate gameplay values and modifiers but omit rebuildable references into
+industry supply/demand maps; old spp9 data is accepted and normalized during loading.
+
 ## License
 
 See [LICENSE](LICENSE).
@@ -187,8 +203,8 @@ construction queue, custom providers, unknown actions and missing capability/bar
 `false` and retain the original global virtual step. No second scheduler, per-commodity revision
 vector, persistent market reference, or static reflection/classloader cache is added.
 
-Only the exact `1.0.14-spp9` contract registers. The bridge declares the exact current mask
-`0x7ff`; older, future and partially declared fork revisions are logged and rejected as a whole
+Only the exact `1.0.14-spp10` contract registers. The bridge declares the exact current mask
+`0xfff`; older, future and partially declared fork revisions are logged and rejected as a whole
 instead of receiving partial or implicit UI semantics. Optional Prepatcher switches may omit bit
-10, but never the required dispatcher bit, so an exact current fork still receives `0x3ff` in the
-safe profile.
+10, but never the required dispatcher and economy-restore bits, so an exact current fork still
+receives `0xbff` in the safe profile.

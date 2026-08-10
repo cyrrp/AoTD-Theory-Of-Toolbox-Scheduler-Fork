@@ -18,10 +18,9 @@ import com.fs.starfarer.api.loading.IndustrySpecAPI;
 import com.fs.starfarer.api.ui.TooltipMakerAPI;
 import com.fs.starfarer.api.util.Misc;
 import com.fs.starfarer.api.util.Pair;
-import com.fs.starfarer.campaign.econ.Market;
 import data.kaysaar.aotd.tot.grandwonders.GrandWonderManager;
 import data.kaysaar.aotd.tot.scripts.commoditydata.AoTDCommodityOnMarket;
-import data.kaysaar.aotd.tot.scripts.economy.AoTDEconomy;
+import data.kaysaar.aotd.tot.scripts.economy.AoTDEconomyRestoreCoordinator;
 import data.kaysaar.aotd.tot.scripts.trade.manager.AoTDTradeManager;
 import data.kaysaar.aotd.tot.scripts.trade.models.AoTDMarketData;
 import data.kaysaar.aotd.tot.strings.AoTDMarketStats;
@@ -31,7 +30,7 @@ public class AoTDToolboxPopAndInfra extends PopulationAndInfrastructure {
     @Override
     public void doPostSaveRestore() {
         super.doPostSaveRestore();
-        AoTDEconomy.pruneCommoditiesThatMightAppear((Market) market);
+        AoTDEconomyRestoreCoordinator.recordMarketForRestore(market);
     }
 
     public Pair<String, Integer> getDeficitAmountPenalty(String commodity) {
@@ -438,10 +437,6 @@ public class AoTDToolboxPopAndInfra extends PopulationAndInfrastructure {
                         "_" + modId + "_ms",
                         Global.getSettings().getFloat("stabilityBaseValue"),
                         "Base value");
-        if (Global.LOADING_SAVE) {
-            AoTDEconomy.pruneCommoditiesThatMightAppear((Market) market);
-        }
-
         if (market.getFaction().isPlayerFaction()) {
             String hehe = "he";
         }

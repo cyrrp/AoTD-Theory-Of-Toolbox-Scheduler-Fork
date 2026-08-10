@@ -677,7 +677,11 @@ public class AoTdMainWorkTask2 extends MainWorkTask2 {
         // Publish one complete market-wide supply/demand revision
         // before claiming the price ticket. buildMarketPricePlan() is now read-only.
         try {
-            materializeMarketSupplyDemand(market);
+            if (!materializeMarketSupplyDemand(market)) {
+                // Core save restoration has not completed for every industry yet. No ticket was
+                // claimed, so the existing dirty generation remains queued for a normal retry.
+                return;
+            }
         } catch (RuntimeException failure) {
             AoTDEconomySemanticBaseline.operation("price-offload.materialization-failure", market);
             Global.getLogger(AoTdMainWorkTask2.class)
@@ -751,24 +755,18 @@ public class AoTdMainWorkTask2 extends MainWorkTask2 {
         long token =
                 SchedulerBridge.beforeMarketMutation(
                         market, SchedulerBridge.MUTATION_COMMODITY_STRUCTURE);
+        boolean commodityStructureChanged = commodityRepairNeeded;
         try {
-            if (demandDataMissing) {
-                ReflectionUtilis.setPrivateVariableFromSuperclass(
-                        "demandData", market, new AoTDMarketDemandData(market));
-            }
-            if (commodityRepairNeeded) {
-                AoTDEconomy.pruneCommoditiesThatMightAppear(market);
-            }
+            commodityStructureChanged =
+                    AoTDEconomy.reconcileCommodityStructureWithoutRefresh(market);
         } finally {
-            SchedulerBridge.afterMarketMutation(
-                    token,
-                    market,
-                    SchedulerBridge.DIRTY_STRUCTURE
-                            | SchedulerBridge.DIRTY_DERIVED_ECONOMY
+            int dirtyMask =
+                    SchedulerBridge.DIRTY_DERIVED_ECONOMY
                             | MarketRegistry.DIRTY_VALUE_STATE
                             | MarketRegistry.DIRTY_PRICE
-                            | MarketRegistry.DIRTY_STOCKPILE,
-                    0L);
+                            | MarketRegistry.DIRTY_STOCKPILE;
+            if (commodityStructureChanged) dirtyMask |= SchedulerBridge.DIRTY_STRUCTURE;
+            SchedulerBridge.afterMarketMutation(token, market, dirtyMask, 0L);
         }
     }
 
@@ -777,7 +775,7 @@ public class AoTdMainWorkTask2 extends MainWorkTask2 {
      * revision. If any calculation fails, all staging buffers are discarded and every previous
      * authoritative commodity revision remains untouched.
      */
-    private void materializeMarketSupplyDemand(Market market) {
+    private boolean materializeMarketSupplyDemand(Market market) {
         ArrayList<AoTDSupplyDemandData.PreparedRefresh> prepared = new ArrayList<>();
         ArrayList<AoTDSupplyDemandData> owners = new ArrayList<>();
         LinkedHashSet<AoTDCommodityOnMarket> commodities = new LinkedHashSet<>();
@@ -793,9 +791,18 @@ public class AoTdMainWorkTask2 extends MainWorkTask2 {
             }
 
             for (AoTDCommodityOnMarket commodity : commodities) {
-                AoTDSupplyDemandData owner = commodity.getSupplyDemandData();
+                AoTDSupplyDemandData owner = commodity.getSupplyDemandDataWithoutRefresh();
                 owners.add(owner);
-                prepared.add(owner.prepareSupplyDemandData(market, false));
+                AoTDSupplyDemandData.PreparedRefresh refresh =
+                        owner.prepareSupplyDemandData(market, false);
+                if (refresh.isNotReady()) {
+                    for (int i = 0; i < prepared.size(); i++) {
+                        owners.get(i).discardPreparedRefresh(prepared.get(i));
+                    }
+                    AoTDEconomySemanticBaseline.operation("supply-demand.market-not-ready", market);
+                    return false;
+                }
+                prepared.add(refresh);
             }
         } catch (RuntimeException failure) {
             for (int i = 0; i < prepared.size(); i++) {
@@ -816,6 +823,7 @@ public class AoTdMainWorkTask2 extends MainWorkTask2 {
         }
         AoTDEconomySemanticBaseline.operation("supply-demand.market-atomic-commit", market);
         AoTDEconomySemanticBaseline.operation("supply-demand.market-commodities", preparedCount);
+        return true;
     }
 
     private LinkedHashSet<String> collectDemandClasses() {

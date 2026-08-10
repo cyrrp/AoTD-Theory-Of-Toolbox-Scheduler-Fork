@@ -25,6 +25,11 @@ public class AoTDCommodityOnMarket extends CommodityOnMarket {
     }
 
     public AoTDCommodityOnMarket(Market market, String commodityId) {
+        this(market, commodityId, true);
+    }
+
+    private AoTDCommodityOnMarket(
+            Market market, String commodityId, boolean refreshSupplyDemandOnCreate) {
         super(market, commodityId);
         ReflectionUtilis.setPrivateVariableFromSuperclass(
                 "available", this, new AoTDAvailableStat(0f));
@@ -34,7 +39,16 @@ public class AoTDCommodityOnMarket extends CommodityOnMarket {
         ReflectionUtilis.setPrivateVariableFromSuperclass(
                 "demandPrice", this, new EffectivePriceCalculator(this));
 
-        getSupplyDemandData();
+        if (refreshSupplyDemandOnCreate) {
+            getSupplyDemandData();
+        } else {
+            getSupplyDemandDataWithoutRefresh();
+        }
+    }
+
+    /** Creates the commodity object but leaves its industry-derived state unprepared. */
+    public static AoTDCommodityOnMarket createUnprepared(Market market, String commodityId) {
+        return new AoTDCommodityOnMarket(market, commodityId, false);
     }
 
     public int stocks;
@@ -113,6 +127,11 @@ public class AoTDCommodityOnMarket extends CommodityOnMarket {
         return getAoTDAvailableStat().getSupplyDemandData(this);
     }
 
+    /** Returns or creates the holder without reading live industry state. */
+    public AoTDSupplyDemandData getSupplyDemandDataWithoutRefresh() {
+        return getAoTDAvailableStat().getOrCreateSupplyDemandDataWithoutRefresh(this);
+    }
+
     /** Read-only UI accessor; never constructs or refreshes supply/demand data. */
     public AoTDSupplyDemandData peekSupplyDemandData() {
         return getAoTDAvailableStat().peekSupplyDemandData();
@@ -167,7 +186,10 @@ public class AoTDCommodityOnMarket extends CommodityOnMarket {
             ReflectionUtilis.invokeMethodWithAutoProjection(
                     "playerDemandMod", this, new StatBonus());
         }
-        this.getSupplyDemandData().getEconSpec();
+        // Deserialization may run while Starsector is still restoring BaseIndustry maps one at a
+        // time. Recreate only the holder here; the post-restore scheduler pass publishes the next
+        // complete industry-derived revision.
+        this.getSupplyDemandDataWithoutRefresh().getEconSpec();
 
         if (this.getPlayerSupplyPriceMod() == null) {
             ReflectionUtilis.invokeMethodWithAutoProjection(

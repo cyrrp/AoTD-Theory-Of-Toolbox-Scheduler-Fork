@@ -9,11 +9,24 @@ public class AoTDAvailableStat extends MutableStatWithTempMods {
 
     public AoTDSupplyDemandData getSupplyDemandData(CommodityOnMarketAPI commodity) {
         if (supplyDemandData == null) {
-            supplyDemandData = new AoTDSupplyDemandData(commodity.getId());
-            supplyDemandData.getEconSpec();
+            supplyDemandData = getOrCreateSupplyDemandDataWithoutRefresh(commodity);
             supplyDemandData.updateSupplyDemandData(commodity.getMarket());
         }
 
+        return supplyDemandData;
+    }
+
+    /**
+     * Creates the derived-state holder without consulting live industry supply/demand maps.
+     *
+     * <p>Save restoration uses this path while Starsector is rebuilding those maps one industry at
+     * a time. The normal scheduler later prepares and publishes one complete market revision.
+     */
+    public AoTDSupplyDemandData getOrCreateSupplyDemandDataWithoutRefresh(
+            CommodityOnMarketAPI commodity) {
+        if (supplyDemandData == null) {
+            supplyDemandData = new AoTDSupplyDemandData(commodity.getId());
+        }
         return supplyDemandData;
     }
 

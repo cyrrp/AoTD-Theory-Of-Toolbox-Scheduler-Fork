@@ -44,7 +44,6 @@ public class AoTDEconomy extends Economy {
             new ConcurrentHashMap<>();
     private static final ConcurrentHashMap<String, Object> MARKET_REPAIR_LOCKS =
             new ConcurrentHashMap<>();
-    private static final Object MARKET_REGISTRY_LOAD_REPAIR_LOCK = new Object();
     private transient AoTDUIEconomyRefreshCoordinator uiRefreshCoordinator;
     public static boolean runningPrePlayerEconomy = false;
     public static boolean mustPruneCommodities = true;
@@ -144,46 +143,6 @@ public class AoTDEconomy extends Economy {
         MarketRegistry.replaceAllMarkets(complete);
         NEGATIVE_MARKET_LOOKUPS.clear();
         MARKET_REPAIR_LOCKS.clear();
-    }
-
-    /**
-     * Save loading may invoke the mod plugin before the deserialized economy has restored its
-     * complete market list. Repair that early empty or partial publication once a post-save
-     * callback proves that the installed economy contains the restored market.
-     */
-    private static void repairMarketRegistryAfterLoad(MarketAPI restoredMarket) {
-        if (restoredMarket == null) return;
-
-        List<MarketAPI> restoredMarkets = Global.getSector().getEconomy().getMarketsCopy();
-        if (MarketRegistry.getRegistryLifecycle() == MarketRegistry.RegistryLifecycle.READY
-                && MarketRegistry.getRegisteredMarketCount() == restoredMarkets.size()
-                && MarketRegistry.lookupMarket(restoredMarket.getId()) == restoredMarket) {
-            return;
-        }
-        synchronized (MARKET_REGISTRY_LOAD_REPAIR_LOCK) {
-            restoredMarkets = Global.getSector().getEconomy().getMarketsCopy();
-            if (MarketRegistry.getRegistryLifecycle() == MarketRegistry.RegistryLifecycle.READY
-                    && MarketRegistry.getRegisteredMarketCount() == restoredMarkets.size()
-                    && MarketRegistry.lookupMarket(restoredMarket.getId()) == restoredMarket) {
-                return;
-            }
-
-            LinkedHashMap<String, MarketAPI> complete = new LinkedHashMap<>();
-            boolean containsRestoredMarket = false;
-            for (MarketAPI market : restoredMarkets) {
-                if (market == null || market.getId() == null) continue;
-                complete.put(market.getId(), market);
-                if (market == restoredMarket) containsRestoredMarket = true;
-            }
-
-            // Do not turn another partial load snapshot into the authoritative
-            // registry. A later post-save callback will retry.
-            if (complete.isEmpty() || !containsRestoredMarket) return;
-
-            MarketRegistry.replaceAllMarkets(complete);
-            NEGATIVE_MARKET_LOOKUPS.clear();
-            MARKET_REPAIR_LOCKS.clear();
-        }
     }
 
     public AoTDReachEconomy getReachEconomy() {
@@ -553,10 +512,35 @@ public class AoTDEconomy extends Economy {
     }
 
     public static void pruneCommoditiesThatMightAppear(Market market) {
-        repairMarketRegistryAfterLoad(market);
+        reconcileCommodityStructure(market, true);
+    }
+
+    /**
+     * Repairs commodity/demand lookup structure without reading any industry supply/demand state.
+     *
+     * <p>This is the only variant allowed from save-restore coordination. It deliberately leaves
+     * newly created supply/demand holders unprepared for the scheduler's next atomic market pass.
+     *
+     * @return true only when the canonical commodity list changed identity, type, size, or order
+     */
+    public static boolean reconcileCommodityStructureWithoutRefresh(Market market) {
+        return reconcileCommodityStructure(market, false);
+    }
+
+    private static boolean reconcileCommodityStructure(Market market, boolean refreshNewData) {
+        if (market == null) return false;
         List<CommodityOnMarket> commodities = getCommodities(market);
+        List<CommoditySpecAPI> specs = Global.getSettings().getAllCommoditySpecs();
+
+        Object currentDemandData =
+                ReflectionUtilis.getPrivateVariableFromSuperClass("demandData", market);
+        boolean canonicalStructure = hasCanonicalCommodityStructure(commodities, specs);
+        if (currentDemandData instanceof AoTDMarketDemandData && canonicalStructure) {
+            return false;
+        }
 
         ensureAoTDDemandData(market);
+        boolean commodityStructureChanged = !canonicalStructure;
 
         /*
          * Preserve already-converted AoTD commodities where possible.
@@ -567,27 +551,50 @@ public class AoTDEconomy extends Economy {
         for (CommodityOnMarket commodity : new ArrayList<>(commodities)) {
             if (commodity instanceof AoTDCommodityOnMarket aotdCommodity) {
                 byId.put(aotdCommodity.getId(), aotdCommodity);
+            } else {
+                commodityStructureChanged = true;
             }
         }
 
-        for (CommoditySpecAPI spec : Global.getSettings().getAllCommoditySpecs()) {
+        for (CommoditySpecAPI spec : specs) {
             AoTDCommodityOnMarket commodity = byId.get(spec.getId());
 
             if (commodity == null) {
-                commodity = new AoTDCommodityOnMarket(market, spec.getId());
-                commodity.getSupplyDemandData();
+                commodity =
+                        refreshNewData
+                                ? new AoTDCommodityOnMarket(market, spec.getId())
+                                : AoTDCommodityOnMarket.createUnprepared(market, spec.getId());
                 byId.put(spec.getId(), commodity);
+                commodityStructureChanged = true;
+            } else if (!refreshNewData) {
+                commodity.getSupplyDemandDataWithoutRefresh();
             }
         }
 
         commodities.clear();
 
-        for (CommoditySpecAPI spec : Global.getSettings().getAllCommoditySpecs()) {
+        for (CommoditySpecAPI spec : specs) {
             commodities.add(byId.get(spec.getId()));
         }
 
         rebuildCommodityLookupMaps(market, commodities);
         market.getAllCommodities();
+        return commodityStructureChanged;
+    }
+
+    private static boolean hasCanonicalCommodityStructure(
+            List<CommodityOnMarket> commodities, List<CommoditySpecAPI> specs) {
+        if (commodities.size() != specs.size()) return false;
+        for (int i = 0; i < specs.size(); i++) {
+            CommodityOnMarket commodity = commodities.get(i);
+            CommoditySpecAPI spec = specs.get(i);
+            if (!(commodity instanceof AoTDCommodityOnMarket)
+                    || spec == null
+                    || !Objects.equals(commodity.getId(), spec.getId())) {
+                return false;
+            }
+        }
+        return true;
     }
 
     public static void initCommodities(Market market) {

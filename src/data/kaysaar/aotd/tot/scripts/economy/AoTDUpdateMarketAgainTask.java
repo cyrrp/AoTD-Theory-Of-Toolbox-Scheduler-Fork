@@ -8,6 +8,7 @@ import com.fs.starfarer.campaign.econ.Economy;
 import com.fs.starfarer.campaign.econ.reach.UpdateMarketsAgainTask;
 import data.kaysaar.aotd.tot.compat.MarketRegistry;
 import data.kaysaar.aotd.tot.scripts.commoditydata.AoTDCommodityOnMarket;
+import data.kaysaar.aotd.tot.scripts.commoditydata.AoTDSupplyDemandData;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -112,7 +113,7 @@ public class AoTDUpdateMarketAgainTask extends UpdateMarketsAgainTask {
             }
         }
 
-        int reconciled = 0;
+        ArrayList<String> reconciledIndustryIds = new ArrayList<>();
         for (Industry industry : industries) {
             String industryId = industry.getId();
             if (!data.needsReconciliation(industryId)) continue;
@@ -127,21 +128,37 @@ public class AoTDUpdateMarketAgainTask extends UpdateMarketsAgainTask {
                     AoTDEconomySemanticBaseline.operation("industry.restore-active", market);
                     restoreIndustry(industry);
                 }
-                data.markReconciled(industryId);
-                reconciled++;
+                reconciledIndustryIds.add(industryId);
             }
         }
 
-        if (conditionsReapplied || reconciled > 0 || desiredStateChanged) {
-            refreshAuthoritativeSupplyDemand(market);
+        boolean authoritativeRefreshReady = true;
+        if (conditionsReapplied || !reconciledIndustryIds.isEmpty() || desiredStateChanged) {
+            authoritativeRefreshReady = refreshAuthoritativeSupplyDemand(market);
         } else {
             AoTDEconomySemanticBaseline.operation(
                     "update-market-again.reconciliation-skipped-unchanged", market);
         }
 
+        // Applying/unapplying industries and publishing supply/demand are one logical market
+        // transition. Keep desired transitions pending when BaseIndustry maps are temporarily not
+        // ready so the next scheduler pass repeats the idempotent materialization and snapshot.
+        if (authoritativeRefreshReady) {
+            for (String industryId : reconciledIndustryIds) {
+                data.markReconciled(industryId);
+            }
+        }
+
         long elapsed = Math.max(0L, System.nanoTime() - started);
-        if (materializedRefresh || conditionsReapplied || desiredStateChanged || reconciled > 0) {
+        if (authoritativeRefreshReady
+                && (materializedRefresh
+                        || conditionsReapplied
+                        || desiredStateChanged
+                        || !reconciledIndustryIds.isEmpty())) {
             MarketRegistry.commitMaterializedState(market, elapsed);
+        } else if (!authoritativeRefreshReady) {
+            AoTDEconomySemanticBaseline.operation(
+                    "update-market-again.materialized-not-ready", market);
         }
 
         // Trade inputs are captured only after ImmigrationTask. Publishing here
@@ -150,17 +167,56 @@ public class AoTDUpdateMarketAgainTask extends UpdateMarketsAgainTask {
                 "update-market-again.trade-snapshot-deferred-post-immigration", market);
     }
 
-    private static void refreshAuthoritativeSupplyDemand(MarketAPI market) {
+    private static boolean refreshAuthoritativeSupplyDemand(MarketAPI market) {
         try (AoTDEconomySemanticBaseline.Scope ignored =
                 AoTDEconomySemanticBaseline.begin(
                         "update-market-again.authoritative-supply-demand",
                         market,
                         "transition-refresh")) {
+            ArrayList<AoTDSupplyDemandData> owners = new ArrayList<>();
+            ArrayList<AoTDSupplyDemandData.PreparedRefresh> prepared = new ArrayList<>();
             for (CommodityOnMarketAPI commodity : new ArrayList<>(market.getAllCommodities())) {
                 if (commodity instanceof AoTDCommodityOnMarket aotdCommodity) {
-                    aotdCommodity.getSupplyDemandData().updateSupplyDemandData(market, true);
+                    AoTDSupplyDemandData owner = aotdCommodity.getSupplyDemandDataWithoutRefresh();
+                    AoTDSupplyDemandData.PreparedRefresh refresh;
+                    try {
+                        refresh = owner.prepareSupplyDemandData(market, true);
+                    } catch (RuntimeException failure) {
+                        discardPrepared(owners, prepared);
+                        Global.getLogger(AoTDUpdateMarketAgainTask.class)
+                                .error(
+                                        "AoTD transition supply/demand refresh failed for market "
+                                                + market.getId()
+                                                + "; preserving the previous committed market revision.",
+                                        failure);
+                        MarketRegistry.quarantineMarket(
+                                market, "transition-supply-demand:" + failure.getClass().getName());
+                        return false;
+                    }
+                    if (refresh.isNotReady()) {
+                        discardPrepared(owners, prepared);
+                        return false;
+                    }
+                    owners.add(owner);
+                    prepared.add(refresh);
                 }
             }
+
+            for (int i = 0; i < prepared.size(); i++) {
+                owners.get(i).commitPreparedRefresh(prepared.get(i));
+            }
+            for (int i = 0; i < prepared.size(); i++) {
+                owners.get(i).finishPreparedRefresh(prepared.get(i));
+            }
+            return true;
+        }
+    }
+
+    private static void discardPrepared(
+            List<AoTDSupplyDemandData> owners,
+            List<AoTDSupplyDemandData.PreparedRefresh> prepared) {
+        for (int i = 0; i < prepared.size(); i++) {
+            owners.get(i).discardPreparedRefresh(prepared.get(i));
         }
     }
 

@@ -4,6 +4,21 @@ All notable changes to the Scheduler Fork are documented here.
 
 ## Unreleased
 
+## 1.0.14-spp10 - 2026-08-10
+
+- Requires StarsectorPrepatcher 0.18.0 and continues to require AshLib 2.2.3.
+- Stopped refreshing supply/demand while Starsector is still restoring industries. Prepatcher now
+  sends one completion signal after the complete economy restore/reapply pass; the fork coalesces
+  affected markets and lets its normal scheduler publish one atomic refresh per market.
+- Restored the upstream "not ready yet" behavior specifically for unavailable industry
+  supply/demand snapshots. This transient state keeps the previous committed revision without an
+  exception, ERROR storm, quarantine or false commit; calculation-script failures remain visible.
+- Removed serialized references to derived per-industry supply/demand stats while retaining the
+  last committed aggregates and gameplay modifiers, reducing stale save-state graphs and forcing a
+  clean scheduled rebuild after load.
+- Updated the exact compatibility contract to Scheduler Bridge V10, fork `1.0.14-spp10`, required
+  mask `0xbff` and complete declared mask `0xfff`.
+
 - Corrected the warehouse LPC icon lookup to use Starsector's
   `misc.cargoFighterChip` sprite instead of the nonexistent `ui.fighter_lpc` key.
 - Made Domain and Economy subsections truly lazy. Hidden warehouses, commodity tables, star-system
@@ -13,8 +28,6 @@ All notable changes to the Scheduler Fork are documented here.
   custom-entity sprites are skipped and logged once instead of aborting the whole Command UI.
 - Corrected reversed parent/child removal in star-system holdings and market-condition refreshes,
   and added safe fallback selection for stale remembered subsection names.
-- Kept Scheduler Bridge schema V9, capability masks and the exact `1.0.14-spp9` compatibility
-  contract unchanged; these UI-only changes add no protocol capability.
 
 ## 1.0.14-spp9 - 2026-08-04
 

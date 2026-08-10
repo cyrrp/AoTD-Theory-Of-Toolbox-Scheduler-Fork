@@ -4,7 +4,6 @@ import static data.kaysaar.aotd.tot.conditions.AoTDToolboxFoodProd.prodId;
 import static data.kaysaar.aotd.tot.scripts.economy.AoTDEconomy.pruneCommoditiesThatMightAppear;
 import static data.kaysaar.aotd.tot.scripts.economy.AoTDEconomy.runningPrePlayerEconomy;
 
-import com.fs.starfarer.api.Global;
 import com.fs.starfarer.api.campaign.econ.Industry;
 import com.fs.starfarer.api.campaign.econ.MarketConditionAPI;
 import com.fs.starfarer.api.impl.campaign.econ.BaseMarketConditionPlugin;
@@ -12,7 +11,6 @@ import com.fs.starfarer.api.impl.campaign.ids.Commodities;
 import com.fs.starfarer.campaign.econ.Market;
 import data.kaysaar.aotd.tot.compat.MarketRegistry;
 import data.kaysaar.aotd.tot.compat.SchedulerBridge;
-import data.kaysaar.aotd.tot.plugins.AoTDToolboxTheoryPlugin;
 import java.util.ArrayList;
 
 public class AoTDToolboxFoodProdCanceler extends BaseMarketConditionPlugin {
@@ -24,9 +22,7 @@ public class AoTDToolboxFoodProdCanceler extends BaseMarketConditionPlugin {
     @Override
     public void apply(String id) {
         boolean conditionOrderMutation = market.getConditions().get(0) != this.condition;
-        boolean commodityStructureMutation =
-                (Global.LOADING_SAVE && AoTDToolboxTheoryPlugin.afterSaveState)
-                        || runningPrePlayerEconomy;
+        boolean commodityStructureMutation = runningPrePlayerEconomy;
         if (!conditionOrderMutation && !commodityStructureMutation) {
             applyWithoutStructureBoundary(id);
             return;
@@ -65,8 +61,7 @@ public class AoTDToolboxFoodProdCanceler extends BaseMarketConditionPlugin {
             }
         }
 
-        if ((Global.LOADING_SAVE && AoTDToolboxTheoryPlugin.afterSaveState)
-                || runningPrePlayerEconomy) {
+        if (runningPrePlayerEconomy) {
             pruneCommoditiesThatMightAppear((Market) market);
         }
         for (Industry industry : market.getIndustries()) {

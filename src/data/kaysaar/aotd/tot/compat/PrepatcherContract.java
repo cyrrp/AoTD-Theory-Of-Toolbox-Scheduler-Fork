@@ -10,7 +10,7 @@ package data.kaysaar.aotd.tot.compat;
 public final class PrepatcherContract {
     public static final String MOD_ID = "aotd_theory_of_toolbox";
     public static final String MARKER_CLASS = "data.kaysaar.aotd.tot.compat.PrepatcherContract";
-    public static final String FORK_VERSION = "1.0.14-spp9";
+    public static final String FORK_VERSION = "1.0.14-spp10";
 
     /** Loader-safe javaagent patch and capability negotiation. */
     public static final long CAPABILITY_CONTRACT_HANDSHAKE = 1L;
@@ -45,6 +45,9 @@ public final class PrepatcherContract {
     /** Atomic UI mutation refresh and affected-commodity rebuild. */
     public static final long CAPABILITY_UI_MARKET_MUTATION_REFRESH = 1L << 10;
 
+    /** One callback after Starsector has completely restored and reapplied the economy. */
+    public static final long CAPABILITY_ECONOMY_RESTORE_COORDINATION = 1L << 11;
+
     /** Exact caller intents accepted by AoTDEconomy.dispatchPrepatcherUiEconomyStep. */
     public static final int UI_ECONOMY_ACTION_MARKET_OPEN = 1;
 
@@ -64,7 +67,8 @@ public final class PrepatcherContract {
                     | CAPABILITY_PURE_PRICE_OFFLOAD
                     | CAPABILITY_GLOBAL_PHASE_COORDINATION
                     | CAPABILITY_RUNTIME_EPOCH_COORDINATION
-                    | CAPABILITY_UI_ECONOMY_DISPATCH;
+                    | CAPABILITY_UI_ECONOMY_DISPATCH
+                    | CAPABILITY_ECONOMY_RESTORE_COORDINATION;
 
     public static final long DECLARED_CAPABILITIES =
             PRODUCTION_CAPABILITIES | CAPABILITY_UI_MARKET_MUTATION_REFRESH;

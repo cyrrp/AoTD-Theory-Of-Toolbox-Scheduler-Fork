@@ -1,5 +1,6 @@
 package data.kaysaar.aotd.tot.compat;
 
+import data.kaysaar.aotd.tot.scripts.economy.AoTDEconomyRestoreCoordinator;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
@@ -12,8 +13,8 @@ import java.util.function.Consumer;
  * is defined.
  */
 public final class SchedulerBridge {
-    public static final int BRIDGE_SCHEMA = 9;
-    public static final String BRIDGE_MARKER = "AOTD_SCHEDULER_BRIDGE_V9";
+    public static final int BRIDGE_SCHEMA = 10;
+    public static final String BRIDGE_MARKER = "AOTD_SCHEDULER_BRIDGE_V10";
 
     public static final int MUTATION_MARKET_MEMBERSHIP = 1;
     public static final int MUTATION_INDUSTRY_STRUCTURE = 1 << 1;
@@ -68,7 +69,16 @@ public final class SchedulerBridge {
                     acceptDeliveredMarket(market);
                 }
             };
+    private static final Runnable ECONOMY_RESTORE_COMPLETE_SIGNAL =
+            new Runnable() {
+                @Override
+                public void run() {
+                    economyRestoreCompleteSignals.incrementAndGet();
+                    AoTDEconomyRestoreCoordinator.signalRestoreComplete();
+                }
+            };
     private static final AtomicLong deliveredSignals = new AtomicLong();
+    private static final AtomicLong economyRestoreCompleteSignals = new AtomicLong();
     private static final AtomicLong deliveryListenerFailures = new AtomicLong();
     private static final AtomicLong runtimeCapabilityRefreshes = new AtomicLong();
     private static final AtomicLong runtimeCapabilityDowngrades = new AtomicLong();
@@ -135,6 +145,11 @@ public final class SchedulerBridge {
     /** Used only by the javaagent-generated contract registration call. */
     public static BiFunction<Object, Object, Object> deficitResolverFunction() {
         return DEFICIT_RESOLVER_SIGNAL;
+    }
+
+    /** Used only by the javaagent-generated contract registration call. */
+    public static Runnable economyRestoreCompleteSignal() {
+        return ECONOMY_RESTORE_COMPLETE_SIGNAL;
     }
 
     public static void setDeliveryListener(DeliveryListener listener) {
@@ -370,6 +385,10 @@ public final class SchedulerBridge {
         return deliveryListenerFailures.get();
     }
 
+    public static long getEconomyRestoreCompleteSignalCount() {
+        return economyRestoreCompleteSignals.get();
+    }
+
     public static long getLastDeliveredGeneration() {
         return lastDeliveredGeneration;
     }
@@ -405,6 +424,8 @@ public final class SchedulerBridge {
                 + runtimeCapabilityResynchronizationFailures.get()
                 + ", deliveredSignals="
                 + deliveredSignals.get()
+                + ", economyRestoreCompleteSignals="
+                + economyRestoreCompleteSignals.get()
                 + ", listenerFailures="
                 + deliveryListenerFailures.get()
                 + ", "
@@ -419,6 +440,7 @@ public final class SchedulerBridge {
         diagnostic = "not initialized";
         deliveryListener = null;
         deliveredSignals.set(0L);
+        economyRestoreCompleteSignals.set(0L);
         deliveryListenerFailures.set(0L);
         runtimeCapabilityRefreshes.set(0L);
         runtimeCapabilityDowngrades.set(0L);

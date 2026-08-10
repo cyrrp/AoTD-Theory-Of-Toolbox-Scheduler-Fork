@@ -40,6 +40,7 @@ import data.kaysaar.aotd.tot.scripts.coreui.IndustryTooltipPlacer;
 import data.kaysaar.aotd.tot.scripts.coreui.listeners.ColonyUIListener;
 import data.kaysaar.aotd.tot.scripts.coreui.listeners.MarketContextListenerInjector;
 import data.kaysaar.aotd.tot.scripts.economy.AoTDEconomy;
+import data.kaysaar.aotd.tot.scripts.economy.AoTDEconomyRestoreCoordinator;
 import data.kaysaar.aotd.tot.scripts.economy.AoTDEconomySemanticBaseline;
 import data.kaysaar.aotd.tot.scripts.economy.AoTDGlobalEconomyCoordinator;
 import data.kaysaar.aotd.tot.scripts.economy.AoTDIndustryData;
@@ -363,14 +364,22 @@ public class AoTDToolboxTheoryPlugin extends BaseModPlugin
     public void afterGameSave() {
         afterSaveState = true;
         AoTDEconomySemanticBaseline.flush("after-game-save");
-        AoTDWorkerManager.endSave();
+        try {
+            AoTDEconomyRestoreCoordinator.consumeAfterSave(AoTDEconomy.getInstance());
+        } finally {
+            AoTDWorkerManager.endSave();
+        }
     }
 
     @Override
     public void onGameSaveFailed() {
         afterSaveState = true;
         AoTDEconomySemanticBaseline.flush("game-save-failed");
-        AoTDWorkerManager.endSave();
+        try {
+            AoTDEconomyRestoreCoordinator.consumeAfterSaveFailure(AoTDEconomy.getInstance());
+        } finally {
+            AoTDWorkerManager.endSave();
+        }
     }
 
     @Override
@@ -390,7 +399,10 @@ public class AoTDToolboxTheoryPlugin extends BaseModPlugin
         AoTDEconomy economy = AoTDEconomy.getInstance();
         AoTDWorkerManager.beginCampaign(economy, newGame ? "new-game-load" : "save-load");
         AoTDEconomySemanticBaseline.initialize();
-        if (economy != null) economy.rebuildMarketRegistry();
+        if (economy != null) {
+            AoTDEconomyRestoreCoordinator.consumeOnGameLoad(economy);
+            economy.rebuildMarketRegistry();
+        }
         AoTDCommodityEconSpecManager.loadSpecs();
         if (newGame) {
             CommandTabMemoryManager.getInstance().setLastCheckedTab("domain");
