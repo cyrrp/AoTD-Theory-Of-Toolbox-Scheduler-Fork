@@ -4,14 +4,6 @@ All notable changes to the Scheduler Fork are documented here.
 
 ## Unreleased
 
-- Registry diagnostics now report the count plus total, maximum and latest nanoseconds spent
-  holding the global market-registry lock for atomic post-immigration trade publication attempts.
-- `signalRestoreComplete()` deliberately marks every economy market dirty after every save with
-  derived-economy, price, stockpile, accessibility, trade and global-revision work. Starsector
-  rebuilds every industry's supply and demand during save cleanup, so preserving correct derived
-  state requires one full scheduled economy recalculation; this is an explicit save-time
-  performance cost.
-
 ## 1.0.14-spp11 - 2026-08-10
 
 - Requires StarsectorPrepatcher 0.18.1 and continues to require AshLib 2.2.3. Scheduler Bridge V10
@@ -42,6 +34,20 @@ All notable changes to the Scheduler Fork are documented here.
   price/stockpile/accessibility/trade work. Month-end changes to AoTD's own pending-industry state
   explicitly invalidate the materialized domain, preserving reconciliation without making every
   ordinary price pass scan industries.
+- A failed `onGameLoad` path can no longer leave the runtime-task load guard active forever or
+  revive a stale serialized task graph. The fail-safe restart clears the graph and process-local
+  baseline, releases the guard in `finally`, and logs its own failure without replacing the primary
+  load exception.
+- Canonical commodity lists now rebuild their serialized lookup maps during restore, and invalid UI
+  sprites are rejected centrally by both dimensions while their runtime blacklist is retried after
+  campaign and dev-mode reloads.
+- Registry diagnostics now report the count plus total, maximum and latest nanoseconds spent
+  holding the global market-registry lock for atomic post-immigration trade publication attempts.
+- `signalRestoreComplete()` deliberately marks every economy market dirty after every save with
+  derived-economy, price, stockpile, accessibility, trade and global-revision work. Starsector
+  rebuilds every industry's supply and demand during save cleanup, so preserving correct derived
+  state requires one full scheduled economy recalculation; this is an explicit save-time
+  performance cost.
 
 ## 1.0.14-spp10 - 2026-08-10
 
