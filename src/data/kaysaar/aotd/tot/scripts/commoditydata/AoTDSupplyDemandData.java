@@ -43,7 +43,12 @@ public class AoTDSupplyDemandData {
     public MutableStatWithTempMods additionalImport = new MutableStatWithTempMods(0f);
     public MutableStatWithTempMods additionalExport = new MutableStatWithTempMods(0f);
 
+    /**
+     * Historical field name retained for compatibility with diagnostics. The value is the exact
+     * MarketRegistry materialized-input generation, not its general dirty queue generation.
+     */
     private transient long authoritativeDirtyGeneration = Long.MIN_VALUE;
+
     private transient LinkedHashMap<String, MutableStat> stagingDemandUnitsFromIndustries =
             new LinkedHashMap<>();
     private transient LinkedHashMap<String, MutableStat> stagingSupplyUnitsFromIndustries =
@@ -112,7 +117,7 @@ public class AoTDSupplyDemandData {
         if (market == null) {
             throw new IllegalArgumentException("market must not be null");
         }
-        long targetGeneration = MarketRegistry.getMarketDirtyGeneration(market);
+        long targetGeneration = MarketRegistry.getMarketMaterializedInputGeneration(market);
         if (!force && targetGeneration > 0L && targetGeneration == authoritativeDirtyGeneration) {
             AoTDEconomySemanticBaseline.operation("supply-demand.skipped-current", market);
             return PreparedRefresh.skipped(this, targetGeneration);
@@ -215,9 +220,8 @@ public class AoTDSupplyDemandData {
         supplyUnitsFromIndustries = prepared.supplyUnits;
         supply = prepared.nextSupply;
         demand = prepared.nextDemand;
-        if (prepared.targetGeneration > 0L) {
-            authoritativeDirtyGeneration = prepared.targetGeneration;
-        }
+        authoritativeDirtyGeneration =
+                prepared.targetGeneration > 0L ? prepared.targetGeneration : Long.MIN_VALUE;
 
         // Reuse the formerly authoritative maps as the next staging buffers.
         stagingDemandUnitsFromIndustries =
@@ -388,6 +392,18 @@ public class AoTDSupplyDemandData {
 
     public int getRawNetExport() {
         return getTotalRawUnitsFromSupply() - getTotalRawUnitsFromDemand();
+    }
+
+    /**
+     * Atomically returns the committed raw net for an exact materialized-input generation, or
+     * {@link Long#MIN_VALUE} when this object is stale. A long sentinel keeps the hot capture path
+     * allocation-free while representing every possible int result.
+     */
+    public synchronized long getRawNetExportForGeneration(long generation) {
+        if (generation <= 0L || authoritativeDirtyGeneration != generation) {
+            return Long.MIN_VALUE;
+        }
+        return (int) (supply - demand);
     }
 
     /**

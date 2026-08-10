@@ -3,6 +3,7 @@ package data.kaysaar.aotd.tot.scripts.trade.manager;
 import com.fs.starfarer.api.Global;
 import com.fs.starfarer.api.campaign.econ.CommodityOnMarketAPI;
 import com.fs.starfarer.api.campaign.econ.MarketAPI;
+import data.kaysaar.aotd.tot.compat.MarketRegistry;
 import data.kaysaar.aotd.tot.listeners.AoTDCoreUIListener;
 import data.kaysaar.aotd.tot.misc.AoTDToolboxMisc;
 import data.kaysaar.aotd.tot.scripts.commoditydata.AoTDCommodityOnMarket;
@@ -121,18 +122,38 @@ public class AoTDTradeManager {
     public PreparedSnapshot preparePostImmigrationSnapshot(MarketAPI market) {
         if (market == null) return PreparedSnapshot.failed(null, "null-market");
         AoTDMarketData candidate;
+        boolean usedCommittedNet;
+        AoTDMarketData.PostImmigrationFallbackReason fallbackReason;
+        boolean requiresMaterializedRefresh;
+        MarketRegistry.TradeCaptureProof proofBefore;
+        MarketRegistry.TradeCaptureProof proofAfter;
         try (AoTDEconomySemanticBaseline.Scope ignored =
                 AoTDEconomySemanticBaseline.begin(
                         "trade-manager.capture-post-immigration", market, "post-immigration")) {
-            candidate = AoTDMarketData.capturePostImmigration(market);
+            proofBefore = MarketRegistry.captureTradeInputProof(market);
+            AoTDMarketData.PostImmigrationCapture capture =
+                    AoTDMarketData.preparePostImmigrationCapture(market);
+            candidate = capture.data;
+            usedCommittedNet = capture.usedCommittedNet;
+            fallbackReason = capture.fallbackReason;
+            requiresMaterializedRefresh = capture.requiresMaterializedRefresh;
+            proofAfter = MarketRegistry.captureTradeInputProof(market);
         } catch (RuntimeException failure) {
             return PreparedSnapshot.failed(market.getId(), failure.toString());
         }
 
+        MarketRegistry.TradeCaptureProof tradeCaptureProof =
+                proofBefore != null
+                                && proofBefore.hasSameInputs(proofAfter)
+                                && proofMatchesCandidate(proofAfter, candidate)
+                        ? proofAfter
+                        : null;
+
         synchronized (this) {
             ensureTransientState();
-            String marketId = market.getId();
-            String nextFaction = market.getFactionId();
+            String marketId = candidate.marketId;
+            String nextFaction =
+                    tradeCaptureProof == null ? market.getFactionId() : tradeCaptureProof.factionId;
             if (marketId == null || nextFaction == null) {
                 return PreparedSnapshot.failed(marketId, "missing-market-or-faction-id");
             }
@@ -172,19 +193,57 @@ public class AoTDTradeManager {
                     expectedRevision,
                     candidate,
                     changed,
-                    reasonMask);
+                    reasonMask,
+                    usedCommittedNet,
+                    fallbackReason,
+                    requiresMaterializedRefresh,
+                    tradeCaptureProof);
         }
+    }
+
+    private static boolean proofMatchesCandidate(
+            MarketRegistry.TradeCaptureProof proof, AoTDMarketData candidate) {
+        if (proof == null
+                || candidate == null
+                || !sameNullable(proof.marketId, candidate.marketId)) {
+            return false;
+        }
+        float accessibility = Float.intBitsToFloat(proof.accessibilityBits);
+        return Float.floatToIntBits(candidate.weight) == Float.floatToIntBits(accessibility * 100f)
+                && Float.floatToIntBits(candidate.outsideWeight)
+                        == Float.floatToIntBits(Math.max(accessibility * 100f, 20f))
+                && candidate.internalTradeEligible == (proof.hasSpaceport && accessibility > 0f);
     }
 
     /**
      * Atomically validates and publishes a complete post-immigration snapshot batch. No market is
      * published if any prepared baseline became stale.
      */
-    public synchronized boolean commitPreparedSnapshots(List<PreparedSnapshot> prepared) {
-        ensureTransientState();
-        if (prepared == null || settlementOpen) return false;
+    public boolean commitPreparedSnapshots(List<PreparedSnapshot> prepared) {
+        if (prepared == null) return false;
+        ArrayList<MarketRegistry.TradeCaptureProof> proofs = new ArrayList<>(prepared.size());
         for (PreparedSnapshot item : prepared) {
             if (item == null || item.failed || item.candidate == null) return false;
+            proofs.add(item.tradeCaptureProof);
+        }
+        return MarketRegistry.publishIfTradeCaptureProofsCurrent(
+                proofs,
+                () -> {
+                    synchronized (AoTDTradeManager.this) {
+                        return publishPreparedSnapshotsLocked(prepared);
+                    }
+                });
+    }
+
+    /** Registry LOCK is already held by the caller; this method must not call MarketRegistry. */
+    private boolean publishPreparedSnapshotsLocked(List<PreparedSnapshot> prepared) {
+        ensureTransientState();
+        if (settlementOpen) return false;
+        LinkedHashSet<String> seenMarketIds = new LinkedHashSet<>();
+        ArrayList<PublicationRollback> rollback = new ArrayList<>();
+        LinkedHashSet<String> originallyMissingTargetFactions = new LinkedHashSet<>();
+        for (PreparedSnapshot item : prepared) {
+            if (!seenMarketIds.add(item.marketId)) return false;
             String currentFaction = marketFactionById.get(item.marketId);
             AoTDMarketData current = findPublishedSnapshotLocked(currentFaction, item.marketId);
             long currentRevision = current == null ? 0L : current.publicationRevision;
@@ -192,13 +251,69 @@ public class AoTDTradeManager {
                     || currentRevision != item.expectedPreviousRevision) {
                 return false;
             }
+            if (item.changed) {
+                rollback.add(
+                        new PublicationRollback(
+                                item,
+                                currentFaction,
+                                current,
+                                item.candidate.publicationRevision,
+                                item.committedPublicationRevision));
+                if (!factionsTradeData.containsKey(item.nextFaction)) {
+                    originallyMissingTargetFactions.add(item.nextFaction);
+                }
+            }
         }
-        for (PreparedSnapshot item : prepared) {
-            if (!item.changed) continue;
-            publishSnapshotLocked(item.nextFaction, item.candidate);
-            item.committedPublicationRevision = item.candidate.publicationRevision;
+        long previousPublicationRevision = localPublicationRevision;
+        try {
+            for (PreparedSnapshot item : prepared) {
+                if (!item.changed) continue;
+                publishSnapshotLocked(item.nextFaction, item.candidate);
+                item.committedPublicationRevision = item.candidate.publicationRevision;
+            }
+            return true;
+        } catch (Throwable failure) {
+            rollbackPreparedPublicationLocked(
+                    rollback, originallyMissingTargetFactions, previousPublicationRevision);
+            throw failure;
         }
-        return true;
+    }
+
+    private void rollbackPreparedPublicationLocked(
+            List<PublicationRollback> rollback,
+            LinkedHashSet<String> originallyMissingTargetFactions,
+            long previousPublicationRevision) {
+        for (PublicationRollback entry : rollback) {
+            String currentFaction = marketFactionById.remove(entry.item.marketId);
+            AoTDFactionTradeData currentData = factionsTradeData.get(currentFaction);
+            if (currentData != null) currentData.removeMarketSnapshot(entry.item.marketId);
+        }
+        for (PublicationRollback entry : rollback) {
+            if (entry.previousFaction != null) {
+                marketFactionById.put(entry.item.marketId, entry.previousFaction);
+                if (entry.previousSnapshot != null) {
+                    AoTDFactionTradeData previousData =
+                            factionsTradeData.get(entry.previousFaction);
+                    if (previousData != null)
+                        previousData.putMarketSnapshot(entry.previousSnapshot);
+                }
+            }
+            entry.item.candidate.publicationRevision = entry.previousCandidateRevision;
+            entry.item.committedPublicationRevision = entry.previousCommittedRevision;
+        }
+        for (String factionId : originallyMissingTargetFactions) {
+            AoTDFactionTradeData data = factionsTradeData.get(factionId);
+            if (data != null && data.getTradeData().isEmpty()) factionsTradeData.remove(factionId);
+        }
+        localPublicationRevision = previousPublicationRevision;
+    }
+
+    public boolean isPreparedSnapshotProofCurrent(PreparedSnapshot prepared) {
+        return prepared != null
+                && !prepared.failed
+                && prepared.candidate != null
+                && proofMatchesCandidate(prepared.tradeCaptureProof, prepared.candidate)
+                && MarketRegistry.isTradeCaptureProofCurrent(prepared.tradeCaptureProof);
     }
 
     /** Convenience compatibility wrapper for non-batched callers. */
@@ -417,6 +532,10 @@ public class AoTDTradeManager {
         public final int reasonMask;
         public final long fingerprint;
         public final String failure;
+        public final boolean usedCommittedNet;
+        public final AoTDMarketData.PostImmigrationFallbackReason fallbackReason;
+        public final boolean requiresMaterializedRefresh;
+        public final transient MarketRegistry.TradeCaptureProof tradeCaptureProof;
         private final String expectedPreviousFaction;
         private final long expectedPreviousRevision;
         private final AoTDMarketData candidate;
@@ -431,7 +550,11 @@ public class AoTDTradeManager {
                 boolean changed,
                 boolean failed,
                 int reasonMask,
-                String failure) {
+                String failure,
+                boolean usedCommittedNet,
+                AoTDMarketData.PostImmigrationFallbackReason fallbackReason,
+                boolean requiresMaterializedRefresh,
+                MarketRegistry.TradeCaptureProof tradeCaptureProof) {
             this.marketId = marketId;
             this.nextFaction = nextFaction;
             this.expectedPreviousFaction = expectedPreviousFaction;
@@ -442,6 +565,10 @@ public class AoTDTradeManager {
             this.reasonMask = reasonMask;
             this.fingerprint = candidate == null ? 0L : candidate.tradeFingerprint;
             this.failure = failure;
+            this.usedCommittedNet = usedCommittedNet;
+            this.fallbackReason = fallbackReason;
+            this.requiresMaterializedRefresh = requiresMaterializedRefresh;
+            this.tradeCaptureProof = tradeCaptureProof;
         }
 
         private static PreparedSnapshot ready(
@@ -451,7 +578,11 @@ public class AoTDTradeManager {
                 long expectedPreviousRevision,
                 AoTDMarketData candidate,
                 boolean changed,
-                int reasonMask) {
+                int reasonMask,
+                boolean usedCommittedNet,
+                AoTDMarketData.PostImmigrationFallbackReason fallbackReason,
+                boolean requiresMaterializedRefresh,
+                MarketRegistry.TradeCaptureProof tradeCaptureProof) {
             return new PreparedSnapshot(
                     marketId,
                     nextFaction,
@@ -461,11 +592,28 @@ public class AoTDTradeManager {
                     changed,
                     false,
                     reasonMask,
-                    null);
+                    null,
+                    usedCommittedNet,
+                    fallbackReason,
+                    requiresMaterializedRefresh,
+                    tradeCaptureProof);
         }
 
         private static PreparedSnapshot failed(String marketId, String failure) {
-            return new PreparedSnapshot(marketId, null, null, 0L, null, false, true, 0, failure);
+            return new PreparedSnapshot(
+                    marketId,
+                    null,
+                    null,
+                    0L,
+                    null,
+                    false,
+                    true,
+                    0,
+                    failure,
+                    false,
+                    AoTDMarketData.PostImmigrationFallbackReason.NONE,
+                    false,
+                    null);
         }
 
         public long getPublicationRevisionAfterCommit() {
@@ -570,6 +718,27 @@ public class AoTDTradeManager {
             this.campaignEpoch = epochStamp.campaignEpoch;
             this.economyEpoch = epochStamp.economyEpoch;
             this.batchRevision = epochStamp.batchRevision;
+        }
+    }
+
+    private static final class PublicationRollback {
+        final PreparedSnapshot item;
+        final String previousFaction;
+        final AoTDMarketData previousSnapshot;
+        final long previousCandidateRevision;
+        final long previousCommittedRevision;
+
+        PublicationRollback(
+                PreparedSnapshot item,
+                String previousFaction,
+                AoTDMarketData previousSnapshot,
+                long previousCandidateRevision,
+                long previousCommittedRevision) {
+            this.item = item;
+            this.previousFaction = previousFaction;
+            this.previousSnapshot = previousSnapshot;
+            this.previousCandidateRevision = previousCandidateRevision;
+            this.previousCommittedRevision = previousCommittedRevision;
         }
     }
 }

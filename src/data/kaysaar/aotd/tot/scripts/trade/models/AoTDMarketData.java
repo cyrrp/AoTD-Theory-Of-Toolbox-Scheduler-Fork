@@ -3,7 +3,11 @@ package data.kaysaar.aotd.tot.scripts.trade.models;
 
 import com.fs.starfarer.api.campaign.econ.CommodityOnMarketAPI;
 import com.fs.starfarer.api.campaign.econ.MarketAPI;
+import data.kaysaar.aotd.tot.compat.MarketRegistry;
+import data.kaysaar.aotd.tot.compat.PrepatcherContract;
+import data.kaysaar.aotd.tot.compat.SchedulerBridge;
 import data.kaysaar.aotd.tot.scripts.commoditydata.AoTDCommodityOnMarket;
+import data.kaysaar.aotd.tot.scripts.commoditydata.AoTDSupplyDemandData;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -94,17 +98,102 @@ public class AoTDMarketData {
     }
 
     /**
-     * Captures trade inputs after ImmigrationTask directly from current live industry stats. The
-     * method does not publish or mutate supply/demand data.
+     * Captures exact trade inputs after ImmigrationTask. A current market-atomic aggregate may be
+     * reused; otherwise all commodity nets come from current live industry stats. The method does
+     * not publish or mutate authoritative supply/demand aggregates. A missing empty holder may be
+     * created so the live fallback still performs only one industry scan.
      */
     public static AoTDMarketData capturePostImmigration(MarketAPI market) {
+        return preparePostImmigrationCapture(market).data;
+    }
+
+    /**
+     * Reuses the market-atomic aggregate revision when immigration did not change the market size
+     * or advance its materialized-input generation. If the registry cannot prove that every
+     * commodity is current, the complete market falls back to the original live calculation;
+     * committed and live values are never mixed.
+     */
+    public static PostImmigrationCapture preparePostImmigrationCapture(MarketAPI market) {
+        List<CommodityOnMarketAPI> commodities = market.getAllCommodities();
+        if (MarketRegistry.getRegistryLifecycle() != MarketRegistry.RegistryLifecycle.READY) {
+            return captureLive(
+                    market, commodities, PostImmigrationFallbackReason.REGISTRY_NOT_READY);
+        }
+        if (!SchedulerBridge.hasCapability(PrepatcherContract.CAPABILITY_MARKET_GENERATIONS)
+                || !SchedulerBridge.hasCapability(
+                        PrepatcherContract.CAPABILITY_AUTHORITATIVE_MARKET_STATE)) {
+            return captureLive(
+                    market, commodities, PostImmigrationFallbackReason.CAPABILITY_UNAVAILABLE);
+        }
+
+        long generation = MarketRegistry.getMarketMaterializedInputGeneration(market);
+        if (generation <= 0L) {
+            return captureLive(
+                    market, commodities, PostImmigrationFallbackReason.GENERATION_UNAVAILABLE);
+        }
+        int marketSize = market.getSize();
+        if (!MarketRegistry.matchesMaterializedCheckpoint(market, generation, marketSize)) {
+            return captureLive(
+                    market,
+                    commodities,
+                    PostImmigrationFallbackReason.MATERIALIZED_CHECKPOINT_MISMATCH);
+        }
+
         LinkedHashMap<String, Integer> netProduction = new LinkedHashMap<>();
-        for (CommodityOnMarketAPI commodity : market.getAllCommodities()) {
+        for (CommodityOnMarketAPI commodity : commodities) {
             if (!(commodity instanceof AoTDCommodityOnMarket aotdCommodity)) continue;
-            int net = aotdCommodity.getSupplyDemandData().computeRawNetForTradeSnapshot(market);
+            AoTDSupplyDemandData data = aotdCommodity.peekSupplyDemandData();
+            if (data == null) {
+                return captureLive(
+                        market, commodities, PostImmigrationFallbackReason.COMMODITY_STATE_MISSING);
+            }
+            long capturedNet = data.getRawNetExportForGeneration(generation);
+            if (capturedNet == Long.MIN_VALUE) {
+                return captureLive(
+                        market,
+                        commodities,
+                        PostImmigrationFallbackReason.COMMODITY_GENERATION_MISMATCH);
+            }
+            int net = (int) capturedNet;
             if (net != 0) netProduction.put(aotdCommodity.getId(), net);
         }
-        return new AoTDMarketData(market, netProduction);
+
+        AoTDMarketData candidate = new AoTDMarketData(market, netProduction);
+        // Retain an exact end check after every market getter so a future callback cannot
+        // accidentally admit a mixed generation or market shape.
+        if (MarketRegistry.getRegistryLifecycle() != MarketRegistry.RegistryLifecycle.READY
+                || MarketRegistry.getMarketMaterializedInputGeneration(market) != generation
+                || market.getSize() != marketSize) {
+            return captureLive(
+                    market,
+                    commodities,
+                    PostImmigrationFallbackReason.PROOF_CHANGED_DURING_CAPTURE);
+        }
+        return new PostImmigrationCapture(candidate, true, PostImmigrationFallbackReason.NONE);
+    }
+
+    private static PostImmigrationCapture captureLive(
+            MarketAPI market,
+            List<CommodityOnMarketAPI> commodities,
+            PostImmigrationFallbackReason reason) {
+        return new PostImmigrationCapture(
+                new AoTDMarketData(market, captureLiveNetProduction(market, commodities)),
+                false,
+                reason);
+    }
+
+    private static LinkedHashMap<String, Integer> captureLiveNetProduction(
+            MarketAPI market, List<CommodityOnMarketAPI> commodities) {
+        LinkedHashMap<String, Integer> netProduction = new LinkedHashMap<>();
+        for (CommodityOnMarketAPI commodity : commodities) {
+            if (!(commodity instanceof AoTDCommodityOnMarket aotdCommodity)) continue;
+            int net =
+                    aotdCommodity
+                            .getSupplyDemandDataWithoutRefresh()
+                            .computeRawNetForTradeSnapshot(market);
+            if (net != 0) netProduction.put(aotdCommodity.getId(), net);
+        }
+        return netProduction;
     }
 
     private static LinkedHashMap<String, Integer> captureCommittedNetProduction(MarketAPI market) {
@@ -116,6 +205,40 @@ public class AoTDMarketData {
             }
         }
         return result;
+    }
+
+    public enum PostImmigrationFallbackReason {
+        NONE(false),
+        REGISTRY_NOT_READY(false),
+        CAPABILITY_UNAVAILABLE(false),
+        GENERATION_UNAVAILABLE(true),
+        MATERIALIZED_CHECKPOINT_MISMATCH(true),
+        COMMODITY_STATE_MISSING(true),
+        COMMODITY_GENERATION_MISMATCH(true),
+        PROOF_CHANGED_DURING_CAPTURE(true);
+
+        public final boolean requiresMaterializedRefresh;
+
+        PostImmigrationFallbackReason(boolean requiresMaterializedRefresh) {
+            this.requiresMaterializedRefresh = requiresMaterializedRefresh;
+        }
+    }
+
+    public static final class PostImmigrationCapture {
+        public final AoTDMarketData data;
+        public final boolean usedCommittedNet;
+        public final PostImmigrationFallbackReason fallbackReason;
+        public final boolean requiresMaterializedRefresh;
+
+        private PostImmigrationCapture(
+                AoTDMarketData data,
+                boolean usedCommittedNet,
+                PostImmigrationFallbackReason fallbackReason) {
+            this.data = data;
+            this.usedCommittedNet = usedCommittedNet;
+            this.fallbackReason = fallbackReason;
+            this.requiresMaterializedRefresh = fallbackReason.requiresMaterializedRefresh;
+        }
     }
 
     /** Exact comparison; the hash is diagnostic only and never the sole correctness gate. */

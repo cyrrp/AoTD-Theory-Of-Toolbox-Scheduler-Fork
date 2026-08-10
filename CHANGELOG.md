@@ -4,6 +4,37 @@ All notable changes to the Scheduler Fork are documented here.
 
 ## Unreleased
 
+## 1.0.14-spp11 - 2026-08-10
+
+- Requires StarsectorPrepatcher 0.18.1 and continues to require AshLib 2.2.3. Scheduler Bridge V10
+  and its required/declared capability masks remain `0xbff`/`0xfff`.
+- New saves no longer contain the live `ReachEconomyStepper.tasks` object graph, worker DTOs,
+  futures, boundary handles or process-local timing origins. The fork stores only the interrupted
+  stage and stable IDs of markets still awaiting that stage. Loading and both save outcomes now
+  discard the invalid process-local graph and lazily construct the same safe semantic suffix.
+- An interrupted main price pass records whether no market was committed, an exact ordered set of
+  markets remains, or only listener notification remains. It rebuilds transient global commodity
+  data from every market but applies price/stockpile results only to the unattempted set, so neither
+  completed work nor monthly mutations run twice. Completed Update/Immigration markets are also
+  excluded, a partial trade snapshot is recaptured atomically, open cuts/tickets are released, and
+  calendar/month-end cadence is preserved. Old spp10 task graphs use a conservative migration path.
+- Post-immigration trade capture now reuses the already committed supply/demand aggregate without
+  rescanning industries when the registry is ready and the dedicated materialized-input generation
+  plus market-size proofs match. Trade, accessibility and faction-only changes do not invalidate
+  this proof. Market growth, stale/mixed generations or missing proof use one whole-market live
+  calculation, then coalesce one normal materialized refresh so the fast path recovers instead of
+  remaining permanently disabled; committed and live revisions are never mixed.
+- Multi-frame trade batches now carry an exact runtime proof for market identity, trade-input
+  revision, size, faction, accessibility and spaceport eligibility. Inputs that change while a
+  batch is being prepared are recaptured once before the atomic publication; a later mismatch
+  retains the previous complete cut and leaves all affected registry work queued for retry.
+- Empty-registry load passes now defer their guaranteed-failing per-market registry commits with
+  one lifecycle check while retaining the atomic trade-manager publication.
+- UpdateMarketAgain now skips industry traversal when a market owes only downstream
+  price/stockpile/accessibility/trade work. Month-end changes to AoTD's own pending-industry state
+  explicitly invalidate the materialized domain, preserving reconciliation without making every
+  ordinary price pass scan industries.
+
 ## 1.0.14-spp10 - 2026-08-10
 
 - Requires StarsectorPrepatcher 0.18.0 and continues to require AshLib 2.2.3.

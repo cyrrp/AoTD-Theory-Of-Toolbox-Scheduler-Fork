@@ -1,6 +1,6 @@
 $ErrorActionPreference = "Stop"
 
-$releaseLabel = "1.0.14-spp10"
+$releaseLabel = "1.0.14-spp11"
 $packageDirectoryName = "AoTD-Theory-Of-Toolbox-Scheduler-Fork"
 $repositoryRoot = [IO.Path]::GetFullPath($PSScriptRoot)
 $releaseDirectory = Join-Path $repositoryRoot "releases"
@@ -25,8 +25,8 @@ if ($ashlibDependency.Count -ne 1 -or $ashlibDependency[0].version -cne '2.2.3')
     throw "The Domain UI hotfix requires exactly one AshLib dependency at minimum version 2.2.3."
 }
 $prepatcherDependency = @($modInfo.dependencies | Where-Object { $_.id -ceq 'starsector_prepatcher' })
-if ($prepatcherDependency.Count -ne 1 -or $prepatcherDependency[0].version -cne '0.18.0') {
-    throw "Scheduler Fork 1.0.14-spp10 requires exactly one Prepatcher dependency at version 0.18.0."
+if ($prepatcherDependency.Count -ne 1 -or $prepatcherDependency[0].version -cne '0.18.1') {
+    throw "Scheduler Fork 1.0.14-spp11 requires exactly one Prepatcher dependency at version 0.18.1."
 }
 if ($updateInfo.directDownloadURL -notlike "*/$archiveName") {
     throw "Fork update URL does not end in the canonical archive name: $archiveName"
@@ -95,11 +95,16 @@ $requiredJarEntries = @(
     'data/kaysaar/aotd/tot/ui/warehouses/WarehouseSectionUI.class',
     'data/kaysaar/aotd/tot/ui/warehouses/components/WarehouseCustomButton.class',
     'data/kaysaar/aotd/tot/scripts/economy/AoTDEconomyRestoreCoordinator.class',
+    'data/kaysaar/aotd/tot/scripts/economy/AoTDEconomyReachStepper$RuntimeTaskRestartReport.class',
+    'data/kaysaar/aotd/tot/scripts/economy/AoTdMainWorkTask2$RuntimeRestartMode.class',
+    'data/kaysaar/aotd/tot/scripts/economy/AoTDPostImmigrationTradeSnapshotTask.class',
+    'data/kaysaar/aotd/tot/compat/MarketRegistry$TradeCaptureProof.class',
+    'data/kaysaar/aotd/tot/scripts/trade/models/AoTDMarketData$PostImmigrationCapture.class',
     'data/kaysaar/aotd/tot/scripts/commoditydata/AoTDSupplyDemandData$PreparedRefresh$Status.class'
 )
 $requiredJarSymbols = @{
     'data/kaysaar/aotd/tot/compat/PrepatcherContract.class' = @(
-        '1.0.14-spp10',
+        '1.0.14-spp11',
         'CAPABILITY_ECONOMY_RESTORE_COORDINATION'
     )
     'data/kaysaar/aotd/tot/compat/SchedulerBridge.class' = @(
@@ -112,8 +117,54 @@ $requiredJarSymbols = @{
     )
     'data/kaysaar/aotd/tot/scripts/commoditydata/AoTDSupplyDemandData.class' = @(
         'discardDerivedIndustrySnapshot',
+        'getRawNetExportForGeneration',
         'writeReplace',
         'readResolve'
+    )
+    'data/kaysaar/aotd/tot/scripts/economy/AoTDEconomyReachStepper.class' = @(
+        'suspendRuntimeTasksForSave',
+        'resumeRuntimeTasksAfterSave',
+        'restartRuntimeTasksAfterLoad',
+        'runtimeRestartMarketIds',
+        'runtimeRestartMainMode',
+        'resume-semantic-restart',
+        'resume-discard',
+        'endBaselineForTaskGraphDiscard'
+    )
+    'data/kaysaar/aotd/tot/scripts/economy/AoTdMainWorkTask2.class' = @(
+        'forRuntimePriceRemaining',
+        'forRuntimeListenersOnly',
+        'discardUnattemptedRuntimeWorkAfterSave',
+        'runtimeGlobalDataMarkets'
+    )
+    'data/kaysaar/aotd/tot/scripts/economy/AoTDFinishEconomyUpdateTask.class' = @(
+        'discardRuntimeStateAfterSave',
+        'internal-trade.save-invalidated-task-dropped'
+    )
+    'data/kaysaar/aotd/tot/compat/MarketRegistry.class' = @(
+        'getMarketMaterializedInputGeneration',
+        'captureTradeInputProof',
+        'publishIfTradeCaptureProofsCurrent',
+        'recordMaterializedCheckpoint',
+        'matchesMaterializedCheckpoint',
+        'commitMaterializedStateDetailed',
+        'commitTradeSnapshotDetailed'
+    )
+    'data/kaysaar/aotd/tot/scripts/economy/AoTDPostImmigrationTradeSnapshotTask.class' = @(
+        'discardRuntimeStateAfterSave',
+        'materializedRefreshRequired',
+        'staleProofRecaptures',
+        'staleProofCommitRejections'
+    )
+    'data/kaysaar/aotd/tot/scripts/trade/manager/AoTDTradeManager.class' = @(
+        'preparePostImmigrationSnapshot',
+        'commitPreparedSnapshots',
+        'isPreparedSnapshotProofCurrent'
+    )
+    'data/kaysaar/aotd/tot/scripts/trade/models/AoTDMarketData.class' = @(
+        'preparePostImmigrationCapture',
+        'getRawNetExportForGeneration',
+        'getSupplyDemandDataWithoutRefresh'
     )
     'data/kaysaar/aotd/tot/ui/LazyUIPanel.class' = @(
         'java/util/function/Supplier',

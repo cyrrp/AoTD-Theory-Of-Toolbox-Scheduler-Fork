@@ -162,17 +162,38 @@ public class AoTDFinishEconomyUpdateTask extends FinishEconomyUpdateTask {
     }
 
     private void discardStaleEpochTask() {
+        discardRuntimeState("internal-trade.stale-epoch-task-dropped");
+    }
+
+    /** Releases an open cut and worker graph invalidated by save cleanup/restore. */
+    void discardRuntimeStateAfterSave() {
+        discardRuntimeState("internal-trade.save-invalidated-task-dropped");
+    }
+
+    private void discardRuntimeState(String operation) {
+        ensureRuntimeCollections();
+        RuntimeException firstFailure = null;
         for (Future<?> future : futures) {
-            if (future != null) future.cancel(true);
+            try {
+                if (future != null) future.cancel(true);
+            } catch (RuntimeException cleanupFailure) {
+                if (firstFailure == null) firstFailure = cleanupFailure;
+            }
         }
         futures.clear();
         if (boundary != null) {
-            boundary.close();
-            boundary = null;
+            try {
+                boundary.close();
+            } catch (RuntimeException cleanupFailure) {
+                if (firstFailure == null) firstFailure = cleanupFailure;
+            } finally {
+                boundary = null;
+            }
         }
         batch = null;
         done = true;
-        AoTDEconomySemanticBaseline.operation("internal-trade.stale-epoch-task-dropped", 1L);
+        AoTDEconomySemanticBaseline.operation(operation, 1L);
+        if (firstFailure != null) throw firstFailure;
     }
 
     private void refreshPlayerContractPredictionsOnMainThread() {

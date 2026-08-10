@@ -40,10 +40,12 @@ import data.kaysaar.aotd.tot.scripts.coreui.IndustryTooltipPlacer;
 import data.kaysaar.aotd.tot.scripts.coreui.listeners.ColonyUIListener;
 import data.kaysaar.aotd.tot.scripts.coreui.listeners.MarketContextListenerInjector;
 import data.kaysaar.aotd.tot.scripts.economy.AoTDEconomy;
+import data.kaysaar.aotd.tot.scripts.economy.AoTDEconomyReachStepper;
 import data.kaysaar.aotd.tot.scripts.economy.AoTDEconomyRestoreCoordinator;
 import data.kaysaar.aotd.tot.scripts.economy.AoTDEconomySemanticBaseline;
 import data.kaysaar.aotd.tot.scripts.economy.AoTDGlobalEconomyCoordinator;
 import data.kaysaar.aotd.tot.scripts.economy.AoTDIndustryData;
+import data.kaysaar.aotd.tot.scripts.economy.AoTDRuntimeEpoch;
 import data.kaysaar.aotd.tot.scripts.economy.AoTDWorkerManager;
 import data.kaysaar.aotd.tot.scripts.submarket.aotd.AoTDBlackMarketPlugin;
 import data.kaysaar.aotd.tot.scripts.submarket.aotd.AoTDLocalResourcesSubmarketPlugin;
@@ -357,6 +359,8 @@ public class AoTDToolboxTheoryPlugin extends BaseModPlugin
         AoTDWorkerManager.beginSaveAndWait();
         AoTDGlobalEconomyCoordinator.flushDeliveredTimeForBoundary(
                 AoTDGlobalEconomyCoordinator.BOUNDARY_SAVE);
+        AoTDEconomyReachStepper stepper = currentEconomyStepper();
+        if (stepper != null) stepper.suspendRuntimeTasksForSave();
         super.beforeGameSave();
     }
 
@@ -367,7 +371,12 @@ public class AoTDToolboxTheoryPlugin extends BaseModPlugin
         try {
             AoTDEconomyRestoreCoordinator.consumeAfterSave(AoTDEconomy.getInstance());
         } finally {
-            AoTDWorkerManager.endSave();
+            try {
+                AoTDEconomyReachStepper stepper = currentEconomyStepper();
+                if (stepper != null) stepper.resumeRuntimeTasksAfterSave();
+            } finally {
+                AoTDWorkerManager.endSave();
+            }
         }
     }
 
@@ -378,8 +387,20 @@ public class AoTDToolboxTheoryPlugin extends BaseModPlugin
         try {
             AoTDEconomyRestoreCoordinator.consumeAfterSaveFailure(AoTDEconomy.getInstance());
         } finally {
-            AoTDWorkerManager.endSave();
+            try {
+                AoTDEconomyReachStepper stepper = currentEconomyStepper();
+                if (stepper != null) stepper.resumeRuntimeTasksAfterSave();
+            } finally {
+                AoTDWorkerManager.endSave();
+            }
         }
+    }
+
+    private static AoTDEconomyReachStepper currentEconomyStepper() {
+        AoTDEconomy economy = AoTDEconomy.getInstance();
+        if (economy == null || !(economy.getStepper() instanceof AoTDEconomyReachStepper stepper))
+            return null;
+        return stepper;
     }
 
     @Override
@@ -397,9 +418,15 @@ public class AoTDToolboxTheoryPlugin extends BaseModPlugin
     public void onGameLoad(boolean newGame) {
         AoTDCoreUIListener.resetCampaignState();
         AoTDEconomy economy = AoTDEconomy.getInstance();
-        AoTDWorkerManager.beginCampaign(economy, newGame ? "new-game-load" : "save-load");
+        AoTDRuntimeEpoch.EpochSnapshot runtimeEpoch =
+                AoTDWorkerManager.beginCampaign(economy, newGame ? "new-game-load" : "save-load");
         AoTDEconomySemanticBaseline.initialize();
         if (economy != null) {
+            if (!newGame && economy.getStepper() instanceof AoTDEconomyReachStepper stepper) {
+                AoTDEconomyReachStepper.RuntimeTaskRestartReport report =
+                        stepper.restartRuntimeTasksAfterLoad(runtimeEpoch);
+                log.info("AoTD restored economy runtime tasks: " + report.summary());
+            }
             AoTDEconomyRestoreCoordinator.consumeOnGameLoad(economy);
             economy.rebuildMarketRegistry();
         }

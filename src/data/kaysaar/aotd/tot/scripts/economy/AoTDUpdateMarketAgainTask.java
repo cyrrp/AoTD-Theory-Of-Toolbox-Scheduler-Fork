@@ -42,6 +42,20 @@ public class AoTDUpdateMarketAgainTask extends UpdateMarketsAgainTask {
         this.singleMarket = singleMarket;
     }
 
+    AoTDUpdateMarketAgainTask(Economy economy, List<MarketAPI> markets) {
+        super(economy);
+        this.markets = new ArrayList<>(markets == null ? List.of() : markets);
+        this.singleMarket = null;
+    }
+
+    /** Semantic progress only; excludes already-finalized markets from a post-load restart. */
+    List<MarketAPI> remainingMarketsForRuntimeRestart() {
+        if (done) return List.of();
+        if (singleMarket != null) return List.of(singleMarket);
+        if (markets == null || marketIndex >= markets.size()) return List.of();
+        return new ArrayList<>(markets.subList(Math.max(0, marketIndex), markets.size()));
+    }
+
     @Override
     public void doNextBatch() {
         if (isDone()) return;
@@ -66,16 +80,35 @@ public class AoTDUpdateMarketAgainTask extends UpdateMarketsAgainTask {
 
     private static void processMarket(MarketAPI market) {
         if (market == null) return;
+        if (MarketRegistry.getRegistryLifecycle() != MarketRegistry.RegistryLifecycle.READY) {
+            AoTDEconomySemanticBaseline.operation(
+                    "update-market-again.skipped-registry-not-ready", market);
+            return;
+        }
         long started = System.nanoTime();
-        final AoTDIndustryData data = AoTDIndustryData.getInstance(market);
         boolean registryDirty = MarketRegistry.needsDerivedRefresh(market);
         if (!registryDirty) {
             AoTDEconomySemanticBaseline.operation(
                     "update-market-again.skipped-current-market", market);
             return;
         }
+        if (MarketRegistry.isQuarantined(market)) {
+            AoTDEconomySemanticBaseline.operation(
+                    "update-market-again.skipped-quarantined", market);
+            return;
+        }
 
         boolean materializedRefresh = MarketRegistry.needsMaterializedReconciliation(market);
+        if (!materializedRefresh) {
+            // Price/stockpile/accessibility/trade debt has no industry-state work for this task.
+            // In particular, the committed-net post-immigration fast path queues only downstream
+            // price work; avoid turning that O(1) proof into another industry traversal.
+            AoTDEconomySemanticBaseline.operation(
+                    "update-market-again.skipped-no-materialized-work", market);
+            return;
+        }
+        final AoTDIndustryData data = AoTDIndustryData.getInstance(market);
+        boolean materializedCheckpointCurrent = hasCurrentMaterializedCheckpoint(market);
         boolean desiredStateChanged = false;
         if (materializedRefresh) {
             try (AoTDEconomySemanticBaseline.Scope ignored =
@@ -132,8 +165,10 @@ public class AoTDUpdateMarketAgainTask extends UpdateMarketsAgainTask {
             }
         }
 
+        boolean transitionChanged =
+                conditionsReapplied || !reconciledIndustryIds.isEmpty() || desiredStateChanged;
         boolean authoritativeRefreshReady = true;
-        if (conditionsReapplied || !reconciledIndustryIds.isEmpty() || desiredStateChanged) {
+        if (transitionChanged || (materializedRefresh && !materializedCheckpointCurrent)) {
             authoritativeRefreshReady = refreshAuthoritativeSupplyDemand(market);
         } else {
             AoTDEconomySemanticBaseline.operation(
@@ -150,12 +185,22 @@ public class AoTDUpdateMarketAgainTask extends UpdateMarketsAgainTask {
         }
 
         long elapsed = Math.max(0L, System.nanoTime() - started);
-        if (authoritativeRefreshReady
-                && (materializedRefresh
-                        || conditionsReapplied
-                        || desiredStateChanged
-                        || !reconciledIndustryIds.isEmpty())) {
-            MarketRegistry.commitMaterializedState(market, elapsed);
+        if (authoritativeRefreshReady && (materializedRefresh || transitionChanged)) {
+            long expectedInputGeneration =
+                    MarketRegistry.getMarketMaterializedInputGeneration(market);
+            int expectedMarketSize = market.getSize();
+            if (expectedInputGeneration > 0L) {
+                MarketRegistry.CommitStatus status =
+                        MarketRegistry.commitMaterializedStateDetailed(
+                                market, expectedInputGeneration, expectedMarketSize, elapsed);
+                if (status != MarketRegistry.CommitStatus.COMMITTED) {
+                    AoTDEconomySemanticBaseline.operation(
+                            "update-market-again.materialized-commit-stale", market);
+                }
+            } else {
+                AoTDEconomySemanticBaseline.operation(
+                        "update-market-again.materialized-proof-missing", market);
+            }
         } else if (!authoritativeRefreshReady) {
             AoTDEconomySemanticBaseline.operation(
                     "update-market-again.materialized-not-ready", market);
@@ -165,6 +210,13 @@ public class AoTDUpdateMarketAgainTask extends UpdateMarketsAgainTask {
         // would expose a pre-growth snapshot to the same iteration's global cut.
         AoTDEconomySemanticBaseline.operation(
                 "update-market-again.trade-snapshot-deferred-post-immigration", market);
+    }
+
+    private static boolean hasCurrentMaterializedCheckpoint(MarketAPI market) {
+        long generation = MarketRegistry.getMarketMaterializedInputGeneration(market);
+        return generation > 0L
+                && MarketRegistry.matchesMaterializedCheckpoint(
+                        market, generation, market.getSize());
     }
 
     private static boolean refreshAuthoritativeSupplyDemand(MarketAPI market) {
@@ -208,6 +260,7 @@ public class AoTDUpdateMarketAgainTask extends UpdateMarketsAgainTask {
             for (int i = 0; i < prepared.size(); i++) {
                 owners.get(i).finishPreparedRefresh(prepared.get(i));
             }
+            MarketRegistry.recordMaterializedCheckpoint(market, market.getSize());
             return true;
         }
     }

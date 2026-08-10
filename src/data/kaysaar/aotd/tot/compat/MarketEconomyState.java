@@ -19,6 +19,12 @@ public final class MarketEconomyState {
     private long priceGeneration;
     private long dirtyGeneration;
 
+    /**
+     * Per-market revision of inputs that can change authoritative supply/demand aggregates. Unlike
+     * {@link #dirtyGeneration}, trade/accessibility-only work does not advance this token.
+     */
+    private long materializedInputGeneration;
+
     /** Current domain-specific input revisions. */
     private long structureRevision;
 
@@ -34,6 +40,13 @@ public final class MarketEconomyState {
 
     private long materializedCommittedRevision;
     private long materializedCommittedTemporalRevision;
+
+    /**
+     * Pre-immigration input-generation checkpoint for the last atomic supply/demand publication.
+     */
+    private long materializedCheckpointGeneration;
+
+    private int materializedCheckpointMarketSize = -1;
 
     private long priceCommittedStructureRevision;
     private long priceCommittedMaterializedRevision;
@@ -97,6 +110,10 @@ public final class MarketEconomyState {
         return dirtyGeneration;
     }
 
+    public long getMaterializedInputGeneration() {
+        return materializedInputGeneration;
+    }
+
     public long getStructureRevision() {
         return structureRevision;
     }
@@ -135,6 +152,14 @@ public final class MarketEconomyState {
 
     public long getMaterializedCommittedTemporalRevision() {
         return materializedCommittedTemporalRevision;
+    }
+
+    public long getMaterializedCheckpointGeneration() {
+        return materializedCheckpointGeneration;
+    }
+
+    public int getMaterializedCheckpointMarketSize() {
+        return materializedCheckpointMarketSize;
     }
 
     public long getPriceCommittedStructureRevision() {
@@ -261,6 +286,10 @@ public final class MarketEconomyState {
         dirtyGeneration = value;
     }
 
+    void setMaterializedInputGeneration(long value) {
+        materializedInputGeneration = value;
+    }
+
     void setStructureRevision(long value) {
         structureRevision = value;
     }
@@ -293,6 +322,11 @@ public final class MarketEconomyState {
         materializedCommittedStructureRevision = structureRevision;
         materializedCommittedRevision = materializedRevision;
         materializedCommittedTemporalRevision = temporalRevision;
+    }
+
+    void setMaterializedCheckpoint(long generation, int marketSize) {
+        materializedCheckpointGeneration = generation;
+        materializedCheckpointMarketSize = marketSize;
     }
 
     void commitPriceVector() {

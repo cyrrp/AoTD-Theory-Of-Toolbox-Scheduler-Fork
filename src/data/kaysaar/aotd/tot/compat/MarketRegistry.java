@@ -1,5 +1,6 @@
 package data.kaysaar.aotd.tot.compat;
 
+import com.fs.starfarer.api.campaign.econ.MarketAPI;
 import data.kaysaar.aotd.tot.scripts.economy.AoTDRuntimeEpoch;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -11,6 +12,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.BooleanSupplier;
 
 /**
  * AoTD-owned market registry and coalescing dirty queue.
@@ -45,6 +47,10 @@ public final class MarketRegistry {
                     | DIRTY_VALUE_STATE
                     | DIRTY_INITIAL_REGISTRATION;
 
+    /** Input changes that invalidate authoritative per-commodity supply/demand aggregates. */
+    private static final int MATERIALIZED_INPUT_GENERATION_MASK =
+            MATERIALIZED_WORK_MASK | SchedulerBridge.DIRTY_DERIVED_ECONOMY;
+
     private static final int TRADE_WORK_MASK =
             SchedulerBridge.DIRTY_STRUCTURE
                     | SchedulerBridge.DIRTY_INDUSTRIES
@@ -69,6 +75,7 @@ public final class MarketRegistry {
             SchedulerBridge.DIRTY_STRUCTURE
                     | SchedulerBridge.DIRTY_INDUSTRIES
                     | SchedulerBridge.DIRTY_CONDITIONS
+                    | SchedulerBridge.DIRTY_DERIVED_ECONOMY
                     | DIRTY_VALUE_STATE
                     | DIRTY_INITIAL_REGISTRATION;
 
@@ -107,6 +114,20 @@ public final class MarketRegistry {
 
     /** Global event sequence retained for ordering/diagnostics only. */
     private static long dirtyGeneration;
+
+    /**
+     * Loader-lifetime sequencer for materialized input tokens. Unlike the scheduler dirty counter,
+     * this is intentionally not reset by {@link #clear()}: a registry rebuild must never collide
+     * with an aggregate stamped by the previous registry instance.
+     */
+    private static long materializedInputSequence;
+
+    /** Loader-lifetime sequencer for exact trade-input capture proofs. */
+    private static long tradeInputSequence;
+
+    private static long staleTradeInputCommits;
+    private static long materializedRefreshRequests;
+    private static long materializedRefreshCoalesces;
 
     private static long claimedTickets;
     private static long committedTickets;
@@ -190,6 +211,9 @@ public final class MarketRegistry {
         unrelatedPriceInvalidationsAvoided = 0L;
         staleEpochTickets = 0L;
         epochSafeDrops = 0L;
+        staleTradeInputCommits = 0L;
+        materializedRefreshRequests = 0L;
+        materializedRefreshCoalesces = 0L;
         urgentBurst = 0;
     }
 
@@ -480,6 +504,102 @@ public final class MarketRegistry {
         }
     }
 
+    /**
+     * Returns the per-market authoritative supply/demand input generation. Trade and accessibility
+     * work deliberately leave this token unchanged.
+     */
+    public static long getMarketMaterializedInputGeneration(Object market) {
+        if (market == null) return 0L;
+        synchronized (LOCK) {
+            MarketEconomyState state = stateForMarketLocked(market);
+            return state == null ? 0L : state.getMaterializedInputGeneration();
+        }
+    }
+
+    /** Captures one exact, loader-local proof after all market getters used by the caller. */
+    public static TradeCaptureProof captureTradeInputProof(Object market) {
+        if (!(market instanceof MarketAPI typedMarket)) return null;
+        synchronized (LOCK) {
+            if (registryLifecycle != RegistryLifecycle.READY) return null;
+            MarketEconomyState state = stateForMarketLocked(market);
+            if (state == null || state.getMarket() != market) return null;
+            int marketSize = typedMarket.getSize();
+            String factionId = typedMarket.getFactionId();
+            int accessibilityBits =
+                    Float.floatToIntBits(typedMarket.getAccessibilityMod().computeEffective(0f));
+            boolean hasSpaceport = typedMarket.hasSpaceport();
+            return new TradeCaptureProof(
+                    state,
+                    market,
+                    state.getMarketId(),
+                    state.getTradeInputRevision(),
+                    marketSize,
+                    factionId,
+                    accessibilityBits,
+                    hasSpaceport);
+        }
+    }
+
+    public static boolean isTradeCaptureProofCurrent(TradeCaptureProof proof) {
+        synchronized (LOCK) {
+            return tradeProofMismatchLocked(proof) == 0;
+        }
+    }
+
+    /**
+     * Validates the complete proof set and invokes the publisher while registry mutations are
+     * excluded. EMPTY bootstrap accepts only a wholly-unproven batch; mixed proof sets fail closed.
+     * The callback must not call MarketRegistry.
+     */
+    public static boolean publishIfTradeCaptureProofsCurrent(
+            List<TradeCaptureProof> proofs, BooleanSupplier publisher) {
+        if (proofs == null || publisher == null) return false;
+        synchronized (LOCK) {
+            if (registryLifecycle == RegistryLifecycle.EMPTY) {
+                for (TradeCaptureProof proof : proofs) {
+                    if (proof != null) return false;
+                }
+                return publisher.getAsBoolean();
+            }
+            if (registryLifecycle != RegistryLifecycle.READY) return false;
+            for (TradeCaptureProof proof : proofs) {
+                if (tradeProofMismatchLocked(proof) != 0) return false;
+            }
+            return publisher.getAsBoolean();
+        }
+    }
+
+    /**
+     * Records the market shape that produced the last market-atomic supply/demand publication. This
+     * is loader-local runtime state; registry rebuilds intentionally discard it and therefore force
+     * one conservative post-immigration live capture.
+     */
+    public static boolean recordMaterializedCheckpoint(Object market, int marketSize) {
+        if (market == null || marketSize < 0) return false;
+        synchronized (LOCK) {
+            if (registryLifecycle != RegistryLifecycle.READY) return false;
+            MarketEconomyState state = stateForMarketLocked(market);
+            long inputGeneration = state == null ? 0L : state.getMaterializedInputGeneration();
+            if (inputGeneration <= 0L) return false;
+            state.setMaterializedCheckpoint(inputGeneration, marketSize);
+            return true;
+        }
+    }
+
+    /** Exact proof used by the post-immigration committed-net fast path. */
+    public static boolean matchesMaterializedCheckpoint(
+            Object market, long expectedGeneration, int marketSize) {
+        if (market == null || expectedGeneration <= 0L || marketSize < 0) return false;
+        synchronized (LOCK) {
+            if (registryLifecycle != RegistryLifecycle.READY) return false;
+            MarketEconomyState state = stateForMarketLocked(market);
+            return state != null
+                    && state.getMaterializedInputGeneration() == expectedGeneration
+                    && state.getMaterializedCheckpointGeneration() == expectedGeneration
+                    && state.getMaterializedCheckpointMarketSize() == marketSize;
+        }
+    }
+
     public static long getMarketStructuralGeneration(Object market) {
         if (market == null) return 0L;
         synchronized (LOCK) {
@@ -694,6 +814,45 @@ public final class MarketRegistry {
                 market, MATERIALIZED_WORK_MASK, OutputDomain.MATERIALIZED, computeNanos);
     }
 
+    /** Commits a materialized vector only for the exact input generation that was published. */
+    public static CommitStatus commitMaterializedStateDetailed(
+            Object market,
+            long expectedInputGeneration,
+            int expectedMarketSize,
+            long computeNanos) {
+        synchronized (LOCK) {
+            MarketEconomyState state = stateForMarketLocked(market);
+            if (state == null) {
+                synchronousCommitUnknownMarket++;
+                return CommitStatus.UNKNOWN_MARKET;
+            }
+            if (expectedInputGeneration <= 0L
+                    || expectedMarketSize < 0
+                    || state.getMaterializedInputGeneration() != expectedInputGeneration
+                    || state.getMaterializedCheckpointGeneration() != expectedInputGeneration
+                    || state.getMaterializedCheckpointMarketSize() != expectedMarketSize) {
+                return CommitStatus.STALE_INPUT;
+            }
+            if (!(market instanceof MarketAPI typedMarket)
+                    || typedMarket.getSize() != expectedMarketSize
+                    || state.getMaterializedInputGeneration() != expectedInputGeneration) {
+                // Market size has no guaranteed native mutation callback. Create the missing
+                // causal revision now so a force=false materializer cannot certify an old aggregate
+                // under the same generation on its next pass.
+                markDirtyLocked(
+                        state,
+                        DIRTY_VALUE_STATE
+                                | DIRTY_PRICE
+                                | DIRTY_STOCKPILE
+                                | SchedulerBridge.DIRTY_DERIVED_ECONOMY,
+                        PRIORITY_NORMAL);
+                return CommitStatus.STALE_INPUT;
+            }
+            return commitSynchronousMaskLocked(
+                    state, MATERIALIZED_WORK_MASK, OutputDomain.MATERIALIZED, computeNanos);
+        }
+    }
+
     public static boolean commitTradeSnapshot(Object market, long computeNanos) {
         return commitTradeSnapshotDetailed(market, computeNanos) == CommitStatus.COMMITTED;
     }
@@ -707,6 +866,87 @@ public final class MarketRegistry {
                         | DIRTY_GLOBAL_REVISION,
                 OutputDomain.TRADE,
                 computeNanos);
+    }
+
+    /**
+     * Validates the capture proof, applies publication-caused dirty work, and commits the trade
+     * vector in one registry transaction. A stale proof never clears external dirty work.
+     */
+    public static CommitStatus commitTradeSnapshotDetailed(
+            Object market,
+            TradeCaptureProof expectedProof,
+            int ordinaryDirtyMask,
+            int materializedDirtyMask,
+            int priorityHint,
+            long computeNanos) {
+        synchronized (LOCK) {
+            MarketEconomyState state = stateForMarketLocked(market);
+            if (state == null) {
+                synchronousCommitUnknownMarket++;
+                return CommitStatus.UNKNOWN_MARKET;
+            }
+            int proofMismatch = tradeProofMismatchLocked(expectedProof);
+            if (proofMismatch != 0) {
+                staleTradeInputCommits++;
+                int repairMask = ordinaryDirtyMask | materializedDirtyMask | DIRTY_TRADE;
+                if ((proofMismatch & TradeCaptureProof.MISMATCH_SIZE) != 0) {
+                    repairMask |=
+                            DIRTY_VALUE_STATE
+                                    | DIRTY_PRICE
+                                    | DIRTY_STOCKPILE
+                                    | SchedulerBridge.DIRTY_DERIVED_ECONOMY;
+                }
+                if ((proofMismatch
+                                & (TradeCaptureProof.MISMATCH_FACTION
+                                        | TradeCaptureProof.MISMATCH_ACCESSIBILITY
+                                        | TradeCaptureProof.MISMATCH_SPACEPORT))
+                        != 0) {
+                    repairMask |= DIRTY_ACCESSIBILITY | DIRTY_GLOBAL_REVISION;
+                }
+                if ((proofMismatch
+                                & (TradeCaptureProof.MISMATCH_SIZE
+                                        | TradeCaptureProof.MISMATCH_FACTION
+                                        | TradeCaptureProof.MISMATCH_ACCESSIBILITY
+                                        | TradeCaptureProof.MISMATCH_SPACEPORT))
+                        != 0) {
+                    // These callback-free scalars changed without advancing a registry token.
+                    // Publish one real causal revision so the repair cannot collide with the
+                    // aggregate captured before the change.
+                    markDirtyLocked(state, repairMask, priorityHint);
+                } else {
+                    // A token mismatch already represents the causal event. Preserve/requeue all
+                    // publication work without manufacturing another input generation.
+                    coalesceDirtyMaskMetadataLocked(state, repairMask, priorityHint);
+                }
+                return CommitStatus.STALE_INPUT;
+            }
+
+            boolean materializedOutstanding =
+                    (state.getDirtyMask() & MATERIALIZED_WORK_MASK) != 0
+                            || needsMaterializedVectorLocked(state);
+            int combinedMask = ordinaryDirtyMask;
+            if (materializedDirtyMask != 0) {
+                if (materializedOutstanding) {
+                    materializedRefreshCoalesces++;
+                    // The causal revision already exists, but it may currently be represented only
+                    // by DERIVED (which this trade commit consumes) or by an in-flight vector. Keep
+                    // explicit materialized/price work queued without advancing the token again.
+                    coalesceDirtyMaskMetadataLocked(state, materializedDirtyMask, priorityHint);
+                } else {
+                    combinedMask |= materializedDirtyMask;
+                    materializedRefreshRequests++;
+                }
+            }
+            if (combinedMask != 0) markDirtyLocked(state, combinedMask, priorityHint);
+            return commitSynchronousMaskLocked(
+                    state,
+                    SchedulerBridge.DIRTY_DERIVED_ECONOMY
+                            | DIRTY_ACCESSIBILITY
+                            | DIRTY_TRADE
+                            | DIRTY_GLOBAL_REVISION,
+                    OutputDomain.TRADE,
+                    computeNanos);
+        }
     }
 
     private static CommitStatus commitSynchronousMask(
@@ -723,38 +963,43 @@ public final class MarketRegistry {
                 synchronousCommitUnknownMarket++;
                 return CommitStatus.UNKNOWN_MARKET;
             }
-            if (state.isSnapshotBuilding()) {
-                lifecycleRejects++;
-                synchronousCommitSnapshotBuilding++;
-                return CommitStatus.SNAPSHOT_BUILDING;
-            }
-            if (state.isRunning()) {
-                lifecycleRejects++;
-                synchronousCommitRunning++;
-                return CommitStatus.RUNNING;
-            }
-            if (state.isResultReady()) {
-                lifecycleRejects++;
-                synchronousCommitResultReady++;
-                return CommitStatus.RESULT_READY;
-            }
-            removeQueuedLocked(state);
-            state.setDirtyMask(state.getDirtyMask() & ~completedMask);
-            state.setLastComputeNanos(Math.max(0L, computeNanos));
-            if (domain == OutputDomain.MATERIALIZED) state.commitMaterializedVector();
-            if (domain == OutputDomain.TRADE) state.commitTradeVector();
-            if (state.getDirtyMask() == 0) {
-                state.setDerivedGeneration(
-                        Math.max(state.getDerivedGeneration(), state.getDirtyGeneration()));
-                state.setPriorityHint(PRIORITY_NORMAL);
-                state.setFirstDirtyNanos(0L);
-                state.setLastDirtyNanos(0L);
-            }
-            committedTickets++;
-            synchronousCommitCommitted++;
-            enqueueIfIdleLocked(state);
-            return CommitStatus.COMMITTED;
+            return commitSynchronousMaskLocked(state, completedMask, domain, computeNanos);
         }
+    }
+
+    private static CommitStatus commitSynchronousMaskLocked(
+            MarketEconomyState state, int completedMask, OutputDomain domain, long computeNanos) {
+        if (state.isSnapshotBuilding()) {
+            lifecycleRejects++;
+            synchronousCommitSnapshotBuilding++;
+            return CommitStatus.SNAPSHOT_BUILDING;
+        }
+        if (state.isRunning()) {
+            lifecycleRejects++;
+            synchronousCommitRunning++;
+            return CommitStatus.RUNNING;
+        }
+        if (state.isResultReady()) {
+            lifecycleRejects++;
+            synchronousCommitResultReady++;
+            return CommitStatus.RESULT_READY;
+        }
+        removeQueuedLocked(state);
+        state.setDirtyMask(state.getDirtyMask() & ~completedMask);
+        state.setLastComputeNanos(Math.max(0L, computeNanos));
+        if (domain == OutputDomain.MATERIALIZED) state.commitMaterializedVector();
+        if (domain == OutputDomain.TRADE) state.commitTradeVector();
+        if (state.getDirtyMask() == 0) {
+            state.setDerivedGeneration(
+                    Math.max(state.getDerivedGeneration(), state.getDirtyGeneration()));
+            state.setPriorityHint(PRIORITY_NORMAL);
+            state.setFirstDirtyNanos(0L);
+            state.setLastDirtyNanos(0L);
+        }
+        committedTickets++;
+        synchronousCommitCommitted++;
+        enqueueIfIdleLocked(state);
+        return CommitStatus.COMMITTED;
     }
 
     public static boolean commitDerived(WorkTicket ticket, long computeNanos) {
@@ -919,6 +1164,8 @@ public final class MarketRegistry {
                     + Integer.toHexString(state.getDirtyMask())
                     + ", dirtyGeneration="
                     + state.getDirtyGeneration()
+                    + ", materializedInputGeneration="
+                    + state.getMaterializedInputGeneration()
                     + ", revisions="
                     + RevisionVector.of(state)
                     + ", queued="
@@ -1185,7 +1432,13 @@ public final class MarketRegistry {
                     + ", unknownDelivery="
                     + unknownDeliveryEvents
                     + ", unknownMutation="
-                    + unknownMutationEvents;
+                    + unknownMutationEvents
+                    + ", staleTradeInputCommits="
+                    + staleTradeInputCommits
+                    + ", materializedRefreshRequests="
+                    + materializedRefreshRequests
+                    + ", materializedRefreshCoalesces="
+                    + materializedRefreshCoalesces;
         }
     }
 
@@ -1286,7 +1539,24 @@ public final class MarketRegistry {
         enqueueIfIdleLocked(state);
     }
 
+    /** Adds work for an already-existing causal revision without advancing any domain token. */
+    private static void coalesceDirtyMaskMetadataLocked(
+            MarketEconomyState state, int dirtyMask, int priorityHint) {
+        if (state == null || dirtyMask == 0) return;
+        long now = System.nanoTime();
+        coalescedEvents++;
+        if (state.getFirstDirtyNanos() == 0L) state.setFirstDirtyNanos(now);
+        state.setLastDirtyNanos(now);
+        state.setDirtyMask(state.getDirtyMask() | dirtyMask);
+        if (priorityHint > state.getPriorityHint()) state.setPriorityHint(priorityHint);
+        enqueueIfIdleLocked(state);
+    }
+
     private static void advanceDomainRevisionsLocked(MarketEconomyState state, int dirtyMask) {
+        if ((dirtyMask & MATERIALIZED_INPUT_GENERATION_MASK) != 0) {
+            materializedInputSequence = nextPositive(materializedInputSequence);
+            state.setMaterializedInputGeneration(materializedInputSequence);
+        }
         if ((dirtyMask & (SchedulerBridge.DIRTY_STRUCTURE | DIRTY_INITIAL_REGISTRATION)) != 0) {
             state.setStructureRevision(nextPositive(state.getStructureRevision()));
         }
@@ -1307,7 +1577,8 @@ public final class MarketRegistry {
             state.setAccessibilityRevision(nextPositive(state.getAccessibilityRevision()));
         }
         if ((dirtyMask & TRADE_REVISION_MASK) != 0) {
-            state.setTradeInputRevision(nextPositive(state.getTradeInputRevision()));
+            tradeInputSequence = nextPositive(tradeInputSequence);
+            state.setTradeInputRevision(tradeInputSequence);
         }
         if ((dirtyMask & DIRTY_TIME_DELIVERED) != 0) {
             state.setTemporalRevision(nextPositive(state.getTemporalRevision()));
@@ -1429,6 +1700,46 @@ public final class MarketRegistry {
                 || state.getTradeCommittedTemporalRevision() != state.getTemporalRevision();
     }
 
+    private static int tradeProofMismatchLocked(TradeCaptureProof proof) {
+        if (proof == null || registryLifecycle != RegistryLifecycle.READY) {
+            return TradeCaptureProof.MISMATCH_IDENTITY;
+        }
+        MarketEconomyState current = stateForMarketLocked(proof.market);
+        if (current == null || current != proof.state || current.getMarket() != proof.market) {
+            return TradeCaptureProof.MISMATCH_IDENTITY;
+        }
+        int mismatch = 0;
+        if (current.getTradeInputRevision() != proof.tradeInputToken) {
+            mismatch |= TradeCaptureProof.MISMATCH_TOKEN;
+        }
+        if (!(proof.market instanceof MarketAPI market)) {
+            return mismatch | TradeCaptureProof.MISMATCH_IDENTITY;
+        }
+        if (market.getSize() != proof.marketSize) mismatch |= TradeCaptureProof.MISMATCH_SIZE;
+        String marketId = market.getId();
+        if (!(proof.marketId == null ? marketId == null : proof.marketId.equals(marketId))) {
+            mismatch |= TradeCaptureProof.MISMATCH_IDENTITY;
+        }
+        String factionId = market.getFactionId();
+        if (!(proof.factionId == null ? factionId == null : proof.factionId.equals(factionId))) {
+            mismatch |= TradeCaptureProof.MISMATCH_FACTION;
+        }
+        int accessibilityBits =
+                Float.floatToIntBits(market.getAccessibilityMod().computeEffective(0f));
+        if (accessibilityBits != proof.accessibilityBits) {
+            mismatch |= TradeCaptureProof.MISMATCH_ACCESSIBILITY;
+        }
+        if (market.hasSpaceport() != proof.hasSpaceport) {
+            mismatch |= TradeCaptureProof.MISMATCH_SPACEPORT;
+        }
+        // Getters above are expected to be callback-free, but retain a final token check so a
+        // future implementation cannot validate a mixed scalar/revision proof.
+        if (current.getTradeInputRevision() != proof.tradeInputToken) {
+            mismatch |= TradeCaptureProof.MISMATCH_TOKEN;
+        }
+        return mismatch;
+    }
+
     private static int dependenciesForDirtyMask(int dirtyMask) {
         int dependencies = 0;
         if ((dirtyMask & (SchedulerBridge.DIRTY_STRUCTURE | DIRTY_INITIAL_REGISTRATION)) != 0)
@@ -1469,7 +1780,8 @@ public final class MarketRegistry {
         UNKNOWN_MARKET,
         SNAPSHOT_BUILDING,
         RUNNING,
-        RESULT_READY
+        RESULT_READY,
+        STALE_INPUT
     }
 
     private enum TicketKind {
@@ -1480,6 +1792,62 @@ public final class MarketRegistry {
     private enum OutputDomain {
         MATERIALIZED,
         TRADE
+    }
+
+    /** Immutable, runtime-only proof for one post-immigration trade capture. */
+    public static final class TradeCaptureProof {
+        private static final int MISMATCH_IDENTITY = 1;
+        private static final int MISMATCH_TOKEN = 1 << 1;
+        private static final int MISMATCH_SIZE = 1 << 2;
+        private static final int MISMATCH_FACTION = 1 << 3;
+        private static final int MISMATCH_ACCESSIBILITY = 1 << 4;
+        private static final int MISMATCH_SPACEPORT = 1 << 5;
+
+        private final MarketEconomyState state;
+        private final Object market;
+        public final String marketId;
+        public final long tradeInputToken;
+        public final int marketSize;
+        public final String factionId;
+        public final int accessibilityBits;
+        public final boolean hasSpaceport;
+
+        private TradeCaptureProof(
+                MarketEconomyState state,
+                Object market,
+                String marketId,
+                long tradeInputToken,
+                int marketSize,
+                String factionId,
+                int accessibilityBits,
+                boolean hasSpaceport) {
+            this.state = state;
+            this.market = market;
+            this.marketId = marketId;
+            this.tradeInputToken = tradeInputToken;
+            this.marketSize = marketSize;
+            this.factionId = factionId;
+            this.accessibilityBits = accessibilityBits;
+            this.hasSpaceport = hasSpaceport;
+        }
+
+        public boolean hasSameInputs(TradeCaptureProof other) {
+            return other != null
+                    && state == other.state
+                    && market == other.market
+                    && (marketId == null ? other.marketId == null : marketId.equals(other.marketId))
+                    && tradeInputToken == other.tradeInputToken
+                    && marketSize == other.marketSize
+                    && accessibilityBits == other.accessibilityBits
+                    && hasSpaceport == other.hasSpaceport
+                    && (factionId == null
+                            ? other.factionId == null
+                            : factionId.equals(other.factionId));
+        }
+
+        public Object getMarket() {
+            return market;
+        }
     }
 
     public static final class RevisionVector {
@@ -1631,6 +1999,7 @@ public final class MarketRegistry {
         public final long derivedGeneration;
         public final long priceGeneration;
         public final long dirtyGeneration;
+        public final long materializedInputGeneration;
         public final RevisionVector revisions;
         public final int dirtyMask;
         public final int priorityHint;
@@ -1646,6 +2015,7 @@ public final class MarketRegistry {
             derivedGeneration = state.getDerivedGeneration();
             priceGeneration = state.getPriceGeneration();
             dirtyGeneration = state.getDirtyGeneration();
+            materializedInputGeneration = state.getMaterializedInputGeneration();
             revisions = RevisionVector.of(state);
             dirtyMask = state.getDirtyMask();
             priorityHint = state.getPriorityHint();

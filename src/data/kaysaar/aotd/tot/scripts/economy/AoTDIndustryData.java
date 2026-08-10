@@ -5,6 +5,8 @@ import com.fs.starfarer.api.campaign.econ.Industry;
 import com.fs.starfarer.api.campaign.econ.MarketAPI;
 import com.fs.starfarer.api.impl.campaign.econ.impl.PopulationAndInfrastructure;
 import com.fs.starfarer.api.impl.campaign.econ.impl.Spaceport;
+import data.kaysaar.aotd.tot.compat.MarketRegistry;
+import data.kaysaar.aotd.tot.compat.SchedulerBridge;
 import data.kaysaar.aotd.tot.plugins.ReflectionUtilis;
 import data.kaysaar.aotd.tot.strings.AoTDIndTags;
 import java.util.ArrayList;
@@ -202,6 +204,8 @@ public class AoTDIndustryData {
     }
 
     public void applyEndOfMonthChange(MarketAPI market) {
+        LinkedHashMap<String, AoTDIndustryState> previousStates =
+                new LinkedHashMap<>(statesOnMarket);
         statesOnMarket.clear();
         for (Industry industry : market.getIndustries()) {
             if (!(industry.isBuilding() && !industry.isUpgrading())
@@ -214,5 +218,17 @@ public class AoTDIndustryData {
         // Keep the materialized map intact so the next pass reconciles only
         // entries whose desired state really changed.
         invalidateStableIndustryOrder();
+        if (!statesOnMarket.equals(previousStates)) {
+            // This mutation is AoTD-local and therefore has no native Prepatcher callback. Publish
+            // its materialized-domain invalidation explicitly; UpdateMarketAgain may then safely
+            // skip pure downstream price/trade debt without scanning every industry.
+            MarketRegistry.markDirty(
+                    market,
+                    MarketRegistry.DIRTY_VALUE_STATE
+                            | MarketRegistry.DIRTY_PRICE
+                            | MarketRegistry.DIRTY_STOCKPILE
+                            | SchedulerBridge.DIRTY_DERIVED_ECONOMY,
+                    MarketRegistry.PRIORITY_NORMAL);
+        }
     }
 }

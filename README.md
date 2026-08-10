@@ -1,9 +1,9 @@
 # Ashes of The Domain — Theory of Toolbox: Scheduler Fork
 
 Scheduler-focused fork of **AoTD — Theory of Toolbox** for Starsector
-`0.98a-RC8`. The current Scheduler Fork release is `1.0.14-spp10`.
+`0.98a-RC8`. The current Scheduler Fork release is `1.0.14-spp11`.
 The mod metadata, release archive, bridge contract, and update manifest all use
-the canonical `1.0.14-spp10` fork release identifier.
+the canonical `1.0.14-spp11` fork release identifier.
 
 The fork keeps the original game `starfarer.api.jar`; it does not require or
 ship an AoTD replacement for any Starsector core JAR.
@@ -22,8 +22,23 @@ setups where AoTD is absent.
 - rejects stale results across campaign or economy replacement with runtime
   epochs;
 - restarts workers safely around load, reset, save and shutdown boundaries;
+- keeps process-local economy task graphs out of new saves and resumes an interrupted iteration
+  after load, successful save or failed save from a compact stage/remaining-market checkpoint;
+- rebuilds transient global commodity data after restore while applying price, stockpile,
+  immigration and listener effects only to their safe unattempted suffix; stale worker tickets,
+  partial trade snapshots and open trade boundaries are released instead of being resumed;
 - defers industry-derived supply/demand rebuilding until Starsector has fully restored and reapplied
   every market, then coalesces the work into the normal atomic scheduler pass;
+- reuses a committed post-immigration trade aggregate only when its dedicated supply/demand
+  generation and pre-immigration size checkpoint both still match; unrelated trade/accessibility
+  changes keep this proof valid, while a stale proof recalculates the complete market once and
+  schedules one coalesced repair;
+- validates each multi-frame trade batch against the exact market identity, revision, size,
+  faction, accessibility and spaceport state immediately before its atomic publication, and
+  recaptures only entries that changed while the batch was being prepared;
+- skips UpdateMarketAgain industry traversal for markets that owe only downstream price, stockpile,
+  accessibility or trade work, while explicitly scheduling materialization when AoTD changes its
+  own pending-industry state at month end;
 - refreshes Prepatcher capabilities at runtime and resynchronizes market
   generations before falling back when native delivery events become
   unavailable;
@@ -40,7 +55,7 @@ The runtime dependencies declared by `mod_info.json` are:
 
 | Mod | Minimum version |
 | --- | --- |
-| StarsectorPrepatcher | 0.18.0 |
+| StarsectorPrepatcher | 0.18.1 |
 | LazyLib | 3.0 |
 | AshLib | 2.2.3 |
 | Building Menu Overhaul | 2.1.0 |
@@ -203,7 +218,7 @@ construction queue, custom providers, unknown actions and missing capability/bar
 `false` and retain the original global virtual step. No second scheduler, per-commodity revision
 vector, persistent market reference, or static reflection/classloader cache is added.
 
-Only the exact `1.0.14-spp10` contract registers. The bridge declares the exact current mask
+Only the exact `1.0.14-spp11` contract registers. The bridge declares the exact current mask
 `0xfff`; older, future and partially declared fork revisions are logged and rejected as a whole
 instead of receiving partial or implicit UI semantics. Optional Prepatcher switches may omit bit
 10, but never the required dispatcher and economy-restore bits, so an exact current fork still

@@ -98,6 +98,8 @@ $requiredEntries = @(
     'data/kaysaar/aotd/tot/compat/SchedulerBridge.class',
     'data/kaysaar/aotd/tot/scripts/economy/AoTDEconomy.class',
     'data/kaysaar/aotd/tot/scripts/economy/AoTDEconomyRestoreCoordinator.class',
+    'data/kaysaar/aotd/tot/scripts/economy/AoTDEconomyReachStepper$RuntimeTaskRestartReport.class',
+    'data/kaysaar/aotd/tot/scripts/economy/AoTdMainWorkTask2$RuntimeRestartMode.class',
     'data/kaysaar/aotd/tot/scripts/commoditydata/AoTDSupplyDemandData$PreparedRefresh$Status.class',
     'data/kaysaar/aotd/tot/ui/core/DomainTabListener.class',
     'data/kaysaar/aotd/tot/ui/LazyUIPanel.class',

@@ -77,6 +77,21 @@ public class AoTdMainWorkTask2 extends MainWorkTask2 {
     // Boxed for save compatibility: null from an older serialized task means enabled.
     private Boolean notifyCommodityListeners = Boolean.TRUE;
 
+    /**
+     * Constructor-set marker. A legacy serialized live task has the JVM default false and is never
+     * mistaken for an exact semantic checkpoint after its transient commit plans were lost.
+     */
+    private boolean runtimeMainCheckpointV1 = true;
+
+    /** Restricted semantic suffix used only by a fresh post-load replacement task. */
+    private RuntimeRestartMode runtimeResumeMode = RuntimeRestartMode.FULL;
+
+    /**
+     * Full loaded-economy scope used only to rebuild transient CommodityMarketData. It is never
+     * part of the durable semantic checkpoint, which stores stable IDs in the stepper.
+     */
+    private transient List<MarketAPI> runtimeGlobalDataMarkets;
+
     private static final int PRICE_WORKER_CHUNK_SIZE = 16;
     private static final int MAIN_THREAD_COMMIT_MARKETS_PER_BATCH = 8;
     private static final long MAIN_THREAD_COMMIT_BUDGET_NANOS = 2_000_000L;
@@ -176,6 +191,130 @@ public class AoTdMainWorkTask2 extends MainWorkTask2 {
         this.aotdMarkets = new ArrayList<>(markets);
         this.aotdParams = econWorkParams;
         this.notifyCommodityListeners = Boolean.valueOf(notifyCommodityListeners);
+    }
+
+    static AoTdMainWorkTask2 forRuntimePriceRemaining(
+            List<MarketAPI> allMarkets,
+            List<MarketAPI> remainingPriceMarkets,
+            ReachEconomy reachEconomy,
+            MainWorkTask.EconWorkParams econWorkParams) {
+        AoTdMainWorkTask2 task =
+                new AoTdMainWorkTask2(remainingPriceMarkets, reachEconomy, econWorkParams);
+        task.runtimeResumeMode = RuntimeRestartMode.PRICE_REMAINING;
+        task.runtimeGlobalDataMarkets = new ArrayList<>(allMarkets);
+        return task;
+    }
+
+    static AoTdMainWorkTask2 forRuntimeListenersOnly(
+            List<MarketAPI> allMarkets,
+            ReachEconomy reachEconomy,
+            MainWorkTask.EconWorkParams econWorkParams) {
+        AoTdMainWorkTask2 task = new AoTdMainWorkTask2(List.of(), reachEconomy, econWorkParams);
+        task.runtimeResumeMode = RuntimeRestartMode.LISTENERS_ONLY;
+        task.runtimeGlobalDataMarkets = new ArrayList<>(allMarkets);
+        return task;
+    }
+
+    /** Captures only stable market identities and a semantic subphase; never a DTO/ticket graph. */
+    RuntimeRestartProgress runtimeRestartProgress() {
+        if (!runtimeMainCheckpointV1) return RuntimeRestartProgress.drop();
+        RuntimeRestartMode mode =
+                runtimeResumeMode == null ? RuntimeRestartMode.FULL : runtimeResumeMode;
+        if (mode == RuntimeRestartMode.DROP) return RuntimeRestartProgress.drop();
+        if (mode == RuntimeRestartMode.LISTENERS_ONLY) {
+            return RuntimeRestartProgress.listenersOnly();
+        }
+        if (!aotdStarted) {
+            return mode == RuntimeRestartMode.PRICE_REMAINING
+                    ? RuntimeRestartProgress.priceRemaining(copyRestartScope())
+                    : RuntimeRestartProgress.full();
+        }
+        if (mtListenersNotified) return RuntimeRestartProgress.drop();
+        if (mtCommitDone) return RuntimeRestartProgress.listenersOnly();
+        if (mtCommitIndex < 0) return RuntimeRestartProgress.drop();
+
+        if (mtCommitIndex == 0) {
+            if (mode == RuntimeRestartMode.FULL) {
+                // No applyMarketPriceResult() call has been attempted. Reapply/global-data/capture
+                // are contract-level idempotent and no stock/sudden-demand mutation was published.
+                return RuntimeRestartProgress.full();
+            }
+            if (!mtCaptureDone) {
+                // A repeatedly saved PRICE_REMAINING task must retain its restricted scope rather
+                // than silently expanding back to every market.
+                return RuntimeRestartProgress.priceRemaining(copyRestartScope());
+            }
+        }
+
+        if (mtCommitPlans == null || mtCommitIndex > mtCommitPlans.size()) {
+            return RuntimeRestartProgress.drop();
+        }
+        if (mtCommitIndex == mtCommitPlans.size()) {
+            // The last budgeted call increments mtCommitIndex before applying. mtCommitDone may
+            // still be false until the next frame, but no market result remains.
+            return RuntimeRestartProgress.listenersOnly();
+        }
+
+        ArrayList<MarketAPI> remaining = new ArrayList<>();
+        LinkedHashSet<String> ids = new LinkedHashSet<>();
+        for (int i = mtCommitIndex; i < mtCommitPlans.size(); i++) {
+            MarketPriceCommitPlan plan = mtCommitPlans.get(i);
+            Market market = plan == null ? null : plan.market;
+            String marketId = market == null ? null : market.getId();
+            if (marketId == null || !ids.add(marketId)) return RuntimeRestartProgress.drop();
+            remaining.add(market);
+        }
+        return RuntimeRestartProgress.priceRemaining(remaining);
+    }
+
+    /**
+     * Releases only unattempted process-local work when save cleanup/restore invalidated its live
+     * DTO tickets. The stepper has already captured a stable semantic suffix and will construct a
+     * fresh replacement after the save barrier opens.
+     */
+    void discardUnattemptedRuntimeWorkAfterSave() {
+        RuntimeException firstFailure = null;
+        if (mtFutures != null) {
+            for (Future<?> future : mtFutures) {
+                try {
+                    if (future != null) future.cancel(true);
+                } catch (RuntimeException cleanupFailure) {
+                    if (firstFailure == null) firstFailure = cleanupFailure;
+                }
+            }
+            mtFutures.clear();
+        }
+        if (mtCommitPlans != null) {
+            int from = Math.max(0, Math.min(mtCommitIndex, mtCommitPlans.size()));
+            for (int i = from; i < mtCommitPlans.size(); i++) {
+                MarketPriceCommitPlan plan = mtCommitPlans.get(i);
+                try {
+                    if (plan != null && plan.ticket != null) {
+                        MarketRegistry.abandon(plan.ticket, true);
+                    }
+                } catch (RuntimeException cleanupFailure) {
+                    if (firstFailure == null) firstFailure = cleanupFailure;
+                }
+            }
+            mtCommitPlans.clear();
+        }
+        mtOffloadBatch = null;
+        if (baselineTaskScope != null) {
+            try {
+                baselineTaskScope.close();
+            } catch (RuntimeException cleanupFailure) {
+                if (firstFailure == null) firstFailure = cleanupFailure;
+            } finally {
+                baselineTaskScope = null;
+            }
+        }
+        baselineTaskClosed = true;
+        AoTDEconomySemanticBaseline.operation("main-work.save-invalidated-suffix-dropped", 1L);
+        if (firstFailure != null) throw firstFailure;
+    }
+
+    private ArrayList<MarketAPI> copyRestartScope() {
+        return new ArrayList<>(aotdMarkets == null ? List.of() : aotdMarkets);
     }
 
     @Override
@@ -319,7 +458,10 @@ public class AoTdMainWorkTask2 extends MainWorkTask2 {
          * campaign-thread snapshot cost bounded even with thousands of markets.
          */
         if (!mtCaptureDone) {
-            if (aotdParams == null || !aotdParams.withStockpileUpdate) {
+            boolean forceRemainingPriceCommit =
+                    runtimeResumeMode == RuntimeRestartMode.PRICE_REMAINING;
+            if (!forceRemainingPriceCommit
+                    && (aotdParams == null || !aotdParams.withStockpileUpdate)) {
                 mtCaptureDone = true;
                 mtCommitDone = true;
                 mtWorkersFinished = true;
@@ -458,6 +600,21 @@ public class AoTdMainWorkTask2 extends MainWorkTask2 {
         mtEpochStamp = AoTDRuntimeEpoch.captureBatch("price-economy-task");
         mtOffloadBatch = new AoTDPriceOffloadBatch(createPriceModelConfig(), mtEpochStamp);
 
+        RuntimeRestartMode resumeMode =
+                runtimeResumeMode == null ? RuntimeRestartMode.FULL : runtimeResumeMode;
+        if (resumeMode == RuntimeRestartMode.PRICE_REMAINING) {
+            // Do not replay market reapply or an attempted price result. CommodityMarketData itself
+            // is transient in Starsector, however, so the global/econ-group data phase must run
+            // again from the full loaded economy before fresh remaining-market DTO capture.
+            mtMarketPrepDone = true;
+        } else if (resumeMode == RuntimeRestartMode.LISTENERS_ONLY) {
+            mtMarketPrepDone = true;
+            mtCaptureDone = true;
+            mtWorkersSubmitted = true;
+            mtWorkersFinished = true;
+            mtCommitDone = true;
+        }
+
         if (currentUiMarket) {
             mtCaptureDone = true;
             mtWorkersSubmitted = true;
@@ -477,7 +634,11 @@ public class AoTdMainWorkTask2 extends MainWorkTask2 {
 
         LinkedHashSet<String> groups = new LinkedHashSet<>();
 
-        for (MarketAPI market : marketsForCurrentMode) {
+        List<MarketAPI> groupSource =
+                runtimeResumeMode != RuntimeRestartMode.FULL && runtimeGlobalDataMarkets != null
+                        ? runtimeGlobalDataMarkets
+                        : marketsForCurrentMode;
+        for (MarketAPI market : groupSource) {
             if (market == null) continue;
 
             String econGroup = market.getEconGroup();
@@ -821,6 +982,7 @@ public class AoTdMainWorkTask2 extends MainWorkTask2 {
         for (int i = 0; i < preparedCount; i++) {
             owners.get(i).finishPreparedRefresh(prepared.get(i));
         }
+        MarketRegistry.recordMaterializedCheckpoint(market, market.getSize());
         AoTDEconomySemanticBaseline.operation("supply-demand.market-atomic-commit", market);
         AoTDEconomySemanticBaseline.operation("supply-demand.market-commodities", preparedCount);
         return true;
@@ -1179,6 +1341,42 @@ public class AoTdMainWorkTask2 extends MainWorkTask2 {
             }
         }
         finishPurePriceComputePhase();
+    }
+
+    enum RuntimeRestartMode {
+        FULL,
+        PRICE_REMAINING,
+        LISTENERS_ONLY,
+        DROP
+    }
+
+    static final class RuntimeRestartProgress {
+        final RuntimeRestartMode mode;
+        final List<MarketAPI> markets;
+        final boolean known;
+
+        private RuntimeRestartProgress(
+                RuntimeRestartMode mode, List<MarketAPI> markets, boolean known) {
+            this.mode = mode;
+            this.markets = markets == null ? List.of() : List.copyOf(markets);
+            this.known = known;
+        }
+
+        static RuntimeRestartProgress full() {
+            return new RuntimeRestartProgress(RuntimeRestartMode.FULL, List.of(), true);
+        }
+
+        static RuntimeRestartProgress priceRemaining(List<MarketAPI> markets) {
+            return new RuntimeRestartProgress(RuntimeRestartMode.PRICE_REMAINING, markets, true);
+        }
+
+        static RuntimeRestartProgress listenersOnly() {
+            return new RuntimeRestartProgress(RuntimeRestartMode.LISTENERS_ONLY, List.of(), true);
+        }
+
+        static RuntimeRestartProgress drop() {
+            return new RuntimeRestartProgress(RuntimeRestartMode.DROP, List.of(), false);
+        }
     }
 
     private static final class MarketPriceCommitPlan {

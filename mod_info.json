@@ -3,8 +3,8 @@
   "name": "zz AoTD - Theory of Toolbox - Scheduler Fork",
   "author": "Kaysaar",
   "utility": "false",
-  "version": "1.0.14-spp10",
-  "description": "Prepatcher-friendly AoTD scheduler fork with restore-safe deferred economy refresh, atomic registry publication, revision-gated UI market-mutation refresh, condition-only/detached-Cargo/loot suppression, read-only Local Resources tooltip snapshots, deterministic trade, runtime epochs, restartable workers, and live capability downgrade recovery without replacing any core game JAR.",
+  "version": "1.0.14-spp11",
+  "description": "Prepatcher-friendly AoTD scheduler fork with compact restore checkpoints, generation-proven trade snapshots, restore-safe deferred economy refresh, atomic registry publication, revision-gated UI market-mutation refresh, deterministic trade, runtime epochs, restartable workers, and live capability downgrade recovery without replacing any core game JAR.",
   "gameVersion": "0.98a-RC8",
   "jars": [
     "jars/AoTDToolboxTheory.jar"
@@ -13,7 +13,7 @@
     {
       "id": "starsector_prepatcher",
       "name": "StarsectorPrepatcher",
-      "version": "0.18.0"
+      "version": "0.18.1"
     },
     {
       "id": "lw_lazylib",
