@@ -128,6 +128,10 @@ public final class MarketRegistry {
     private static long staleTradeInputCommits;
     private static long materializedRefreshRequests;
     private static long materializedRefreshCoalesces;
+    private static long tradePublicationLockHolds;
+    private static long tradePublicationLockHoldTotalNanos;
+    private static long tradePublicationLockHoldMaxNanos;
+    private static long tradePublicationLockHoldLastNanos;
 
     private static long claimedTickets;
     private static long committedTickets;
@@ -214,6 +218,10 @@ public final class MarketRegistry {
         staleTradeInputCommits = 0L;
         materializedRefreshRequests = 0L;
         materializedRefreshCoalesces = 0L;
+        tradePublicationLockHolds = 0L;
+        tradePublicationLockHoldTotalNanos = 0L;
+        tradePublicationLockHoldMaxNanos = 0L;
+        tradePublicationLockHoldLastNanos = 0L;
         urgentBurst = 0;
     }
 
@@ -555,17 +563,34 @@ public final class MarketRegistry {
             List<TradeCaptureProof> proofs, BooleanSupplier publisher) {
         if (proofs == null || publisher == null) return false;
         synchronized (LOCK) {
-            if (registryLifecycle == RegistryLifecycle.EMPTY) {
+            long lockAcquiredNanos = System.nanoTime();
+            try {
+                if (registryLifecycle == RegistryLifecycle.EMPTY) {
+                    for (TradeCaptureProof proof : proofs) {
+                        if (proof != null) return false;
+                    }
+                    return publisher.getAsBoolean();
+                }
+                if (registryLifecycle != RegistryLifecycle.READY) return false;
                 for (TradeCaptureProof proof : proofs) {
-                    if (proof != null) return false;
+                    if (tradeProofMismatchLocked(proof) != 0) return false;
                 }
                 return publisher.getAsBoolean();
+            } finally {
+                recordTradePublicationLockHoldLocked(lockAcquiredNanos);
             }
-            if (registryLifecycle != RegistryLifecycle.READY) return false;
-            for (TradeCaptureProof proof : proofs) {
-                if (tradeProofMismatchLocked(proof) != 0) return false;
-            }
-            return publisher.getAsBoolean();
+        }
+    }
+
+    private static void recordTradePublicationLockHoldLocked(long lockAcquiredNanos) {
+        long elapsed = Math.max(0L, System.nanoTime() - lockAcquiredNanos);
+        tradePublicationLockHolds++;
+        tradePublicationLockHoldLastNanos = elapsed;
+        tradePublicationLockHoldMaxNanos = Math.max(tradePublicationLockHoldMaxNanos, elapsed);
+        if (Long.MAX_VALUE - tradePublicationLockHoldTotalNanos < elapsed) {
+            tradePublicationLockHoldTotalNanos = Long.MAX_VALUE;
+        } else {
+            tradePublicationLockHoldTotalNanos += elapsed;
         }
     }
 
@@ -834,8 +859,7 @@ public final class MarketRegistry {
                 return CommitStatus.STALE_INPUT;
             }
             if (!(market instanceof MarketAPI typedMarket)
-                    || typedMarket.getSize() != expectedMarketSize
-                    || state.getMaterializedInputGeneration() != expectedInputGeneration) {
+                    || typedMarket.getSize() != expectedMarketSize) {
                 // Market size has no guaranteed native mutation callback. Create the missing
                 // causal revision now so a force=false materializer cannot certify an old aggregate
                 // under the same generation on its next pass.
@@ -1438,7 +1462,15 @@ public final class MarketRegistry {
                     + ", materializedRefreshRequests="
                     + materializedRefreshRequests
                     + ", materializedRefreshCoalesces="
-                    + materializedRefreshCoalesces;
+                    + materializedRefreshCoalesces
+                    + ", tradePublicationLockHolds="
+                    + tradePublicationLockHolds
+                    + ", tradePublicationLockHoldTotalNanos="
+                    + tradePublicationLockHoldTotalNanos
+                    + ", tradePublicationLockHoldMaxNanos="
+                    + tradePublicationLockHoldMaxNanos
+                    + ", tradePublicationLockHoldLastNanos="
+                    + tradePublicationLockHoldLastNanos;
         }
     }
 

@@ -18,6 +18,7 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
+import java.util.AbstractList;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -46,7 +47,54 @@ public final class AoTDRuntimeTaskRestartTest {
         verifySaveBeforeFirstRestartFramePreservesSuffix();
         verifyWaitingCadenceIsPreserved();
         verifyUnknownHeadUsesKnownSuffix();
+        verifyGuardedLoadRestartFailSafe();
         System.out.println("AoTD runtime-task restart tests passed.");
+    }
+
+    private static void verifyGuardedLoadRestartFailSafe() throws Exception {
+        AoTDEconomyReachStepper stepper = doingStepper();
+        setField(stepper, "runtimeTaskLoadGuard", true);
+
+        AoTDEconomyReachStepper.RuntimeTaskRestartReport first =
+                stepper.restartRuntimeTasksAfterLoadIfGuarded(null);
+        check(first != null && first.loadGuardWasActive, "guarded load restart did not run");
+        check(
+                stepper.restartRuntimeTasksAfterLoadIfGuarded(null) == null,
+                "guarded load restart was not idempotent");
+
+        AoTDEconomyReachStepper failing = doingStepper();
+        setField(failing, "runtimeTaskLoadGuard", true);
+        setField(failing, "baselineRevision", 42L);
+        setField(
+                failing,
+                "tasks",
+                new AbstractList<MultiFrameTask>() {
+                    @Override
+                    public MultiFrameTask get(int index) {
+                        throw new IllegalStateException("injected load-restart failure");
+                    }
+
+                    @Override
+                    public int size() {
+                        throw new IllegalStateException("injected load-restart failure");
+                    }
+                });
+        boolean failed = false;
+        try {
+            failing.restartRuntimeTasksAfterLoadIfGuarded(null);
+        } catch (IllegalStateException expected) {
+            failed = true;
+        }
+        check(failed, "injected load-restart failure did not reach the caller");
+        check(
+                !(boolean) getField(failing, "runtimeTaskLoadGuard"),
+                "failed load restart left nextFrame guarded forever");
+        check(
+                getField(failing, "tasks") == null,
+                "failed load restart retained its stale task graph");
+        check(
+                (long) getField(failing, "baselineRevision") == 0L,
+                "failed load restart retained its process-local baseline revision");
     }
 
     private static void verifyMainPrecommitFullReplay() throws Exception {

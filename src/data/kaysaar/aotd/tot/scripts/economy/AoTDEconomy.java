@@ -536,6 +536,10 @@ public class AoTDEconomy extends Economy {
                 ReflectionUtilis.getPrivateVariableFromSuperClass("demandData", market);
         boolean canonicalStructure = hasCanonicalCommodityStructure(commodities, specs);
         if (currentDemandData instanceof AoTDMarketDemandData && canonicalStructure) {
+            // The serialized list and its lookup maps are independent fields. A canonical list
+            // does not prove that the maps survived restore with the same contents.
+            rebuildCommodityLookupMaps(market, commodities);
+            market.getAllCommodities();
             return false;
         }
 

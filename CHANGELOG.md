@@ -4,6 +4,14 @@ All notable changes to the Scheduler Fork are documented here.
 
 ## Unreleased
 
+- Registry diagnostics now report the count plus total, maximum and latest nanoseconds spent
+  holding the global market-registry lock for atomic post-immigration trade publication attempts.
+- `signalRestoreComplete()` deliberately marks every economy market dirty after every save with
+  derived-economy, price, stockpile, accessibility, trade and global-revision work. Starsector
+  rebuilds every industry's supply and demand during save cleanup, so preserving correct derived
+  state requires one full scheduled economy recalculation; this is an explicit save-time
+  performance cost.
+
 ## 1.0.14-spp11 - 2026-08-10
 
 - Requires StarsectorPrepatcher 0.18.1 and continues to require AshLib 2.2.3. Scheduler Bridge V10

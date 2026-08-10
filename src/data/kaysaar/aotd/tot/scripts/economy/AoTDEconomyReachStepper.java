@@ -762,6 +762,26 @@ public class AoTDEconomyReachStepper extends ReachEconomyStepper {
         return report;
     }
 
+    /**
+     * Accepts a serialized runtime checkpoint only while {@link #readResolve()} is still guarding
+     * the stepper. This makes the load-callback cleanup path idempotent: a normal restart wins,
+     * while an interrupted {@code onGameLoad()} can still release the guard without discarding the
+     * checkpoint semantics.
+     */
+    public RuntimeTaskRestartReport restartRuntimeTasksAfterLoadIfGuarded(
+            AoTDRuntimeEpoch.EpochSnapshot epoch) {
+        if (!runtimeTaskLoadGuard) return null;
+        try {
+            return restartRuntimeTasksAfterLoad(epoch);
+        } finally {
+            // A diagnostic or checkpoint-recovery failure must neither revive a process-local task
+            // graph nor leave nextFrame() silently disabled for the rest of the process.
+            tasks = null;
+            baselineRevision = 0L;
+            runtimeTaskLoadGuard = false;
+        }
+    }
+
     /** XStream compatibility hook; performs no live economy reads or task creation. */
     private Object readResolve() {
         if (tasks != null) captureRuntimeRestartCheckpoint(tasks);

@@ -83,7 +83,7 @@ public class MarketConditionWidget implements ExtendedUIPanelPlugin {
                     SafeSpriteLoader.getSpriteOrNull(
                             marketCondition.getSpec().getIcon(),
                             "Domain market condition " + marketCondition.getId());
-            if (sprite == null || sprite.getHeight() <= 0f) continue;
+            if (sprite == null) continue;
             visibleConditions.add(new ConditionIcon(marketCondition, sprite));
             float ratio = sprite.getWidth() / sprite.getHeight();
             iconWidthTotal += defaultWidth * ratio;

@@ -100,31 +100,10 @@ public final class AoTDPostImmigrationTradeSnapshotTask extends MultiFrameTask {
                                         + snapshot.marketId
                                         + "; the previous complete trade cut will be retained. "
                                         + snapshot.failure);
-            } else {
-                if (snapshot.usedCommittedNet) committedNetFastPaths++;
-                else {
-                    liveNetFallbacks++;
-                    if (snapshot.fallbackReason != null) {
-                        fallbackReasons.merge(snapshot.fallbackReason, 1, Integer::sum);
-                    }
-                }
-            }
-            if (!snapshot.failed && snapshot.changed) {
-                changed++;
-                countReasons(snapshot.reasonMask);
-                if (changedMarketIds.size() < MAX_CHANGED_IDS_IN_SUMMARY) {
-                    changedMarketIds.add(
-                            snapshot.marketId
-                                    + "["
-                                    + describeReasons(snapshot.reasonMask)
-                                    + ",fp="
-                                    + Long.toUnsignedString(snapshot.fingerprint, 16)
-                                    + "]");
-                }
+            } else if (snapshot.changed) {
                 AoTDEconomySemanticBaseline.operation(
                         "post-immigration.trade-input-changed", market);
-            } else if (!snapshot.failed) {
-                unchanged++;
+            } else {
                 AoTDEconomySemanticBaseline.operation(
                         "post-immigration.trade-input-unchanged", market);
             }

@@ -70,6 +70,7 @@ import data.kaysaar.aotd.tot.scripts.trade.contracts.rewards.creators.impl.rewar
 import data.kaysaar.aotd.tot.scripts.trade.route.AoTDEconomyRouteManager;
 import data.kaysaar.aotd.tot.strings.AoTDIndTags;
 import data.kaysaar.aotd.tot.strings.AoTDTradeTags;
+import data.kaysaar.aotd.tot.ui.SafeSpriteLoader;
 import data.kaysaar.aotd.tot.ui.core.CommoditiesPanelInjector;
 import data.kaysaar.aotd.tot.ui.core.DomainTabListener;
 import data.kaysaar.aotd.tot.ui.core.GrandProjectLabelInjector;
@@ -405,6 +406,7 @@ public class AoTDToolboxTheoryPlugin extends BaseModPlugin
 
     @Override
     public void onDevModeF8Reload() {
+        SafeSpriteLoader.resetCampaignState();
         AoTDWorkerManager.resetRuntime("dev-mode-f8-reload");
         AoTDWorkerManager.bindLoadedEconomy(AoTDEconomy.getInstance(), "dev-mode-f8-reload-bind");
     }
@@ -416,19 +418,46 @@ public class AoTDToolboxTheoryPlugin extends BaseModPlugin
 
     @Override
     public void onGameLoad(boolean newGame) {
-        AoTDCoreUIListener.resetCampaignState();
         AoTDEconomy economy = AoTDEconomy.getInstance();
-        AoTDRuntimeEpoch.EpochSnapshot runtimeEpoch =
-                AoTDWorkerManager.beginCampaign(economy, newGame ? "new-game-load" : "save-load");
-        AoTDEconomySemanticBaseline.initialize();
-        if (economy != null) {
-            if (!newGame && economy.getStepper() instanceof AoTDEconomyReachStepper stepper) {
-                AoTDEconomyReachStepper.RuntimeTaskRestartReport report =
-                        stepper.restartRuntimeTasksAfterLoad(runtimeEpoch);
-                log.info("AoTD restored economy runtime tasks: " + report.summary());
+        AoTDEconomyReachStepper loadedStepper =
+                economy != null && economy.getStepper() instanceof AoTDEconomyReachStepper stepper
+                        ? stepper
+                        : null;
+        AoTDRuntimeEpoch.EpochSnapshot runtimeEpoch = null;
+        try {
+            AoTDCoreUIListener.resetCampaignState();
+            SafeSpriteLoader.resetCampaignState();
+            runtimeEpoch =
+                    AoTDWorkerManager.beginCampaign(
+                            economy, newGame ? "new-game-load" : "save-load");
+            AoTDEconomySemanticBaseline.initialize();
+            if (economy != null) {
+                if (!newGame && loadedStepper != null) {
+                    AoTDEconomyReachStepper.RuntimeTaskRestartReport report =
+                            loadedStepper.restartRuntimeTasksAfterLoad(runtimeEpoch);
+                    log.info("AoTD restored economy runtime tasks: " + report.summary());
+                }
+                AoTDEconomyRestoreCoordinator.consumeOnGameLoad(economy);
+                economy.rebuildMarketRegistry();
             }
-            AoTDEconomyRestoreCoordinator.consumeOnGameLoad(economy);
-            economy.rebuildMarketRegistry();
+        } finally {
+            if (loadedStepper != null) {
+                try {
+                    AoTDEconomyReachStepper.RuntimeTaskRestartReport report =
+                            loadedStepper.restartRuntimeTasksAfterLoadIfGuarded(runtimeEpoch);
+                    if (report != null) {
+                        log.warn(
+                                "AoTD onGameLoad ended before the normal economy runtime-task restart; "
+                                        + "the load guard was released by the fail-safe restart: "
+                                        + report.summary());
+                    }
+                } catch (RuntimeException failSafeFailure) {
+                    log.error(
+                            "AoTD economy runtime-task fail-safe restart failed; the stale task "
+                                    + "graph was discarded and the load guard was released.",
+                            failSafeFailure);
+                }
+            }
         }
         AoTDCommodityEconSpecManager.loadSpecs();
         if (newGame) {

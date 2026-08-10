@@ -14,6 +14,12 @@ public final class SafeSpriteLoader {
 
     private SafeSpriteLoader() {}
 
+    /** Retries transiently unavailable textures after campaign and dev-mode reloads. */
+    public static void resetCampaignState() {
+        VALIDATED_PATHS.clear();
+        INVALID_PATHS.clear();
+    }
+
     public static SpriteAPI getSpriteOrNull(String path, String context) {
         if (path == null || path.isBlank()) {
             report(path, context, null);
@@ -24,11 +30,11 @@ public final class SafeSpriteLoader {
         }
         try {
             SpriteAPI sprite = Global.getSettings().getSprite(path);
-            if (sprite == null) {
+            if (!isUsable(sprite)) {
                 report(path, context, null);
-            } else {
-                VALIDATED_PATHS.add(path);
+                return null;
             }
+            VALIDATED_PATHS.add(path);
             return sprite;
         } catch (RuntimeException exception) {
             report(path, context, exception);
@@ -48,6 +54,10 @@ public final class SafeSpriteLoader {
             report(path, context, exception);
             return null;
         }
+    }
+
+    private static boolean isUsable(SpriteAPI sprite) {
+        return sprite != null && sprite.getWidth() > 0f && sprite.getHeight() > 0f;
     }
 
     private static void report(String path, String context, RuntimeException exception) {

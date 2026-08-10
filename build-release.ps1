@@ -125,6 +125,7 @@ $requiredJarSymbols = @{
         'suspendRuntimeTasksForSave',
         'resumeRuntimeTasksAfterSave',
         'restartRuntimeTasksAfterLoad',
+        'restartRuntimeTasksAfterLoadIfGuarded',
         'runtimeRestartMarketIds',
         'runtimeRestartMainMode',
         'resume-semantic-restart',
@@ -148,7 +149,11 @@ $requiredJarSymbols = @{
         'recordMaterializedCheckpoint',
         'matchesMaterializedCheckpoint',
         'commitMaterializedStateDetailed',
-        'commitTradeSnapshotDetailed'
+        'commitTradeSnapshotDetailed',
+        'tradePublicationLockHolds',
+        'tradePublicationLockHoldTotalNanos',
+        'tradePublicationLockHoldMaxNanos',
+        'tradePublicationLockHoldLastNanos'
     )
     'data/kaysaar/aotd/tot/scripts/economy/AoTDPostImmigrationTradeSnapshotTask.class' = @(
         'discardRuntimeStateAfterSave',
@@ -169,6 +174,9 @@ $requiredJarSymbols = @{
     'data/kaysaar/aotd/tot/ui/LazyUIPanel.class' = @(
         'java/util/function/Supplier',
         'factory returned null'
+    )
+    'data/kaysaar/aotd/tot/ui/SafeSpriteLoader.class' = @(
+        'resetCampaignState'
     )
     'data/kaysaar/aotd/tot/ui/warehouses/components/WarehouseCustomButton.class' = @(
         'misc',
