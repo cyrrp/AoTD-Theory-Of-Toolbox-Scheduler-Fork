@@ -4,6 +4,17 @@ All notable changes to the Scheduler Fork are documented here.
 
 ## Unreleased
 
+## 1.0.14-spp13 - 2026-08-17
+
+- Requires StarsectorPrepatcher 0.18.3 and continues to require AshLib 2.2.3.
+- Captures quote-invariant market, trade-history, live-state and wrapper inputs once per price
+  calculation instead of repeatedly reading campaign state for every integration step. This keeps
+  one quote internally consistent and reduces work in the price-preview hot path without retaining
+  campaign objects after the calculation returns.
+- Corrected the fallback utility for exotic commodities whose origin market is unavailable: they
+  now retain the configured exotic multiplier instead of falling back to unmodified base utility.
+- Keeps Scheduler Bridge V10 and capability masks `0xbff`/`0xfff` unchanged.
+
 ## 1.0.14-spp12 - 2026-08-11
 
 - Requires StarsectorPrepatcher 0.18.2 and continues to require AshLib 2.2.3.

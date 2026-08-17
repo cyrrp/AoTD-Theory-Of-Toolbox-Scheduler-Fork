@@ -46,7 +46,10 @@ public class AoTDCommodityOnMarket extends CommodityOnMarket {
         }
     }
 
-    /** Creates the commodity object but leaves its industry-derived state unprepared. */
+    /**
+     * Creates the commodity object but leaves its industry-derived state
+     * unprepared.
+     */
     public static AoTDCommodityOnMarket createUnprepared(Market market, String commodityId) {
         return new AoTDCommodityOnMarket(market, commodityId, false);
     }
@@ -81,7 +84,8 @@ public class AoTDCommodityOnMarket extends CommodityOnMarket {
     }
 
     @Override
-    public void reapplyEventMod() {}
+    public void reapplyEventMod() {
+    }
 
     public int getDef() {
         return Math.min(
@@ -186,8 +190,10 @@ public class AoTDCommodityOnMarket extends CommodityOnMarket {
             ReflectionUtilis.invokeMethodWithAutoProjection(
                     "playerDemandMod", this, new StatBonus());
         }
-        // Deserialization may run while Starsector is still restoring BaseIndustry maps one at a
-        // time. Recreate only the holder here; the post-restore scheduler pass publishes the next
+        // Deserialization may run while Starsector is still restoring BaseIndustry maps
+        // one at a
+        // time. Recreate only the holder here; the post-restore scheduler pass
+        // publishes the next
         // complete industry-derived revision.
         this.getSupplyDemandDataWithoutRefresh().getEconSpec();
 
@@ -234,35 +240,51 @@ public class AoTDCommodityOnMarket extends CommodityOnMarket {
         }
 
         this.getSupplyDemandData().updateSupplyDemandData(getMarket());
-        supply =
-                getSupplyDemandData()
-                        .getEconSpec()
-                        .getCalculationScript()
-                        .convertRawUnitsToSupply(
-                                getSupplyDemandData().getTotalRawUnitsFromSupply(),
-                                getMarket(),
-                                this.getSpec().getId());
-        demand =
-                getSupplyDemandData()
-                        .getEconSpec()
-                        .getCalculationScript()
-                        .convertRawUnitsToDemand(
-                                getSupplyDemandData().getTotalRawUnitsFromDemand(),
-                                getMarket(),
-                                this.getSpec().getId());
+        supply = getSupplyDemandData()
+                .getEconSpec()
+                .getCalculationScript()
+                .convertRawUnitsToSupply(
+                        getSupplyDemandData().getTotalRawUnitsFromSupply(),
+                        getMarket(),
+                        this.getSpec().getId());
+        demand = getSupplyDemandData()
+                .getEconSpec()
+                .getCalculationScript()
+                .convertRawUnitsToDemand(
+                        getSupplyDemandData().getTotalRawUnitsFromDemand(),
+                        getMarket(),
+                        this.getSpec().getId());
     }
 
     @Override
     public float getUtilityOnMarket() {
-        MarketAPI var3 = AoTDEconomy.getInstance().getMarketThreadSave(this.getSpec().getOrigin());
-        if (this.getSpec().isExotic() && var3 != null) {
-            float var1 = Economy.EXOTIC_UTILITY_MULT;
-            float var2 = Economy.RANGE_FOR_MAX_EXOTIC_DEMAND;
-            float var4 = Misc.getDistanceLY((var3.getLocation()), this.getMarket().getLocation());
-            float var5 = 1.0F + var1 * Math.min(var4 / var2, 1.0F);
-            return this.getSpec().getUtility() * var5;
+        CommoditySpecAPI spec = getSpec();
+        float baseUtility = spec.getUtility();
+
+        if (!spec.isExotic()) {
+            return baseUtility;
         }
-        return getSpec().getUtility();
+
+        MarketAPI originMarket = AoTDEconomy.getInstance().getMarketThreadSave(spec.getOrigin());
+
+        float rangeForMaxExoticDemand = Economy.RANGE_FOR_MAX_EXOTIC_DEMAND;
+        float exoticUtilityMult = Economy.EXOTIC_UTILITY_MULT;
+
+        if (originMarket == null) {
+            return baseUtility * exoticUtilityMult;
+        }
+
+        float distanceFromOriginLY = Misc.getDistanceLY(
+                originMarket.getLocation(),
+                getMarket().getLocation());
+
+        float distanceUtilityMult = 1f
+                + exoticUtilityMult
+                        * Math.min(
+                                distanceFromOriginLY / rangeForMaxExoticDemand,
+                                1f);
+
+        return baseUtility * distanceUtilityMult;
     }
 
     @Override
@@ -276,21 +298,20 @@ public class AoTDCommodityOnMarket extends CommodityOnMarket {
 
     @Override
     public int getDeficitQuantity() {
-        if (getDef() <= 0) return 0;
-        float trade =
-                getTradeMod().getModifiedValue()
-                        + getTradeModPlus().getModifiedValue()
-                        + getTradeModMinus().getModifiedValue();
+        if (getDef() <= 0)
+            return 0;
+        float trade = getTradeMod().getModifiedValue()
+                + getTradeModPlus().getModifiedValue()
+                + getTradeModMinus().getModifiedValue();
         int deficit = Math.round(getDef() - trade);
 
         return Math.max(0, deficit);
     }
 
     public int getExcessQuantityFromTrade() {
-        float trade =
-                getTradeMod().getModifiedValue()
-                        + getTradeModPlus().getModifiedValue()
-                        + getTradeModMinus().getModifiedValue();
+        float trade = getTradeMod().getModifiedValue()
+                + getTradeModPlus().getModifiedValue()
+                + getTradeModMinus().getModifiedValue();
 
         return Math.max(0, Math.round(trade));
     }
@@ -299,20 +320,17 @@ public class AoTDCommodityOnMarket extends CommodityOnMarket {
     public int getExcessQuantity() {
         float excess = getExc();
         if (excess <= 0) {
-            float trade =
-                    getTradeMod().getModifiedValue()
-                            + getTradeModPlus().getModifiedValue()
-                            + getTradeModMinus().getModifiedValue();
-            float effectiveOversurplus =
-                    Math.max(
-                            getSupplyDemandData().getTotalRawUnitsFromDemand() * 2,
-                            getSpec().getEconUnit() * 3);
+            float trade = getTradeMod().getModifiedValue()
+                    + getTradeModPlus().getModifiedValue()
+                    + getTradeModMinus().getModifiedValue();
+            float effectiveOversurplus = Math.max(
+                    getSupplyDemandData().getTotalRawUnitsFromDemand() * 2,
+                    getSpec().getEconUnit() * 3);
             return (int) Math.max(0, trade - effectiveOversurplus);
         }
-        float trade =
-                getTradeMod().getModifiedValue()
-                        + getTradeModPlus().getModifiedValue()
-                        + getTradeModMinus().getModifiedValue();
+        float trade = getTradeMod().getModifiedValue()
+                + getTradeModPlus().getModifiedValue()
+                + getTradeModMinus().getModifiedValue();
 
         return Math.max(0, Math.round(excess + trade));
     }
