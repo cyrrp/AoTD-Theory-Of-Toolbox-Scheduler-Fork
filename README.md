@@ -40,13 +40,17 @@ The runtime dependencies declared by `mod_info.json` are:
 
 | Mod | Minimum version |
 | --- | --- |
-| StarsectorPrepatcher | 0.18.3 |
+| StarsectorPrepatcher | 0.19.0 |
 | LazyLib | 3.0 |
 | AshLib | 2.2.3 |
 | Building Menu Overhaul | 2.1.0 |
 
 Nexerelin and Hazard Mining Incorporated integrations are enabled when those
 mods are present, but neither is declared as a required dependency.
+
+The development package targets Prepatcher 0.19.0. Starsector's launcher treats
+0.18.x and 0.19.x as different compatibility families, not as a minimum-version range.
+The fork version and V10 runtime contract are unchanged.
 
 ## Installation
 

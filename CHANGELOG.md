@@ -4,6 +4,9 @@ All notable changes to the Scheduler Fork are documented here.
 
 ## Unreleased
 
+- Align the launcher dependency with Prepatcher 0.19.0; the former 0.18.3 declaration
+  disables this fork with the 0.19.x compatibility family. Runtime V10 remains unchanged.
+
 ## 1.0.14-spp13 - 2026-08-17
 
 - Requires StarsectorPrepatcher 0.18.3 and continues to require AshLib 2.2.3.
